@@ -41,6 +41,9 @@ export interface PrescriptionDraft {
   uploadedAt: string;
   fields: PrescriptionField[];
   confirmed: boolean;
+  confirmedAt?: string | null;
+  confirmedBy?: string | null;
+  rawText?: string | null;
 }
 
 export interface Medicine {
@@ -110,6 +113,7 @@ export interface CareGap {
   missingInfo: string | null;
   followupQuestion: string | null;
   status: CareGapStatus;
+  severity?: 'low' | 'medium' | 'high';
 }
 
 export interface FollowUp {
@@ -125,10 +129,13 @@ export interface FollowUp {
 export interface Reminder {
   id: string;
   patientId: string;
+  scheduleId?: string;
   type: 'dose' | 'missed_dose' | 'followup' | 'doctor_review';
   message: string;
   scheduledFor: string;
   acknowledged: boolean;
+  channel?: 'in_app_simulated' | 'push' | 'sms';
+  escalated?: boolean;
 }
 
 export interface PatientProfile {
@@ -162,6 +169,9 @@ export interface PatientSummary {
   criticalAlertMessage?: string;
   scoreFactors?: { reason: string; points: number; evidence?: string }[];
   pendingRxCount?: number;
+  dataWarnings?: string[];
+  overdueFollowUpsCount?: number;
+  overdueTasksCount?: number;
 }
 
 
@@ -254,5 +264,81 @@ export interface ReportSummary {
     failureReason?: string;
   };
   generatedAt: string;
+}
+
+export type FindingChangeDirection = 'increased' | 'decreased' | 'unchanged' | 'incomparable';
+
+export interface ComparedFinding {
+  testName: string;
+  baseline: {
+    reportId: string;
+    reportDate: string;
+    value: string;
+    numericValue: number | null;
+    unit?: string | null;
+    referenceRange?: string | null;
+    isAbnormal?: boolean | null;
+    status: 'present' | 'unavailable';
+  };
+  current: {
+    reportId: string;
+    reportDate: string;
+    value: string;
+    numericValue: number | null;
+    unit?: string | null;
+    referenceRange?: string | null;
+    isAbnormal?: boolean | null;
+    status: 'present' | 'unavailable';
+  };
+  comparable: boolean;
+  delta: number | null;
+  percentChange: number | null;
+  direction: FindingChangeDirection;
+  incomparabilityReason?: string;
+}
+
+export interface ReportComparisonResult {
+  patientId: string;
+  baselineReport: {
+    id: string;
+    title: string;
+    date: string;
+    reportType: MedicalReportType;
+  };
+  comparisonReport: {
+    id: string;
+    title: string;
+    date: string;
+    reportType: MedicalReportType;
+  };
+  findings: ComparedFinding[];
+  disclaimer: string;
+  generatedAt: string;
+}
+
+export interface LabTrendDataPoint {
+  reportId: string;
+  date: string;
+  value: string;
+  numericValue: number | null;
+  unit?: string | null;
+  referenceRange?: string | null;
+  isAbnormal?: boolean | null;
+}
+
+export interface LabTrendSeries {
+  testName: string;
+  unit: string;
+  dataPoints: LabTrendDataPoint[];
+  hasSufficientData: boolean; // true if >= 3 data points
+  summary?: {
+    min: number;
+    max: number;
+    earliest: number;
+    latest: number;
+    delta: number;
+    direction: FindingChangeDirection;
+  };
+  insufficientDataReason?: string;
 }
 

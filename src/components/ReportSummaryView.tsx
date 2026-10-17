@@ -13,9 +13,15 @@ import {
   RefreshCw,
   Cpu,
   ShieldCheck,
+  History,
+  GitCompare,
+  TrendingUp,
+  Calendar,
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { dataService } from '@/services/dataService';
+import { ReportComparisonView } from './ReportComparisonView';
+import { LabTrendView } from './LabTrendView';
 import type { MedicalReport, ReportSummary, SummaryEngineMode } from '@/types';
 
 interface ReportSummaryViewProps {
@@ -24,6 +30,7 @@ interface ReportSummaryViewProps {
 }
 
 export function ReportSummaryView({ reports, className }: ReportSummaryViewProps) {
+  const [workflowMode, setWorkflowMode] = useState<'summary' | 'history' | 'compare' | 'trends'>('summary');
   const [selectedReportId, setSelectedReportId] = useState<string>(reports[0]?.id ?? '');
   const [selectedEngine, setSelectedEngine] = useState<'ai_assisted' | 'rule_based_mvp'>('ai_assisted');
   const [summary, setSummary] = useState<ReportSummary | null>(null);
@@ -67,10 +74,10 @@ export function ReportSummaryView({ reports, className }: ReportSummaryViewProps
     };
   }, [activeReport, selectedEngine, retryCount]);
 
-  if (!activeReport) {
+  if (!activeReport || reports.length === 0) {
     return (
       <div className="rounded-2xl border border-navy-600 bg-navy-700/30 p-8 text-center text-navy-400">
-        <FileText className="w-10 h-10 mx-auto mb-3 opacity-40" />
+        <FileText className="w-10 h-10 mx-auto mb-3 opacity-40 text-teal-400" />
         <p className="text-base font-semibold text-white">No Diagnostic Reports On File</p>
         <p className="text-sm text-navy-400 mt-1">
           No laboratory or diagnostic pathology reports have been registered for this patient profile.
@@ -81,55 +88,241 @@ export function ReportSummaryView({ reports, className }: ReportSummaryViewProps
 
   return (
     <div className={cn('flex flex-col gap-5', className)}>
-      {/* Top Header: Report Switcher & Engine Selector */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-navy-600/60 pb-3">
-        {/* Report Selection Tabs */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1">
-          <span className="text-xs font-semibold text-navy-300 uppercase mr-1">Report:</span>
-          {reports.map((r) => (
-            <button
-              key={r.id}
-              onClick={() => setSelectedReportId(r.id)}
-              className={cn(
-                'px-3 py-1.5 rounded-lg text-xs font-bold border transition-all whitespace-nowrap',
-                selectedReportId === r.id
-                  ? 'border-teal-400 bg-teal-500/20 text-teal-300 shadow-sm'
-                  : 'border-navy-600 bg-navy-800/40 text-navy-300 hover:bg-navy-700 hover:text-white'
-              )}
-            >
-              {r.title}
-            </button>
-          ))}
-        </div>
+      {/* Workflow Navigation Bar: Summary | History | Compare | Trends */}
+      <div className="flex items-center gap-2 border-b border-navy-600/70 pb-3 overflow-x-auto">
+        <button
+          onClick={() => setWorkflowMode('summary')}
+          className={cn(
+            'flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap',
+            workflowMode === 'summary'
+              ? 'bg-teal-500/20 text-teal-300 border border-teal-500/40 shadow-sm'
+              : 'text-navy-300 hover:text-white hover:bg-navy-800/60 border border-transparent'
+          )}
+        >
+          <FileText className="w-3.5 h-3.5" />
+          <span>Report Summary</span>
+        </button>
 
-        {/* Engine Toggle (AI vs Rule-Based) */}
-        <div className="flex items-center gap-1.5 rounded-lg bg-navy-900/80 border border-navy-700 p-1 self-start sm:self-auto">
-          <button
-            onClick={() => setSelectedEngine('ai_assisted')}
-            className={cn(
-              'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-all',
-              selectedEngine === 'ai_assisted'
-                ? 'bg-purple-600 text-white shadow-sm'
-                : 'text-navy-300 hover:text-white'
-            )}
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>AI-Assisted Summary</span>
-          </button>
-          <button
-            onClick={() => setSelectedEngine('rule_based_mvp')}
-            className={cn(
-              'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-all',
-              selectedEngine === 'rule_based_mvp'
-                ? 'bg-navy-700 text-teal-300 border border-navy-600 shadow-sm'
-                : 'text-navy-300 hover:text-white'
-            )}
-          >
-            <Cpu className="w-3.5 h-3.5" />
-            <span>Rule-Based MVP</span>
-          </button>
-        </div>
+        <button
+          onClick={() => setWorkflowMode('history')}
+          className={cn(
+            'flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap',
+            workflowMode === 'history'
+              ? 'bg-teal-500/20 text-teal-300 border border-teal-500/40 shadow-sm'
+              : 'text-navy-300 hover:text-white hover:bg-navy-800/60 border border-transparent'
+          )}
+        >
+          <History className="w-3.5 h-3.5" />
+          <span>Report History</span>
+          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-navy-700 border border-navy-600 font-mono text-navy-200">
+            {reports.length}
+          </span>
+        </button>
+
+        <button
+          onClick={() => setWorkflowMode('compare')}
+          className={cn(
+            'flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap',
+            workflowMode === 'compare'
+              ? 'bg-teal-500/20 text-teal-300 border border-teal-500/40 shadow-sm'
+              : 'text-navy-300 hover:text-white hover:bg-navy-800/60 border border-transparent'
+          )}
+        >
+          <GitCompare className="w-3.5 h-3.5" />
+          <span>Compare Reports</span>
+          {reports.length >= 2 && (
+            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-purple-500/20 border border-purple-500/30 font-semibold text-purple-200">
+              {reports.length} available
+            </span>
+          )}
+        </button>
+
+        <button
+          onClick={() => setWorkflowMode('trends')}
+          className={cn(
+            'flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap',
+            workflowMode === 'trends'
+              ? 'bg-teal-500/20 text-teal-300 border border-teal-500/40 shadow-sm'
+              : 'text-navy-300 hover:text-white hover:bg-navy-800/60 border border-transparent'
+          )}
+        >
+          <TrendingUp className="w-3.5 h-3.5" />
+          <span>Lab Trends</span>
+        </button>
       </div>
+
+      {/* 1. REPORT HISTORY WORKFLOW */}
+      {workflowMode === 'history' && (
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <div className="flex flex-col">
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider">
+                Patient Diagnostic Report History
+              </h3>
+              <p className="text-xs text-navy-300">
+                Chronological pathology and laboratory reports registered on this patient profile ({reports.length} total)
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-3">
+            {[...reports]
+              .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+              .map((rep) => {
+                const abnormalCount =
+                  rep.structuredFindings?.filter((f) => f.isAbnormal === true).length ?? 0;
+                const findingsCount = rep.structuredFindings?.length ?? 0;
+                const isSelected = rep.id === selectedReportId;
+
+                return (
+                  <div
+                    key={rep.id}
+                    className={cn(
+                      'rounded-2xl border p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all',
+                      isSelected
+                        ? 'border-teal-400 bg-navy-700/80 shadow-md'
+                        : 'border-navy-600 bg-navy-800/60 hover:bg-navy-700/50'
+                    )}
+                  >
+                    <div className="flex items-start gap-3.5">
+                      <div className="flex w-10 h-10 items-center justify-center rounded-xl bg-teal-500/10 border border-teal-500/20 text-teal-400 flex-shrink-0 mt-0.5">
+                        <FileText className="w-5 h-5" />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h4 className="text-sm font-bold text-white">{rep.title}</h4>
+                          <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-navy-700 text-teal-300 border border-navy-600">
+                            {rep.reportType}
+                          </span>
+                          {abnormalCount > 0 && (
+                            <span className="text-[10px] px-2 py-0.5 rounded font-bold bg-danger-500/20 text-danger-300 border border-danger-500/30">
+                              {abnormalCount} Abnormal Result(s)
+                            </span>
+                          )}
+                          <span className="text-[10px] text-navy-400">
+                            ({findingsCount} discrete finding{findingsCount === 1 ? '' : 's'})
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-4 text-xs text-navy-300 flex-wrap">
+                          <span className="flex items-center gap-1 font-medium">
+                            <Calendar className="w-3.5 h-3.5 text-navy-400" />
+                            Date: {rep.date}
+                          </span>
+                          {rep.facilityOrLab && (
+                            <span className="flex items-center gap-1 text-navy-400">
+                              <Building className="w-3.5 h-3.5" />
+                              {rep.facilityOrLab}
+                            </span>
+                          )}
+                          {rep.orderingDoctor && (
+                            <span className="flex items-center gap-1 text-navy-400">
+                              <User className="w-3.5 h-3.5" />
+                              Ordering: {rep.orderingDoctor}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 self-end sm:self-auto flex-wrap">
+                      <button
+                        onClick={() => {
+                          setSelectedReportId(rep.id);
+                          setWorkflowMode('summary');
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-teal-500/40 bg-teal-500/15 text-xs font-bold text-teal-300 hover:bg-teal-500/25 transition-all"
+                      >
+                        <FileText className="w-3.5 h-3.5" />
+                        <span>View Summary</span>
+                      </button>
+
+                      {reports.length >= 2 && (
+                        <button
+                          onClick={() => {
+                            setSelectedReportId(rep.id);
+                            setWorkflowMode('compare');
+                          }}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-navy-600 bg-navy-700 text-xs font-semibold text-navy-200 hover:text-white hover:bg-navy-600 transition-all"
+                        >
+                          <GitCompare className="w-3.5 h-3.5" />
+                          <span>Compare</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+        </div>
+      )}
+
+      {/* 2. REPORT COMPARISON WORKFLOW */}
+      {workflowMode === 'compare' && (
+        <ReportComparisonView
+          reports={reports}
+          initialReportAId={selectedReportId}
+          onOpenReportSummary={(id) => {
+            setSelectedReportId(id);
+            setWorkflowMode('summary');
+          }}
+        />
+      )}
+
+      {/* 3. LAB TRENDS WORKFLOW */}
+      {workflowMode === 'trends' && <LabTrendView reports={reports} />}
+
+      {/* 4. CURRENT SUMMARY WORKFLOW */}
+      {workflowMode === 'summary' && (
+        <>
+          {/* Top Header: Report Switcher & Engine Selector */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-navy-600/60 pb-3">
+            {/* Report Selection Tabs */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1">
+              <span className="text-xs font-semibold text-navy-300 uppercase mr-1">Report:</span>
+              {reports.map((r) => (
+                <button
+                  key={r.id}
+                  onClick={() => setSelectedReportId(r.id)}
+                  className={cn(
+                    'px-3 py-1.5 rounded-lg text-xs font-bold border transition-all whitespace-nowrap',
+                    selectedReportId === r.id
+                      ? 'border-teal-400 bg-teal-500/20 text-teal-300 shadow-sm'
+                      : 'border-navy-600 bg-navy-800/40 text-navy-300 hover:bg-navy-700 hover:text-white'
+                  )}
+                >
+                  {r.title}
+                </button>
+              ))}
+            </div>
+
+            {/* Engine Toggle (AI vs Rule-Based) */}
+            <div className="flex items-center gap-1.5 rounded-lg bg-navy-900/80 border border-navy-700 p-1 self-start sm:self-auto">
+              <button
+                onClick={() => setSelectedEngine('ai_assisted')}
+                className={cn(
+                  'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-all',
+                  selectedEngine === 'ai_assisted'
+                    ? 'bg-purple-600 text-white shadow-sm'
+                    : 'text-navy-300 hover:text-white'
+                )}
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>AI-Assisted Summary</span>
+              </button>
+              <button
+                onClick={() => setSelectedEngine('rule_based_mvp')}
+                className={cn(
+                  'flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition-all',
+                  selectedEngine === 'rule_based_mvp'
+                    ? 'bg-navy-700 text-teal-300 border border-navy-600 shadow-sm'
+                    : 'text-navy-300 hover:text-white'
+                )}
+              >
+                <Cpu className="w-3.5 h-3.5" />
+                <span>Rule-Based MVP</span>
+              </button>
+            </div>
+          </div>
 
       {/* Loading Skeleton */}
       {loading && (
@@ -408,6 +601,8 @@ export function ReportSummaryView({ reports, className }: ReportSummaryViewProps
           </div>
         </>
       )}
-    </div>
+    </>
+  )}
+</div>
   );
 }

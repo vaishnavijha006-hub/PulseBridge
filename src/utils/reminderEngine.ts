@@ -1,4 +1,4 @@
-import type { DoseStatus, MedicationSchedule, DoseActionReason } from '@/types';
+import type { DoseStatus, MedicationSchedule, DoseActionReason, Reminder, FollowUp } from '@/types';
 
 export const GRACE_WINDOW_MINUTES = 20;
 export const DEFAULT_SNOOZE_MINUTES = 10;
@@ -108,3 +108,96 @@ export function applyOverdueEvaluations(
 
   return { schedules: updated, overdueCount };
 }
+
+/**
+ * Generates structured in-app reminders for medication schedules and pending clinical follow-ups.
+ *
+ * Rules:
+ * 1. Doses in the 20-min grace window: type 'dose' (Due Now).
+ * 2. Unacknowledged doses > 20 min past scheduled time: type 'missed_dose', escalated: true.
+ * 3. Snoozed doses: reminder with remaining snooze minutes.
+ * 4. Pending follow-ups: type 'followup'.
+ * 5. Channel: strictly labeled 'in_app_simulated' (external SMS/Push delivery requires carrier gateway).
+ * 6. Deduplication: returns exactly one unique reminder per schedule item.
+ */
+export function generateReminders(
+  schedules: MedicationSchedule[],
+  followUps: FollowUp[] = [],
+  now: Date = new Date()
+): Reminder[] {
+  const reminders: Reminder[] = [];
+  const seenScheduleIds = new Set<string>();
+
+  for (const schedule of schedules) {
+    if (seenScheduleIds.has(schedule.id)) continue;
+    seenScheduleIds.add(schedule.id);
+
+    // Skip already taken or confirmed doses
+    if (schedule.status === 'taken' || schedule.status === 'cannot_take') {
+      continue;
+    }
+
+    const timing = evaluateDoseTiming(schedule, now);
+
+    if (timing.isOverdue || schedule.status === 'missed') {
+      // Escalated missed-dose reminder (> 20 min grace window exceeded)
+      reminders.push({
+        id: `rem-missed-${schedule.id}`,
+        patientId: schedule.patientId || 'p1',
+        scheduleId: schedule.id,
+        type: 'missed_dose',
+        message: `ESCALATION ALERT: Missed dose of ${schedule.medicineName} (${schedule.dosage}) scheduled for ${schedule.scheduledTime}. 20-minute grace window expired.`,
+        scheduledFor: timing.scheduledDate.toISOString(),
+        acknowledged: false,
+        escalated: true,
+        channel: 'in_app_simulated',
+      });
+    } else if (timing.isInGracePeriod || schedule.status === 'pending') {
+      if (now.getTime() >= timing.scheduledDate.getTime()) {
+        // Due Now reminder
+        reminders.push({
+          id: `rem-due-${schedule.id}`,
+          patientId: schedule.patientId || 'p1',
+          scheduleId: schedule.id,
+          type: 'dose',
+          message: `Dose Due Now: ${schedule.medicineName} (${schedule.dosage}) scheduled for ${schedule.scheduledTime}. Grace period: 20 minutes.`,
+          scheduledFor: timing.scheduledDate.toISOString(),
+          acknowledged: false,
+          escalated: false,
+          channel: 'in_app_simulated',
+        });
+      }
+    } else if (timing.isSnoozed) {
+      reminders.push({
+        id: `rem-snooze-${schedule.id}`,
+        patientId: schedule.patientId || 'p1',
+        scheduleId: schedule.id,
+        type: 'dose',
+        message: `Snoozed: ${schedule.medicineName} (${schedule.dosage}) will remind again in ${timing.snoozeRemainingMinutes || 10} minute(s).`,
+        scheduledFor: timing.scheduledDate.toISOString(),
+        acknowledged: false,
+        escalated: false,
+        channel: 'in_app_simulated',
+      });
+    }
+  }
+
+  // Pending follow-up reminders
+  for (const fu of followUps) {
+    if (fu.status === 'pending') {
+      reminders.push({
+        id: `rem-fu-${fu.id}`,
+        patientId: fu.patientId,
+        type: 'followup',
+        message: `Doctor Follow-up Question Pending: "${fu.question}"`,
+        scheduledFor: fu.askedAt,
+        acknowledged: false,
+        escalated: false,
+        channel: 'in_app_simulated',
+      });
+    }
+  }
+
+  return reminders;
+}
+

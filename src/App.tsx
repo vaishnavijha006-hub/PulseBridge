@@ -85,6 +85,7 @@ function AppContent() {
   const activePatientIdRef = useRef<string>(DEMO_PATIENT_ID);
   const [currentPatient, setCurrentPatient] = useState<PatientProfile | null>(() => demoPatients.find((p) => p.id === DEMO_PATIENT_ID) ?? null);
   const [prescriptionPreview, setPrescriptionPreview] = useState<string | null>(null);
+  const [prescriptionFile, setPrescriptionFile] = useState<File | null>(null);
   const [schedules, setSchedules] = useState<MedicationSchedule[]>(demoSchedules[DEMO_PATIENT_ID] ?? []);
   const [careGaps, setCareGaps] = useState<Record<string, CareGap[]>>(demoCareGaps);
   const [prescriptionDrafts, setPrescriptionDrafts] = useState<Record<string, PrescriptionDraft>>(demoPrescriptionDrafts);
@@ -165,6 +166,7 @@ function AppContent() {
       setActivePatientId(newPatientId);
       setCurrentPatient(newPatient);
       setPatientProfile(newPatient);
+      setPrescriptionFile(file);
 
       if (file) {
         const uploadRes = await dataService.uploadPrescriptionImage(newPatientId, file);
@@ -186,8 +188,14 @@ function AppContent() {
     }
   }, [setView]);
 
-  const handleProcessingComplete = useCallback(async () => {
+  const handleProcessingComplete = useCallback(async (draft?: PrescriptionDraft) => {
     const targetPatientId = activePatientIdRef.current || activePatientId;
+    if (draft) {
+      setPrescriptionDrafts((prev) => ({
+        ...prev,
+        [targetPatientId]: draft,
+      }));
+    }
     try {
       const [sched, userFollowUps, userReports, userPatient] = await Promise.all([
         dataService.fetchMedicationSchedules(targetPatientId),
@@ -355,6 +363,8 @@ function AppContent() {
       {view === 'patient_processing' && (
         <PrescriptionProcessing
           imageUrl={prescriptionPreview}
+          file={prescriptionFile}
+          patientId={activePatientId}
           onComplete={handleProcessingComplete}
           onBack={() => setView('patient_intake')}
         />
@@ -365,6 +375,7 @@ function AppContent() {
           patientId={activePatientId}
           schedules={schedules}
           followUps={followUps[activePatientId] ?? []}
+          prescriptionDraft={prescriptionDrafts[activePatientId] ?? null}
           reports={reports[activePatientId] ?? []}
           onDoseAction={handleDoseAction}
           onHealthUpdate={handleHealthUpdate}

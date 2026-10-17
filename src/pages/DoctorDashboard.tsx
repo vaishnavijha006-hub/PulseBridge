@@ -11,6 +11,8 @@ import {
   MessageSquare,
   Pill,
   Check,
+  ArrowUpDown,
+  RefreshCw,
   LayoutDashboard,
   Users,
   Radar,
@@ -44,6 +46,9 @@ interface DoctorDashboardProps {
   prescriptionDrafts: Record<string, PrescriptionDraft>;
   followUps: Record<string, FollowUp[]>;
   reports?: Record<string, MedicalReport[]>;
+  isLoading?: boolean;
+  error?: string | null;
+  onRetry?: () => void;
   onConfirmCarePlan: (patientId: string, fields: any[]) => void;
   onCareGapAction: (gapId: string, action: 'reviewed' | 'followup_planned') => void;
   onBack: () => void;
@@ -51,6 +56,8 @@ interface DoctorDashboardProps {
 }
 
 type Filter = 'all' | 'urgent' | 'needs_attention' | 'on_track';
+type SortOption = 'priority_desc' | 'priority_asc' | 'overdue_desc' | 'gaps_desc' | 'name_asc';
+type GapFilterOption = 'all' | 'open' | 'resolved';
 type DoctorNavTab = 'overview' | 'patients' | 'radar' | 'actions' | 'reports';
 
 export function DoctorDashboard({
@@ -59,6 +66,9 @@ export function DoctorDashboard({
   prescriptionDrafts,
   followUps,
   reports,
+  isLoading,
+  error,
+  onRetry,
   onConfirmCarePlan,
   onCareGapAction,
   onBack,
@@ -67,6 +77,8 @@ export function DoctorDashboard({
   const { t } = useLanguage();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
+  const [sortBy, setSortBy] = useState<SortOption>('priority_desc');
+  const [gapFilter, setGapFilter] = useState<GapFilterOption>('all');
   const [selectedPatient, setSelectedPatient] = useState<string | null>(null);
   const [activeNav, setActiveNav] = useState<DoctorNavTab>('overview');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -80,6 +92,7 @@ export function DoctorDashboard({
   );
 
   const totalOpenGaps = allGaps.filter((g) => g.status === 'open').length;
+  const totalResolvedGaps = allGaps.filter((g) => g.status !== 'open').length;
   const pendingRxCount = Object.values(prescriptionDrafts).filter((d) => !d.confirmed).length;
   const allActions = useMemo(() => careActionService.getAll(), []);
   const openActionsCount = allActions.filter((a) => a.status === 'open' || a.status === 'in_progress').length;
@@ -90,21 +103,49 @@ export function DoctorDashboard({
     [summaries]
   );
 
+  const filteredGaps = useMemo(() => {
+    if (gapFilter === 'open') return allGaps.filter(g => g.status === 'open');
+    if (gapFilter === 'resolved') return allGaps.filter(g => g.status !== 'open');
+    return allGaps;
+  }, [allGaps, gapFilter]);
+
   const filteredSummaries = useMemo(() => {
     return summaries
       .filter((s) => filter === 'all' || s.priority === filter)
       .filter((s) => !search || s.patient.name.toLowerCase().includes(search.toLowerCase()))
       .sort((a, b) => {
-        // 1. Critical safety emergency override always first
-        if (a.criticalSafetyOverride && !b.criticalSafetyOverride) return -1;
-        if (!a.criticalSafetyOverride && b.criticalSafetyOverride) return 1;
-        // 2. Triage score descending
-        const scoreDiff = (b.triageScore ?? 0) - (a.triageScore ?? 0);
-        if (scoreDiff !== 0) return scoreDiff;
-        // 3. Open care gaps count descending
-        return b.openGaps - a.openGaps;
+        if (sortBy === 'priority_desc') {
+          // 1. Critical safety emergency override always first
+          if (a.criticalSafetyOverride && !b.criticalSafetyOverride) return -1;
+          if (!a.criticalSafetyOverride && b.criticalSafetyOverride) return 1;
+          // 2. Triage score descending
+          const scoreDiff = (b.triageScore ?? 0) - (a.triageScore ?? 0);
+          if (scoreDiff !== 0) return scoreDiff;
+          // 3. Open care gaps count descending
+          return b.openGaps - a.openGaps;
+        }
+        if (sortBy === 'priority_asc') {
+          const scoreDiff = (a.triageScore ?? 0) - (b.triageScore ?? 0);
+          if (scoreDiff !== 0) return scoreDiff;
+          return a.openGaps - b.openGaps;
+        }
+        if (sortBy === 'overdue_desc') {
+          const aOverdue = (a.overdueFollowUpsCount ?? 0) + (a.overdueTasksCount ?? 0) + (a.openGaps ?? 0);
+          const bOverdue = (b.overdueFollowUpsCount ?? 0) + (b.overdueTasksCount ?? 0) + (b.openGaps ?? 0);
+          if (bOverdue !== aOverdue) return bOverdue - aOverdue;
+          return (b.triageScore ?? 0) - (a.triageScore ?? 0);
+        }
+        if (sortBy === 'gaps_desc') {
+          const gapDiff = b.openGaps - a.openGaps;
+          if (gapDiff !== 0) return gapDiff;
+          return (b.triageScore ?? 0) - (a.triageScore ?? 0);
+        }
+        if (sortBy === 'name_asc') {
+          return a.patient.name.localeCompare(b.patient.name);
+        }
+        return 0;
       });
-  }, [summaries, filter, search]);
+  }, [summaries, filter, search, sortBy]);
 
   // When patient is selected, display EHR Clinical Chart
   if (selectedPatient) {
@@ -156,7 +197,6 @@ export function DoctorDashboard({
                 <span>Clinical Command Center</span>
               </div>
             </div>
-
             <div className="flex items-center gap-3">
               {/* Doctor identity pill */}
               <div className="hidden md:flex items-center gap-2.5 rounded-xl border border-navy-600 bg-navy-700/60 px-3 py-1.5">
@@ -282,6 +322,25 @@ export function DoctorDashboard({
 
         {/* Content Cockpit */}
         <main className="flex-1 px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6 overflow-x-hidden">
+          {/* Error notification banner */}
+          {error && (
+            <div className="rounded-xl border border-danger-500/40 bg-danger-500/10 p-4 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <AlertTriangle className="w-5 h-5 text-danger-400 flex-shrink-0" />
+                <span className="text-sm text-danger-200">{error}</span>
+              </div>
+              {onRetry && (
+                <button
+                  onClick={onRetry}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-danger-500/20 hover:bg-danger-500/30 text-danger-200 text-xs font-semibold transition-colors flex-shrink-0"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  Retry
+                </button>
+              )}
+            </div>
+          )}
+
           {/* Header Bar with View Title & Search */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
@@ -320,15 +379,34 @@ export function DoctorDashboard({
           {/* Search & Filter Bar */}
           {(activeNav === 'overview' || activeNav === 'patients') && (
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="relative flex-1 max-w-md">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder={t('doctor_search')}
-                  className="w-full rounded-xl border border-navy-600 bg-navy-800/80 pl-10 pr-4 py-2 text-sm text-white placeholder:text-slate-400 focus:border-teal-400 focus:ring-1 focus:ring-teal-400 outline-none transition-colors"
-                />
+              <div className="flex items-center gap-3 flex-1 max-w-xl">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder={t('doctor_search')}
+                    className="w-full rounded-xl border border-navy-600 bg-navy-800/80 pl-10 pr-4 py-2 text-sm text-white placeholder:text-slate-400 focus:border-teal-400 focus:ring-1 focus:ring-teal-400 outline-none transition-colors"
+                  />
+                </div>
+                {/* Queue Sort Select */}
+                <div className="flex items-center gap-2 bg-navy-800/80 border border-navy-600 rounded-xl px-3 py-2 flex-shrink-0">
+                  <ArrowUpDown className="w-3.5 h-3.5 text-teal-400" />
+                  <label htmlFor="doctor-sort-select" className="text-xs text-slate-300 sr-only">Sort queue:</label>
+                  <select
+                    id="doctor-sort-select"
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as SortOption)}
+                    className="bg-transparent text-xs text-white outline-none cursor-pointer pr-1"
+                  >
+                    <option value="priority_desc" className="bg-navy-800 text-white">Priority (High to Low)</option>
+                    <option value="priority_asc" className="bg-navy-800 text-white">Priority (Low to High)</option>
+                    <option value="overdue_desc" className="bg-navy-800 text-white">Overdue Status First</option>
+                    <option value="gaps_desc" className="bg-navy-800 text-white">Open Gaps (Most First)</option>
+                    <option value="name_asc" className="bg-navy-800 text-white">Patient Name (A-Z)</option>
+                  </select>
+                </div>
               </div>
 
               {/* Priority Filter tabs */}
@@ -373,10 +451,30 @@ export function DoctorDashboard({
                   <h2 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
                     Assigned Patients ({filteredSummaries.length})
                   </h2>
-                  <span className="text-[11px] text-slate-400">Sorted by Triage Severity</span>
+                  <span className="text-[11px] text-slate-400">
+                    Sorted by: {sortBy === 'priority_desc' ? 'Priority (High → Low)' : sortBy === 'priority_asc' ? 'Priority (Low → High)' : sortBy === 'overdue_desc' ? 'Overdue Status' : sortBy === 'gaps_desc' ? 'Open Gaps' : 'Name'}
+                  </span>
                 </div>
 
-                {filteredSummaries.length === 0 ? (
+                {isLoading ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {[1, 2, 3, 4].map((n) => (
+                      <div key={n} className="rounded-2xl border border-navy-600/50 bg-navy-700/20 p-5 flex flex-col gap-4 animate-pulse">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-navy-600/50" />
+                          <div className="flex flex-col gap-1.5 flex-1">
+                            <div className="w-24 h-4 bg-navy-600/50 rounded" />
+                            <div className="w-16 h-3 bg-navy-600/30 rounded" />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="h-14 bg-navy-800/40 rounded-lg" />
+                          <div className="h-14 bg-navy-800/40 rounded-lg" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : filteredSummaries.length === 0 ? (
                   <div className="rounded-2xl border border-navy-600 bg-navy-800/40 p-8 text-center text-slate-400">
                     {t('empty_no_data')}
                   </div>
@@ -697,6 +795,7 @@ function PatientDetail({
           <PrescriptionReview
             draft={draft}
             patientAllergies={summary.patient.allergies}
+            patientCurrentMeds={summary.patient.currentMeds}
             onConfirm={onConfirmCarePlan}
           />
         )}
