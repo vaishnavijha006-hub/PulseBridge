@@ -84,14 +84,14 @@ export function PatientStatusCard({ summary, onClick }: PatientStatusCardProps) 
             <span
               className={cn(
                 'px-2 py-0.5 rounded-full text-xs font-extrabold border',
-                triageScore >= 80
+                criticalSafetyOverride || triageScore >= 80
                   ? 'bg-danger-500/20 text-danger-300 border-danger-500/40'
                   : triageScore >= 50
                   ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
                   : 'bg-teal-500/20 text-teal-300 border-teal-500/40',
               )}
             >
-              Score: {triageScore}
+              {criticalSafetyOverride ? `Score: ${triageScore} (OVERRIDE)` : `Score: ${triageScore}`}
             </span>
           )}
           <StatusBadge status={pc.status} label={pc.label} icon={<PriorityIcon className="w-3 h-3" />} size="md" />
@@ -167,7 +167,12 @@ export function PatientStatusCard({ summary, onClick }: PatientStatusCardProps) 
             </div>
           ))}
         </div>
-      ) : null}
+      ) : (
+        <div className="relative flex items-center gap-1.5 text-xs text-teal-300 bg-teal-500/10 border border-teal-500/20 rounded-lg p-2">
+          <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0 text-teal-400" />
+          <span>Care plan on track: All doses taken, no adverse symptoms, zero open gaps.</span>
+        </div>
+      )}
 
       {/* Transparent Queue-Sorting Disclaimer */}
       <div className="relative text-[10px] text-navy-400 leading-tight border-t border-navy-700 pt-2 italic">

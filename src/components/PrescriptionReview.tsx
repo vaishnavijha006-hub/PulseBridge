@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Check, AlertTriangle, Edit3, Save, Lock } from 'lucide-react';
+import { Check, AlertTriangle, Edit3, Save, Lock, ShieldAlert } from 'lucide-react';
 import { StatusBadge } from '@/components/StatusBadge';
 import { useLanguage } from '@/i18n/LanguageContext';
 import { cn } from '@/utils/cn';
@@ -7,10 +7,11 @@ import type { PrescriptionDraft, PrescriptionField } from '@/types';
 
 interface PrescriptionReviewProps {
   draft: PrescriptionDraft;
+  patientAllergies?: string;
   onConfirm: (updatedFields: PrescriptionField[]) => void;
 }
 
-export function PrescriptionReview({ draft, onConfirm }: PrescriptionReviewProps) {
+export function PrescriptionReview({ draft, patientAllergies, onConfirm }: PrescriptionReviewProps) {
   const { t } = useLanguage();
   const [fields, setFields] = useState<PrescriptionField[]>(draft.fields.map(f => ({ ...f })));
   const [confirmed, setConfirmed] = useState(draft.confirmed);
@@ -31,6 +32,19 @@ export function PrescriptionReview({ draft, onConfirm }: PrescriptionReviewProps
     (f) => CRITICAL_KEYS.includes(f.key) && f.status === 'uncertain'
   );
   const hasUnresolved = emptyCriticalFields.length > 0 || uncertainCriticalFields.length > 0;
+
+  // Active allergy conflict check
+  const allergyConflict = Boolean(
+    patientAllergies &&
+    patientAllergies.toLowerCase() !== 'none' &&
+    fields.some(
+      (f) =>
+        f.key === 'medicine' &&
+        f.value &&
+        (patientAllergies.toLowerCase().includes(f.value.toLowerCase()) ||
+          f.value.toLowerCase().includes(patientAllergies.toLowerCase().split(',')[0].trim()))
+    )
+  );
 
   const handleEdit = (key: string, value: string) => {
     setFields(prev => prev.map(f => f.key === key ? { ...f, value } : f));
@@ -79,6 +93,20 @@ export function PrescriptionReview({ draft, onConfirm }: PrescriptionReviewProps
         {/* Fields side */}
         <div className="p-5 flex flex-col gap-3">
           <span className="text-sm font-semibold text-navy-200">{t('doctor_rx_fields')}</span>
+
+          {allergyConflict && (
+            <div className="rounded-xl border border-danger-500/50 bg-danger-500/15 p-3 flex items-start gap-2.5 text-danger-300">
+              <ShieldAlert className="w-4 h-4 text-danger-400 flex-shrink-0 mt-0.5" />
+              <div className="flex flex-col text-xs">
+                <span className="font-bold text-danger-200 uppercase tracking-wide">
+                  ⚠️ Allergy Alert: Patient Sensitive to "{patientAllergies}"
+                </span>
+                <span className="text-danger-300 mt-0.5">
+                  Verify medication and drug class compatibility before confirming this care plan.
+                </span>
+              </div>
+            </div>
+          )}
 
           {sortedFields.map((field) => {
             const isUncertain = field.status === 'uncertain';

@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Search, AlertTriangle, FileCheck, ChevronLeft, Clock, TrendingUp, Activity, ShieldAlert, MessageSquare, Pill } from 'lucide-react';
+import { Search, AlertTriangle, FileCheck, ChevronLeft, Clock, TrendingUp, Activity, ShieldAlert, MessageSquare, Pill, Check } from 'lucide-react';
 import { PulseBridgeLogo } from '@/components/PulseBridgeLogo';
 import { CursorGlow } from '@/components/CursorGlow';
 import { PatientStatusCard } from '@/components/PatientStatusCard';
@@ -48,7 +48,17 @@ export function DoctorDashboard({
   const filteredSummaries = useMemo(() => {
     return summaries
       .filter(s => filter === 'all' || s.priority === filter)
-      .filter(s => !search || s.patient.name.toLowerCase().includes(search.toLowerCase()));
+      .filter(s => !search || s.patient.name.toLowerCase().includes(search.toLowerCase()))
+      .sort((a, b) => {
+        // 1. Critical safety emergency override always first
+        if (a.criticalSafetyOverride && !b.criticalSafetyOverride) return -1;
+        if (!a.criticalSafetyOverride && b.criticalSafetyOverride) return 1;
+        // 2. Triage score descending
+        const scoreDiff = (b.triageScore ?? 0) - (a.triageScore ?? 0);
+        if (scoreDiff !== 0) return scoreDiff;
+        // 3. Open care gaps count descending
+        return b.openGaps - a.openGaps;
+      });
   }, [summaries, filter, search]);
 
   if (selectedPatient) {
@@ -271,7 +281,7 @@ function PatientDetail({
         </div>
 
         {activeTab === 'overview' && <OverviewTab summary={summary} followUps={followUps} />}
-        {activeTab === 'rx' && draft && <PrescriptionReview draft={draft} onConfirm={onConfirmCarePlan} />}
+        {activeTab === 'rx' && draft && <PrescriptionReview draft={draft} patientAllergies={summary.patient.allergies} onConfirm={onConfirmCarePlan} />}
         {activeTab === 'gaps' && (
           <div className="flex flex-col gap-3">
             {gaps.length === 0 ? (
@@ -369,14 +379,16 @@ function OverviewTab({ summary, followUps }: { summary: PatientSummary; followUp
             <span
               className={cn(
                 'px-2.5 py-1 rounded-full text-xs font-extrabold border',
-                triageScore >= 80
+                criticalSafetyOverride || triageScore >= 80
                   ? 'bg-danger-500/20 text-danger-300 border-danger-500/40'
                   : triageScore >= 50
                   ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
                   : 'bg-teal-500/20 text-teal-300 border-teal-500/40',
               )}
             >
-              Triage Score: {triageScore}/100
+              {criticalSafetyOverride
+                ? `Triage Score: ${triageScore}/100 (Emergency Override)`
+                : `Triage Score: ${triageScore}/100`}
             </span>
           )}
         </div>
@@ -387,7 +399,7 @@ function OverviewTab({ summary, followUps }: { summary: PatientSummary; followUp
           <StatBox icon={<Clock className="w-5 h-5" />} label={t('doctor_last_update')} value={formatTimeAgo(summary.lastUpdateAt)} color="navy" />
         </div>
 
-        {scoreFactors && scoreFactors.length > 0 && (
+        {scoreFactors && scoreFactors.length > 0 ? (
           <div className="border-t border-navy-600/50 pt-3 flex flex-col gap-2">
             <span className="text-xs font-semibold text-amber-400 uppercase">Triage Heuristic Factors</span>
             <div className="flex flex-col gap-1.5">
@@ -403,6 +415,11 @@ function OverviewTab({ summary, followUps }: { summary: PatientSummary; followUp
                 </div>
               ))}
             </div>
+          </div>
+        ) : (
+          <div className="border-t border-navy-600/50 pt-3 flex items-center gap-2 text-xs text-teal-300 bg-teal-500/10 border border-teal-500/20 rounded-lg p-2.5">
+            <Check className="w-4 h-4 flex-shrink-0 text-teal-400" />
+            <span>Care regimen on track: Zero missed doses, normal check-ins, and no open clinical gaps.</span>
           </div>
         )}
 
