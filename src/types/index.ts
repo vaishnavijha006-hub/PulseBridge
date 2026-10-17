@@ -207,6 +207,8 @@ export interface MedicalReport {
   structuredFindings?: MedicalReportFinding[];
 }
 
+export type SummaryEngineMode = 'rule_based_mvp' | 'ai_assisted' | 'ai_unavailable_fallback';
+
 export interface ReportSummary {
   reportId: string;
   patientId: string;
@@ -243,7 +245,14 @@ export interface ReportSummary {
     context: string;
   }[];
   disclaimer: string;
-  engineMode: 'rule_based_mvp';
+  engineMode: SummaryEngineMode;
+  aiMetadata?: {
+    provider: 'gemini' | 'anthropic' | 'openai' | 'mock_test_provider' | 'none';
+    modelName: string;
+    verifiedGrounded: boolean;
+    latencyMs?: number;
+    failureReason?: string;
+  };
   generatedAt: string;
 }
 
