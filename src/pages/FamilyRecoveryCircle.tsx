@@ -33,6 +33,7 @@ import { LanguageToggle } from '@/components/LanguageToggle';
 import { DemoBadge } from '@/components/DemoBanner';
 import { useLanguage } from '@/i18n/LanguageContext';
 import { cn } from '@/utils/cn';
+import { formatPhoneNumber } from '@/utils/phone';
 import { familyConsentService } from '@/services/familyConsentService';
 import type { GranularFamilyView, FamilyCircleMember } from '@/types/familyConsent';
 import type { FamilyView } from '@/types';
@@ -501,7 +502,7 @@ export function FamilyRecoveryCircle({ onBack, onNavigateRole }: FamilyRecoveryC
                             className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white py-3 text-sm font-bold transition-all shadow-sm shadow-emerald-600/20 active:scale-[0.99]"
                           >
                             <Phone className="w-4 h-4" />
-                            <span>{t('family_call')} ({liveView.contactNumber})</span>
+                            <span>{t('family_call')} ({formatPhoneNumber(liveView.contactNumber)})</span>
                           </a>
                         ) : (
                           <div className="flex items-center justify-center gap-2 py-2 text-xs text-slate-400 bg-slate-50 rounded-xl border border-slate-100">

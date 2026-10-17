@@ -37,6 +37,7 @@ import { ClosedLoopCareView } from '@/components/ClosedLoopCareView';
 import { ReportSummaryView } from '@/components/ReportSummaryView';
 import { useLanguage } from '@/i18n/LanguageContext';
 import { cn } from '@/utils/cn';
+import { formatPhoneNumber } from '@/utils/phone';
 import type { PatientSummary, CareGap, PrescriptionDraft, FollowUp, MedicalReport } from '@/types';
 import { demoMedicalReports } from '@/data/demoData';
 import { careActionService } from '@/services/careActionService';
@@ -958,7 +959,7 @@ function OverviewTab({ summary, followUps }: { summary: PatientSummary; followUp
           <InfoRow label="Name" value={patient.name} />
           <InfoRow label="Age" value={`${patient.age} yrs`} />
           <InfoRow label="Gender" value={patient.gender} />
-          <InfoRow label="Phone" value={patient.phone} />
+          <InfoRow label="Phone" value={patient.phone ? formatPhoneNumber(patient.phone, true) : 'Not provided'} />
         </div>
         <div className="flex flex-col gap-1">
           <span className="text-[11px] font-semibold text-slate-400 uppercase">Known Allergies</span>

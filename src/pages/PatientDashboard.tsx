@@ -19,6 +19,7 @@ import {
   ChevronLeft,
   Users,
   CreditCard,
+  Phone,
 } from 'lucide-react';
 import { PulseBridgeLogo } from '@/components/PulseBridgeLogo';
 import { LanguageToggle } from '@/components/LanguageToggle';
@@ -27,6 +28,7 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { FamilyConsentManager } from '@/components/FamilyConsentManager';
 import { useLanguage } from '@/i18n/LanguageContext';
 import { cn } from '@/utils/cn';
+import { formatPhoneNumber } from '@/utils/phone';
 import { evaluateDoseTiming, DOSE_REASON_OPTIONS, applyOverdueEvaluations, generateReminders } from '@/utils/reminderEngine';
 import type { MedicationSchedule, DoseStatus, HealthState, FollowUp, PrescriptionDraft, MedicalReport, PatientProfile } from '@/types';
 import { demoMedicalReports, demoPatients } from '@/data/demoData';
@@ -231,44 +233,54 @@ export function PatientDashboard({
                   : "Your post-discharge care regimen is verified by Dr. Sharma. Stay on track with today's medication routine."}
               </p>
 
-              {/* ABHA Patient Card / Pill (truthful status display) */}
-              {(activePatient.abhaNumber || activePatient.abhaAddress) && (
+              {/* Patient Contacts & Health Identifiers Bar */}
+              {(activePatient.phone || activePatient.abhaNumber || activePatient.abhaAddress) && (
                 <div className="flex flex-wrap items-center gap-2 mt-3 pt-2.5 border-t border-slate-100 text-xs">
-                  <span className="font-semibold text-slate-700 flex items-center gap-1.5">
-                    <CreditCard className="w-3.5 h-3.5 text-teal-600" />
-                    ABHA:
-                  </span>
-                  {activePatient.abhaNumber && (
-                    <span className="font-mono text-slate-800 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
-                      {activePatient.abhaNumber}
+                  {activePatient.phone && (
+                    <span className="inline-flex items-center gap-1.5 font-mono text-slate-800 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                      <Phone className="w-3 h-3 text-teal-600" />
+                      {formatPhoneNumber(activePatient.phone)}
                     </span>
                   )}
-                  {activePatient.abhaAddress && (
-                    <span className="text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
-                      {activePatient.abhaAddress}
-                    </span>
-                  )}
-                  <span
-                    className={cn(
-                      'px-2 py-0.5 rounded-full text-[11px] font-semibold border',
-                      activePatient.abhaVerificationStatus === 'verified'
-                        ? 'bg-success-50 text-success-700 border-success-200'
-                        : 'bg-amber-50 text-amber-700 border-amber-200'
-                    )}
-                    title={
-                      activePatient.abhaVerificationStatus === 'verified'
-                        ? 'Officially Verified via ABDM Gateway'
-                        : 'Unverified — Self-declared record. Official ABDM gateway verification is not configured.'
-                    }
-                  >
-                    {activePatient.abhaVerificationStatus === 'verified'
-                      ? t('abha_badge_verified')
-                      : t('abha_badge_unverified')}
-                  </span>
-                  {activePatient.abhaVerificationStatus !== 'verified' && (
-                    <span className="text-[11px] text-slate-400 italic">
-                      ({t('intake_abha_notice')})
-                    </span>
+                  {(activePatient.abhaNumber || activePatient.abhaAddress) && (
+                    <>
+                      <span className="font-semibold text-slate-700 flex items-center gap-1.5 ml-0.5">
+                        <CreditCard className="w-3.5 h-3.5 text-teal-600" />
+                        ABHA:
+                      </span>
+                      {activePatient.abhaNumber && (
+                        <span className="font-mono text-slate-800 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                          {activePatient.abhaNumber}
+                        </span>
+                      )}
+                      {activePatient.abhaAddress && (
+                        <span className="text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                          {activePatient.abhaAddress}
+                        </span>
+                      )}
+                      <span
+                        className={cn(
+                          'px-2 py-0.5 rounded-full text-[11px] font-semibold border',
+                          activePatient.abhaVerificationStatus === 'verified'
+                            ? 'bg-success-50 text-success-700 border-success-200'
+                            : 'bg-amber-50 text-amber-700 border-amber-200'
+                        )}
+                        title={
+                          activePatient.abhaVerificationStatus === 'verified'
+                            ? 'Officially Verified via ABDM Gateway'
+                            : 'Unverified — Self-declared record. Official ABDM gateway verification is not configured.'
+                        }
+                      >
+                        {activePatient.abhaVerificationStatus === 'verified'
+                          ? t('abha_badge_verified')
+                          : t('abha_badge_unverified')}
+                      </span>
+                      {activePatient.abhaVerificationStatus !== 'verified' && (
+                        <span className="text-[11px] text-slate-400 italic">
+                          ({t('intake_abha_notice')})
+                        </span>
+                      )}
+                    </>
                   )}
                 </div>
               )}
