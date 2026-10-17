@@ -227,6 +227,40 @@ export type TranslationKey =
   | 'family_no_members'
   | 'family_care_instructions_title'
   | 'family_view_as_label'
+  | 'family_welcome_title'
+  | 'family_welcome_sub'
+  | 'family_non_monitoring_note'
+  | 'family_conn_status_label'
+  | 'family_last_update_label'
+  | 'family_active_verified'
+  | 'family_timeline_title'
+  | 'family_timeline_subtitle'
+  | 'family_btn_acknowledge'
+  | 'family_btn_acknowledged'
+  | 'family_source_patient'
+  | 'family_source_doctor'
+  | 'family_source_meds'
+  | 'family_support_actions_title'
+  | 'family_support_actions_subtitle'
+  | 'family_support_quick_prompt1'
+  | 'family_support_quick_prompt2'
+  | 'family_support_quick_prompt3'
+  | 'family_privacy_center_title'
+  | 'family_privacy_center_desc'
+  | 'family_perm_active_title'
+  | 'family_perm_restricted_title'
+  | 'family_restricted_rx_full'
+  | 'family_restricted_soap'
+  | 'family_restricted_override'
+  | 'family_restricted_triage'
+  | 'family_empty_connection_title'
+  | 'family_empty_connection_desc'
+  | 'family_tab_overview'
+  | 'family_tab_milestones'
+  | 'family_tab_privacy'
+  | 'family_shared_appointments_title'
+  | 'family_notifications_title'
+  | 'family_mark_all_read'
   | 'reminder_dose'
   | 'reminder_missed'
   | 'reminder_followup'
@@ -443,6 +477,58 @@ const dict: Dictionary = {
   },
   family_care_instructions_title: { en: 'Doctor-Approved Care Guidelines', hi: 'डॉक्टर-स्वीकृत देखभाल निर्देश' },
   family_view_as_label: { en: 'Viewing as Family Member', hi: 'परिवार के सदस्य के रूप में देख रहे हैं' },
+  family_welcome_title: { en: 'Support their recovery, together.', hi: 'साथ मिलकर बनाएं उनकी रिकवरी आसान।' },
+  family_welcome_sub: {
+    en: 'Stay connected with the updates your loved one has chosen to share.',
+    hi: 'अपने प्रियजन द्वारा साझा किए गए अपडेट से जुड़े रहें।',
+  },
+  family_non_monitoring_note: {
+    en: 'Updates reflect patient-reported check-ins and doctor-verified instructions. PulseBridge does not provide 24/7 continuous ICU telemetry or replace emergency hospital care.',
+    hi: 'अपडेट्स मरीज द्वारा दर्ज चेक-इन और डॉक्टर-सत्यापित निर्देशों को दर्शाते हैं। PulseBridge 24/7 आईसीयू टेलीमेट्री प्रदान नहीं करता है और आपातकालीन सेवा का विकल्प नहीं है।',
+  },
+  family_conn_status_label: { en: 'Connection Status', hi: 'कनेक्शन स्थिति' },
+  family_last_update_label: { en: 'Last Updated', hi: 'अंतिम अपडेट' },
+  family_active_verified: { en: 'Active & Verified', hi: 'सक्रिय एवं सत्यापित' },
+  family_timeline_title: { en: 'Shared Recovery Updates', hi: 'साझा किए गए रिकवरी अपडेट' },
+  family_timeline_subtitle: {
+    en: 'Chronological timeline of explicitly permitted health updates, medication progress, and care milestones.',
+    hi: 'अनुमति प्राप्त स्वास्थ्य अपडेट, दवा प्रगति और देखभाल के मील के पत्थरों का कालानुक्रमिक विवरण।',
+  },
+  family_btn_acknowledge: { en: 'Acknowledge Update', hi: 'अपडेट स्वीकारें' },
+  family_btn_acknowledged: { en: 'Acknowledged by Family', hi: 'परिवार द्वारा देखा गया' },
+  family_source_patient: { en: 'Patient Daily Check-in', hi: 'मरीज का दैनिक चेक-इन' },
+  family_source_doctor: { en: 'Doctor Verified Care Plan', hi: 'डॉक्टर सत्यापित केयर प्लान' },
+  family_source_meds: { en: 'Medication Adherence Log', hi: 'दवा लॉग' },
+  family_support_actions_title: { en: 'Permitted Family Support Activities', hi: 'अनुमति प्राप्त पारिवारिक सहायता गतिविधियाँ' },
+  family_support_actions_subtitle: {
+    en: 'Supportive actions designed to keep loved ones encouraged without altering medical decisions.',
+    hi: 'प्रियजनों को प्रोत्साहित रखने के लिए बनाई गई गतिविधियाँ, जो चिकित्सीय निर्णयों को प्रभावित नहीं करतीं।',
+  },
+  family_support_quick_prompt1: { en: 'Proud of your recovery progress today! ❤️', hi: 'आज आपकी रिकवरी प्रगति पर गर्व है! ❤️' },
+  family_support_quick_prompt2: { en: 'Remember to drink lukewarm water and rest well.', hi: 'गुनगुना पानी पीना और आराम करना याद रखें।' },
+  family_support_quick_prompt3: { en: 'Taking care of everything here. Focus on getting better!', hi: 'यहाँ सब ठीक है, आप केवल ठीक होने पर ध्यान दें!' },
+  family_privacy_center_title: { en: 'Family Privacy & Boundaries Center', hi: 'पारिवारिक गोपनीयता एवं सीमा केंद्र' },
+  family_privacy_center_desc: {
+    en: 'PulseBridge operates under strict patient-first consent. You have transparent visibility into what is shared and what remains protected.',
+    hi: 'PulseBridge सख्त मरीज-प्रथम सहमति पर कार्य करता है। आपके पास स्पष्ट जानकारी है कि क्या साझा है और क्या सुरक्षित।',
+  },
+  family_perm_active_title: { en: 'Permitted Sharing Categories', hi: 'अनुमति प्राप्त साझाकरण श्रेणियां' },
+  family_perm_restricted_title: { en: 'Protected Clinical Boundaries (Withheld)', hi: 'संरक्षित क्लीनिकल सीमाएं (रोकी गई)' },
+  family_restricted_rx_full: { en: 'Raw clinical prescription monographs & chemical compounds', hi: 'कच्ची पर्ची मोनोग्राफ और रासायनिक यौगिक' },
+  family_restricted_soap: { en: 'Doctor internal SOAP clinical notes & physician hypotheses', hi: 'डॉक्टर के आंतरिक SOAP क्लिनिकल नोट्स और विचार' },
+  family_restricted_override: { en: 'Emergency safety overrides and hospital internal audit logs', hi: 'आपातकालीन सुरक्षा ओवरराइड और अस्पताल आंतरिक ऑडिट लॉग' },
+  family_restricted_triage: { en: 'Automated clinical triage risk scoring models', hi: 'स्वचालित क्लिनिकल ट्राइएज जोखिम स्कोरिंग मॉडल' },
+  family_empty_connection_title: { en: 'No Active Patient Connection', hi: 'कोई सक्रिय मरीज कनेक्शन नहीं है' },
+  family_empty_connection_desc: {
+    en: 'You are not currently linked to any patient recovery circle. Please ask your loved one to send an authorized invitation code from their dashboard.',
+    hi: 'आप वर्तमान में किसी मरीज के रिकवरी सर्कल से जुड़े नहीं हैं। कृपया अपने प्रियजन से उनके डैशबोर्ड से इनवाइट कोड भेजने का अनुरोध करें।',
+  },
+  family_tab_overview: { en: 'Recovery Stream', hi: 'रिकवरी स्ट्रीम' },
+  family_tab_milestones: { en: 'Care Milestones', hi: 'केयर माइलस्टोन्स' },
+  family_tab_privacy: { en: 'Privacy & Permissions', hi: 'गोपनीयता एवं अनुमतियाँ' },
+  family_shared_appointments_title: { en: 'Authorized Follow-up Consultations', hi: 'अधिकृत फॉलो-अप परामर्श' },
+  family_notifications_title: { en: 'Recovery Notifications', hi: 'रिकवरी सूचनाएं' },
+  family_mark_all_read: { en: 'Mark all as read', hi: 'सभी को पढ़ा हुआ चिह्नित करें' },
   reminder_dose: { en: 'Dose reminder', hi: 'दवाई रिमाइंडर' },
   reminder_missed: { en: 'Missed-dose reminder', hi: 'छूटी खुराक रिमाइंडर' },
   reminder_followup: { en: 'Follow-up reminder', hi: 'फॉलो-अप रिमाइंडर' },

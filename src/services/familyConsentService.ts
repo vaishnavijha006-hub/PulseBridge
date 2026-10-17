@@ -88,6 +88,7 @@ const INITIAL_NOTES: FamilySupportNote[] = [
 class FamilyConsentService {
   private members: FamilyCircleMember[] = [];
   private notes: FamilySupportNote[] = [];
+  private acknowledgedUpdates: Record<string, string[]> = {};
   private listeners: Set<() => void> = new Set();
 
   constructor() {
@@ -344,6 +345,10 @@ class FamilyConsentService {
         contactNumber: null,
         careInstructions: null,
         supportNotes: [],
+        lastUpdateTimestamp: null,
+        sharedAppointments: null,
+        recoveryMilestones: null,
+        acknowledgedUpdates: [],
         redactedReason: 'Access is not authorized or has been revoked by the patient.',
       };
     }
@@ -388,8 +393,59 @@ class FamilyConsentService {
       contactNumber,
       careInstructions,
       supportNotes,
+      lastUpdateTimestamp: new Date(Date.now() - 3600000 * 1.5).toISOString(),
+      sharedAppointments: perms.shareCareInstructions
+        ? [
+            {
+              id: 'apt_1',
+              doctorName: 'Dr. S. Sharma, MD',
+              department: 'Cardiology (हृदय रोग विभाग)',
+              date: '22 Oct 2026',
+              time: '10:30 AM',
+              status: 'Confirmed & Scheduled',
+            },
+          ]
+        : null,
+      recoveryMilestones: perms.shareCareInstructions
+        ? [
+            {
+              id: 'ms_1',
+              title: 'Day 1 Post-Discharge Adherence',
+              subtitle: 'All prescribed doses logged consistently',
+              achieved: true,
+              date: 'Today',
+            },
+            {
+              id: 'ms_2',
+              title: 'Cardiology Check-in Booked',
+              subtitle: 'Appointment reserved with Dr. S. Sharma',
+              achieved: true,
+              date: '22 Oct',
+            },
+            {
+              id: 'ms_3',
+              title: '7-Day Steady Recovery Goal',
+              subtitle: 'Zero severe symptom alerts target',
+              achieved: false,
+            },
+          ]
+        : null,
+      acknowledgedUpdates: this.acknowledgedUpdates[member.id] || [],
       redactedReason: null,
     };
+  }
+
+  /**
+   * Acknowledge an authorized update from the family dashboard.
+   */
+  public acknowledgeUpdate(updateId: string, memberId: string): void {
+    if (!this.acknowledgedUpdates[memberId]) {
+      this.acknowledgedUpdates[memberId] = [];
+    }
+    if (!this.acknowledgedUpdates[memberId].includes(updateId)) {
+      this.acknowledgedUpdates[memberId].push(updateId);
+      this.saveState();
+    }
   }
 
   /**
@@ -398,6 +454,7 @@ class FamilyConsentService {
   public resetToDemo(): void {
     this.members = JSON.parse(JSON.stringify(INITIAL_MEMBERS));
     this.notes = JSON.parse(JSON.stringify(INITIAL_NOTES));
+    this.acknowledgedUpdates = {};
     this.saveState();
   }
 }

@@ -6,38 +6,99 @@ import { PatientDashboard } from './PatientDashboard';
 import { familyConsentService } from '@/services/familyConsentService';
 import { demoSchedules, demoFollowUps, demoMedicalReports } from '@/data/demoData';
 
-describe('FamilyRecoveryCircle — Consent-Based Family Experience', () => {
+describe('FamilyRecoveryCircle — Dedicated Premium Healthcare Dashboard', () => {
   beforeEach(() => {
     familyConsentService.resetToDemo();
   });
 
-  it('renders authorized family companion view with allowed information', () => {
+  it('renders top navigation, non-alarming welcome section, and patient connection card', () => {
     render(
       <LanguageProvider initialLang="en">
         <FamilyRecoveryCircle onBack={vi.fn()} />
       </LanguageProvider>
     );
 
-    expect(screen.getByText('Papa ka aaj ka din')).toBeInTheDocument();
-    expect(screen.getByText('Active — Authorized by patient')).toBeInTheDocument();
-    expect(screen.getByText('Daily Medication Progress')).toBeInTheDocument();
-    expect(screen.getAllByText('Send Note of Encouragement')[0]).toBeInTheDocument();
+    // Top Navigation & Branding
+    expect(screen.getByText('Family Recovery Circle')).toBeInTheDocument();
+
+    // Welcome Section
+    expect(screen.getByText('Support their recovery, together.')).toBeInTheDocument();
+    expect(
+      screen.getByText('Stay connected with the updates your loved one has chosen to share.')
+    ).toBeInTheDocument();
+    expect(screen.getByText(/PulseBridge does not provide 24\/7 continuous ICU telemetry/i)).toBeInTheDocument();
+
+    // Patient Connection Card
+    expect(screen.getByText('Active & Verified')).toBeInTheDocument();
+    expect(screen.getAllByText('Ravi Sharma')[0]).toBeInTheDocument();
+    expect(screen.getAllByText(/Daughter/i)[0]).toBeInTheDocument();
   });
 
-  it('allows family member to send an encouragement note', () => {
+  it('renders shared recovery updates timeline with permitted categories and permits acknowledgment', () => {
     render(
       <LanguageProvider initialLang="en">
         <FamilyRecoveryCircle onBack={vi.fn()} />
       </LanguageProvider>
     );
 
+    // Medication adherence card
+    expect(screen.getByText('Daily Medication Progress')).toBeInTheDocument();
+    expect(screen.getByText('Medication Adherence Log • Today')).toBeInTheDocument();
+
+    // Vitals check-in card
+    expect(screen.getByText('Daily Health Status')).toBeInTheDocument();
+    expect(screen.getByText('Patient Daily Check-in • Today')).toBeInTheDocument();
+
+    // Acknowledge action
+    const ackBtn = screen.getAllByRole('button', { name: /Acknowledge Update/i })[0];
+    fireEvent.click(ackBtn);
+    expect(screen.getAllByText('Acknowledged by Family')[0]).toBeInTheDocument();
+  });
+
+  it('allows family member to send an encouragement note with quick prompts', () => {
+    render(
+      <LanguageProvider initialLang="en">
+        <FamilyRecoveryCircle onBack={vi.fn()} />
+      </LanguageProvider>
+    );
+
+    // Quick prompt click
+    const quickPrompt = screen.getByText('Proud of your recovery progress today! ❤️');
+    fireEvent.click(quickPrompt);
+
     const textarea = screen.getByPlaceholderText(/Write a warm message/i);
-    fireEvent.change(textarea, { target: { value: 'Stay strong Papa! Thinking of you.' } });
+    expect(textarea).toHaveValue('Proud of your recovery progress today! ❤️');
 
     const sendBtn = screen.getByRole('button', { name: /Send Note of Encouragement/i });
     fireEvent.click(sendBtn);
 
-    expect(screen.getByText('"Stay strong Papa! Thinking of you."')).toBeInTheDocument();
+    expect(screen.getByText('"Proud of your recovery progress today! ❤️"')).toBeInTheDocument();
+  });
+
+  it('switches between tabs and displays milestones and privacy center', () => {
+    render(
+      <LanguageProvider initialLang="en">
+        <FamilyRecoveryCircle onBack={vi.fn()} />
+      </LanguageProvider>
+    );
+
+    // Switch to Milestones Tab
+    const milestonesTab = screen.getByText('Care Milestones');
+    fireEvent.click(milestonesTab);
+
+    expect(screen.getByText('Authorized Follow-up Consultations')).toBeInTheDocument();
+    expect(screen.getByText('Dr. S. Sharma, MD')).toBeInTheDocument();
+    expect(screen.getByText('Day 1 Post-Discharge Adherence')).toBeInTheDocument();
+
+    // Switch to Privacy & Permissions Tab
+    const privacyTab = screen.getByText('Privacy & Permissions');
+    fireEvent.click(privacyTab);
+
+    expect(screen.getByText('Family Privacy & Boundaries Center')).toBeInTheDocument();
+    expect(screen.getByText('Permitted Sharing Categories')).toBeInTheDocument();
+    expect(screen.getByText('Protected Clinical Boundaries (Withheld)')).toBeInTheDocument();
+    expect(screen.getByText('Raw clinical prescription monographs & chemical compounds')).toBeInTheDocument();
+    expect(screen.getByText('Doctor internal SOAP clinical notes & physician hypotheses')).toBeInTheDocument();
   });
 
   it('displays secure fail-closed state when patient revokes access with NO self-authorization button', () => {

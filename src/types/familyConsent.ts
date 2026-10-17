@@ -89,5 +89,26 @@ export interface GranularFamilyView {
   careInstructions: string[] | null;
   /** Recent family encouragement messages */
   supportNotes: FamilySupportNote[];
+  /** Latest recorded activity timestamp */
+  lastUpdateTimestamp: string | null;
+  /** Doctor-scheduled follow-up visits explicitly permitted by care instructions */
+  sharedAppointments: {
+    id: string;
+    doctorName: string;
+    department: string;
+    date: string;
+    time: string;
+    status: string;
+  }[] | null;
+  /** High-level recovery achievements */
+  recoveryMilestones: {
+    id: string;
+    title: string;
+    subtitle: string;
+    achieved: boolean;
+    date?: string;
+  }[] | null;
+  /** IDs of recovery timeline updates acknowledged by this family member */
+  acknowledgedUpdates: string[];
   redactedReason?: string | null;
 }

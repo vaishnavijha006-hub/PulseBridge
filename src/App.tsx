@@ -279,6 +279,11 @@ function AppContent() {
           view={familyView}
           onBack={() => setView('landing')}
           onToggleAccess={handleFamilyToggleAccess}
+          onNavigateRole={(role) => {
+            if (role === 'doctor') setView('doctor');
+            else if (role === 'patient') setView('patient_dashboard');
+            else if (role === 'admin') setView('admin');
+          }}
         />
       )}
       {view === 'admin' && (
