@@ -2,9 +2,17 @@ export type Language = 'en' | 'hi';
 
 export type Priority = 'on_track' | 'needs_attention' | 'urgent';
 
-export type DoseStatus = 'pending' | 'taken' | 'missed' | 'snoozed';
+export type DoseStatus = 'pending' | 'taken' | 'missed' | 'snoozed' | 'cannot_take';
+
+export type DoseActionReason =
+  | 'side_effect'
+  | 'medicine_unavailable'
+  | 'forgot'
+  | 'doctor_advised_stop'
+  | 'other';
 
 export type HealthState = 'good' | 'ok' | 'bad';
+
 
 export type CareGapType =
   | 'new_symptom'
@@ -45,6 +53,21 @@ export interface Medicine {
   confirmed: boolean;
 }
 
+export interface CarePlan {
+  id: string;
+  patientId: string;
+  prescriptionId?: string;
+  doctorId?: string;
+  status: 'draft' | 'active' | 'completed' | 'discontinued';
+  diagnosis?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type PatientIntakeData = Omit<PatientProfile, 'id'>;
+
+
 export interface MedicationSchedule {
   id: string;
   medicineId: string;
@@ -53,6 +76,9 @@ export interface MedicationSchedule {
   scheduledTime: string;
   status: DoseStatus;
   instructions: string;
+  snoozedUntil?: string | null;
+  reason?: string | null;
+  patientId?: string;
 }
 
 export interface AdherenceLog {
@@ -62,6 +88,8 @@ export interface AdherenceLog {
   scheduledTime: string;
   status: DoseStatus;
   recordedAt: string | null;
+  reason?: string | null;
+  notes?: string | null;
 }
 
 export interface HealthUpdate {
@@ -117,14 +145,25 @@ export interface PatientProfile {
 
 export interface PatientSummary {
   patient: PatientProfile;
-  dosesToday: { taken: number; total: number };
+  dosesToday: {
+    taken: number;
+    missed: number;
+    pending: number;
+    total: number;
+  };
   adherence7Day: number;
   latestUpdate: HealthUpdate | null;
   openGaps: number;
   gapReasons: string[];
   lastUpdateAt: string;
   priority: Priority;
+  triageScore?: number;
+  criticalSafetyOverride?: boolean;
+  criticalAlertMessage?: string;
+  scoreFactors?: { reason: string; points: number; evidence?: string }[];
+  pendingRxCount?: number;
 }
+
 
 export interface CaregiverAccess {
   patientId: string;

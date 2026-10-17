@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Check, AlertTriangle, Edit3, Save, Lock } from 'lucide-react';
+import { Check, AlertTriangle, Edit3, Save, Lock, ShieldAlert } from 'lucide-react';
 import { StatusBadge } from '@/components/StatusBadge';
 import { useLanguage } from '@/i18n/LanguageContext';
 import { cn } from '@/utils/cn';
@@ -7,21 +7,44 @@ import type { PrescriptionDraft, PrescriptionField } from '@/types';
 
 interface PrescriptionReviewProps {
   draft: PrescriptionDraft;
+  patientAllergies?: string;
   onConfirm: (updatedFields: PrescriptionField[]) => void;
 }
 
-export function PrescriptionReview({ draft, onConfirm }: PrescriptionReviewProps) {
+export function PrescriptionReview({ draft, patientAllergies, onConfirm }: PrescriptionReviewProps) {
   const { t } = useLanguage();
   const [fields, setFields] = useState<PrescriptionField[]>(draft.fields.map(f => ({ ...f })));
   const [confirmed, setConfirmed] = useState(draft.confirmed);
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const CRITICAL_KEYS = ['medicine', 'dosage', 'frequency', 'duration'];
+
   const uncertainFields = fields.filter(f => f.status === 'uncertain');
   const confirmedFields = fields.filter(f => f.status !== 'uncertain');
   const sortedFields = [...uncertainFields, ...confirmedFields];
 
-  const hasUnresolved = uncertainFields.some(f => !f.value.trim());
+  // Critical prescription fields must be non-empty AND doctor-confirmed
+  const emptyCriticalFields = fields.filter(
+    (f) => CRITICAL_KEYS.includes(f.key) && (!f.value || !f.value.trim())
+  );
+  const uncertainCriticalFields = fields.filter(
+    (f) => CRITICAL_KEYS.includes(f.key) && f.status === 'uncertain'
+  );
+  const hasUnresolved = emptyCriticalFields.length > 0 || uncertainCriticalFields.length > 0;
+
+  // Active allergy conflict check
+  const allergyConflict = Boolean(
+    patientAllergies &&
+    patientAllergies.toLowerCase() !== 'none' &&
+    fields.some(
+      (f) =>
+        f.key === 'medicine' &&
+        f.value &&
+        (patientAllergies.toLowerCase().includes(f.value.toLowerCase()) ||
+          f.value.toLowerCase().includes(patientAllergies.toLowerCase().split(',')[0].trim()))
+    )
+  );
 
   const handleEdit = (key: string, value: string) => {
     setFields(prev => prev.map(f => f.key === key ? { ...f, value } : f));
@@ -34,8 +57,8 @@ export function PrescriptionReview({ draft, onConfirm }: PrescriptionReviewProps
 
   const handleConfirm = () => {
     if (hasUnresolved) {
-      setError('Please resolve all uncertain fields before confirming.');
-      setTimeout(() => setError(null), 3000);
+      setError('Critical fields (medicine, dosage, frequency, duration) must be verified and non-empty.');
+      setTimeout(() => setError(null), 4000);
       return;
     }
     const updated = fields.map(f => ({ ...f, status: 'confirmed' as const }));
@@ -43,6 +66,7 @@ export function PrescriptionReview({ draft, onConfirm }: PrescriptionReviewProps
     setConfirmed(true);
     onConfirm(updated);
   };
+
 
   return (
     <div className="rounded-2xl border border-navy-600 bg-navy-700/50 overflow-hidden">
@@ -69,6 +93,20 @@ export function PrescriptionReview({ draft, onConfirm }: PrescriptionReviewProps
         {/* Fields side */}
         <div className="p-5 flex flex-col gap-3">
           <span className="text-sm font-semibold text-navy-200">{t('doctor_rx_fields')}</span>
+
+          {allergyConflict && (
+            <div className="rounded-xl border border-danger-500/50 bg-danger-500/15 p-3 flex items-start gap-2.5 text-danger-300">
+              <ShieldAlert className="w-4 h-4 text-danger-400 flex-shrink-0 mt-0.5" />
+              <div className="flex flex-col text-xs">
+                <span className="font-bold text-danger-200 uppercase tracking-wide">
+                  ⚠️ Allergy Alert: Patient Sensitive to "{patientAllergies}"
+                </span>
+                <span className="text-danger-300 mt-0.5">
+                  Verify medication and drug class compatibility before confirming this care plan.
+                </span>
+              </div>
+            </div>
+          )}
 
           {sortedFields.map((field) => {
             const isUncertain = field.status === 'uncertain';
@@ -124,12 +162,24 @@ export function PrescriptionReview({ draft, onConfirm }: PrescriptionReviewProps
                       {field.value || '(missing — needs review)'}
                     </span>
                     {!confirmed && (
-                      <button
-                        onClick={() => setEditingKey(field.key)}
-                        className="flex w-7 h-7 items-center justify-center rounded text-navy-300 hover:text-teal-400 hover:bg-navy-600 transition-colors"
-                      >
-                        <Edit3 className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        {isUncertain && field.value.trim() && (
+                          <button
+                            onClick={() => handleMarkResolved(field.key)}
+                            title="Verify and confirm field"
+                            className="flex w-7 h-7 items-center justify-center rounded text-teal-400 hover:text-white hover:bg-teal-500/20 transition-colors"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setEditingKey(field.key)}
+                          title="Edit field"
+                          className="flex w-7 h-7 items-center justify-center rounded text-navy-300 hover:text-teal-400 hover:bg-navy-600 transition-colors"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     )}
                   </div>
                 )}
@@ -170,11 +220,14 @@ export function PrescriptionReview({ draft, onConfirm }: PrescriptionReviewProps
               </button>
               {hasUnresolved && (
                 <p className="text-xs text-amber-400/80 text-center">
-                  {uncertainFields.filter(f => !f.value.trim()).length} field(s) need values before confirmation.
+                  {emptyCriticalFields.length > 0
+                    ? `${emptyCriticalFields.length} critical field(s) missing: ${emptyCriticalFields.map((f) => f.key).join(', ')}`
+                    : `${uncertainCriticalFields.length} critical field(s) must be verified before confirmation.`}
                 </p>
               )}
             </div>
           )}
+
 
           {confirmed && (
             <div className="mt-2 flex items-center gap-2 rounded-xl bg-success-500/10 border border-success-500/30 px-4 py-3">

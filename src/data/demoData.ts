@@ -1,3 +1,4 @@
+import { calculatePatientTriageScore } from '@/services/careGapRules';
 import type {
   PatientProfile,
   PatientSummary,
@@ -204,31 +205,43 @@ export const demoFamilyView: FamilyView = {
 export function getPatientSummaries(): PatientSummary[] {
   return demoPatients.map((patient) => {
     const schedules = demoSchedules[patient.id] ?? [];
+    const takenCount = schedules.filter((s) => s.status === 'taken').length;
+    const missedCount = schedules.filter((s) => s.status === 'missed' || s.status === 'cannot_take').length;
+    const pendingCount = schedules.filter((s) => s.status === 'pending' || s.status === 'snoozed').length;
+
     const dosesToday = {
-      taken: schedules.filter((s) => s.status === 'taken').length,
+      taken: takenCount,
+      missed: missedCount,
+      pending: pendingCount,
       total: schedules.length,
     };
+
     const adherence7Day = patient.id === 'p1' ? 64 : patient.id === 'p4' ? 78 : patient.id === 'p2' ? 90 : 95;
     const updates = demoHealthUpdates[patient.id] ?? [];
     const latestUpdate = updates[0] ?? null;
     const gaps = demoCareGaps[patient.id] ?? [];
-    const gapReasons = gaps.map((g) => g.evidence);
+    const followUps = demoFollowUps[patient.id] ?? [];
     const lastUpdateAt = latestUpdate?.submittedAt ?? new Date(Date.now() - 86400000).toISOString();
+    const draft = demoPrescriptionDrafts[patient.id];
+    const pendingRxCount = draft && !draft.confirmed ? 1 : 0;
 
-    let priority: 'on_track' | 'needs_attention' | 'urgent' = 'on_track';
-    if (patient.id === 'p1') priority = 'urgent';
-    else if (patient.id === 'p4') priority = 'needs_attention';
-    else if (gaps.length > 0) priority = 'needs_attention';
+    const triageResult = calculatePatientTriageScore(patient, updates, schedules, followUps, gaps);
 
     return {
       patient,
       dosesToday,
       adherence7Day,
       latestUpdate,
-      openGaps: gaps.length,
-      gapReasons,
+      openGaps: gaps.filter((g) => g.status === 'open').length,
+      gapReasons: triageResult.reasons.length > 0 ? triageResult.reasons : gaps.map((g) => g.evidence),
       lastUpdateAt,
-      priority,
+      priority: triageResult.priority,
+      triageScore: triageResult.score,
+      criticalSafetyOverride: triageResult.criticalSafetyOverride,
+      criticalAlertMessage: triageResult.criticalAlertMessage,
+      scoreFactors: triageResult.factors,
+      pendingRxCount,
     };
   });
 }
+

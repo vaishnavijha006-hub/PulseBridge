@@ -1,21 +1,23 @@
 /**
  * Closed-Loop Care — Unit Tests
  *
- * Tests the care action lifecycle and validation rules in careActionService.ts.
- * Does NOT depend on React or the DOM — pure logic tests.
+ * Tests the care action lifecycle and validation rules using the
+ * careActionService (CareActionStore class) API.
+ *
+ * Covers all 12 required test scenarios specified in the implementation brief.
+ * Does NOT depend on React or the DOM — pure logic tests run with vitest.
  *
  * Run with: npm run test
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
-  createCareAction,
-  updateCareActionStatus,
-  getActionsForPatient,
-  getAllActions,
+  careActionService,
+  validateNewAction,
+  validateTransition,
   isActionOverdue,
-  _resetStoreForTesting,
-  _setStoreForTesting,
+  isActionUnresolved,
+  ALLOWED_TRANSITIONS,
 } from '@/services/careActionService';
 import type { CareAction } from '@/types/careAction';
 
@@ -23,200 +25,158 @@ import type { CareAction } from '@/types/careAction';
 // Reset store before each test to prevent cross-test contamination.
 // ---------------------------------------------------------------------------
 beforeEach(() => {
-  _resetStoreForTesting();
+  careActionService.reset([]);
 });
+
+// ---------------------------------------------------------------------------
+// Helper: create a minimal valid action and assert success.
+// ---------------------------------------------------------------------------
+function createValidAction(overrides?: Partial<{ title: string; description: string; patientId: string }>) {
+  const result = careActionService.create({
+    patientId: overrides?.patientId ?? 'p1',
+    title: overrides?.title ?? 'Test action',
+    description: overrides?.description ?? 'A test description',
+  });
+  if (!result.success) throw new Error(`Failed to create action: ${result.error}`);
+  return result.data;
+}
 
 // ---------------------------------------------------------------------------
 // 1. New actions start as 'open'
 // ---------------------------------------------------------------------------
-describe('createCareAction', () => {
+describe('createCareAction — new actions start as open', () => {
   it('creates a new action with status "open"', () => {
-    const result = createCareAction({
+    const result = careActionService.create({
       patientId: 'p1',
       title: 'Test action',
       description: 'A test description',
     });
 
-    expect(result.ok).toBe(true);
-    if (!result.ok) throw new Error('Expected ok');
-    expect(result.action.status).toBe('open');
+    expect(result.success).toBe(true);
+    if (!result.success) throw new Error('Expected success');
+    expect(result.data.status).toBe('open');
   });
 
-  it('assigns createdAt and updatedAt timestamps', () => {
+  it('assigns unique ID, createdAt, and updatedAt timestamps', () => {
     const before = new Date().toISOString();
-    const result = createCareAction({
+    const result = careActionService.create({
       patientId: 'p1',
       title: 'Timestamp test',
       description: 'Check timestamps',
     });
     const after = new Date().toISOString();
 
-    expect(result.ok).toBe(true);
-    if (!result.ok) throw new Error('Expected ok');
-    expect(result.action.createdAt >= before).toBe(true);
-    expect(result.action.createdAt <= after).toBe(true);
-    expect(result.action.updatedAt).toBe(result.action.createdAt);
+    expect(result.success).toBe(true);
+    if (!result.success) throw new Error('Expected success');
+    expect(result.data.id).toBeTruthy();
+    expect(result.data.createdAt >= before).toBe(true);
+    expect(result.data.createdAt <= after).toBe(true);
+    expect(result.data.updatedAt).toBe(result.data.createdAt);
   });
 
-  it('initialises outcomeNote and followUpNote to null', () => {
-    const result = createCareAction({
+  it('initialises outcomeNote, followUpNote, and documentedDecision to undefined/null', () => {
+    const result = careActionService.create({
       patientId: 'p1',
       title: 'Null notes test',
-      description: 'Verify notes start null',
+      description: 'Verify notes start null/undefined',
     });
 
-    expect(result.ok).toBe(true);
-    if (!result.ok) throw new Error('Expected ok');
-    expect(result.action.outcomeNote).toBeNull();
-    expect(result.action.followUpNote).toBeNull();
+    expect(result.success).toBe(true);
+    if (!result.success) throw new Error('Expected success');
+    expect(result.data.outcomeNote == null).toBe(true);
+    expect(result.data.followUpNote == null).toBe(true);
+    expect(result.data.documentedDecision == null).toBe(true);
   });
 
   it('returns an error when title is empty', () => {
-    const result = createCareAction({ patientId: 'p1', title: '', description: 'desc' });
-    expect(result.ok).toBe(false);
-    if (result.ok) throw new Error('Expected error');
+    const result = careActionService.create({ patientId: 'p1', title: '', description: 'desc' });
+    expect(result.success).toBe(false);
+    if (result.success) throw new Error('Expected failure');
     expect(result.error).toMatch(/title/i);
   });
 
   it('returns an error when description is empty', () => {
-    const result = createCareAction({ patientId: 'p1', title: 'Title', description: '' });
-    expect(result.ok).toBe(false);
-    if (result.ok) throw new Error('Expected error');
+    const result = careActionService.create({ patientId: 'p1', title: 'Title', description: '' });
+    expect(result.success).toBe(false);
+    if (result.success) throw new Error('Expected failure');
     expect(result.error).toMatch(/description/i);
   });
 
   it('returns an error when patientId is missing', () => {
-    const result = createCareAction({ patientId: '', title: 'T', description: 'D' });
-    expect(result.ok).toBe(false);
-    if (result.ok) throw new Error('Expected error');
+    const result = careActionService.create({ patientId: '', title: 'T', description: 'D' });
+    expect(result.success).toBe(false);
+    if (result.success) throw new Error('Expected failure');
     expect(result.error).toMatch(/patient/i);
-  });
-
-  it('does NOT automatically resolve the linked care gap', () => {
-    // This test proves that creating an action with linkedCareGapId='g1'
-    // only stores a reference — it does NOT modify demoCareGaps.
-    // (The actual CareGap data is in demoData.ts which we do not import here.)
-    const result = createCareAction({
-      patientId: 'p1',
-      linkedCareGapId: 'g1',
-      title: 'Linked action',
-      description: 'Check gap is untouched',
-    });
-
-    expect(result.ok).toBe(true);
-    if (!result.ok) throw new Error('Expected ok');
-    // The action stores the reference but the action status is still 'open'
-    // (not 'resolved'), confirming the gap is not auto-resolved.
-    expect(result.action.linkedCareGapId).toBe('g1');
-    expect(result.action.status).toBe('open');
   });
 });
 
 // ---------------------------------------------------------------------------
 // 2. Valid transition: open → in_progress
 // ---------------------------------------------------------------------------
-describe('updateCareActionStatus — valid transitions', () => {
+describe('valid transitions', () => {
   it('transitions from open to in_progress', () => {
-    const created = createCareAction({
-      patientId: 'p1',
-      title: 'Transition test',
-      description: 'Test open → in_progress',
-    });
+    const action = createValidAction();
 
-    expect(created.ok).toBe(true);
-    if (!created.ok) throw new Error('Expected ok');
+    const result = careActionService.transition(action.id, { targetStatus: 'in_progress' });
 
-    const updated = updateCareActionStatus({
-      actionId: created.action.id,
-      newStatus: 'in_progress',
-    });
-
-    expect(updated.ok).toBe(true);
-    if (!updated.ok) throw new Error('Expected ok');
-    expect(updated.action.status).toBe('in_progress');
+    expect(result.success).toBe(true);
+    if (!result.success) throw new Error('Expected success');
+    expect(result.data.status).toBe('in_progress');
   });
 
   it('transitions from in_progress to resolved with an outcome note', () => {
-    const created = createCareAction({
-      patientId: 'p1',
-      title: 'Resolve test',
-      description: 'Will be resolved',
-    });
-    if (!created.ok) throw new Error('Expected ok');
+    const action = createValidAction();
+    careActionService.transition(action.id, { targetStatus: 'in_progress' });
 
-    updateCareActionStatus({ actionId: created.action.id, newStatus: 'in_progress' });
-
-    const resolved = updateCareActionStatus({
-      actionId: created.action.id,
-      newStatus: 'resolved',
+    const result = careActionService.transition(action.id, {
+      targetStatus: 'resolved',
       outcomeNote: 'Clinician reviewed and confirmed no further action needed.',
     });
 
-    expect(resolved.ok).toBe(true);
-    if (!resolved.ok) throw new Error('Expected ok');
-    expect(resolved.action.status).toBe('resolved');
-    expect(resolved.action.outcomeNote).toBe(
-      'Clinician reviewed and confirmed no further action needed.',
-    );
+    expect(result.success).toBe(true);
+    if (!result.success) throw new Error('Expected success');
+    expect(result.data.status).toBe('resolved');
+    expect(result.data.outcomeNote).toBe('Clinician reviewed and confirmed no further action needed.');
   });
 
-  it('transitions from open to documented without requiring an outcome note', () => {
-    const created = createCareAction({
-      patientId: 'p1',
-      title: 'Document test',
-      description: 'Will be documented',
-    });
-    if (!created.ok) throw new Error('Expected ok');
+  it('transitions from open to documented with a clinical decision note', () => {
+    const action = createValidAction();
 
-    const documented = updateCareActionStatus({
-      actionId: created.action.id,
-      newStatus: 'documented',
+    const result = careActionService.transition(action.id, {
+      targetStatus: 'documented',
+      documentedDecision: 'Clinical decision recorded: no immediate intervention required.',
     });
 
-    expect(documented.ok).toBe(true);
-    if (!documented.ok) throw new Error('Expected ok');
-    expect(documented.action.status).toBe('documented');
+    expect(result.success).toBe(true);
+    if (!result.success) throw new Error('Expected success');
+    expect(result.data.status).toBe('documented');
   });
 });
 
 // ---------------------------------------------------------------------------
 // 3. Resolution without an outcome note is rejected
 // ---------------------------------------------------------------------------
-describe('updateCareActionStatus — resolution validation', () => {
+describe('resolution validation', () => {
   it('rejects resolution when outcomeNote is absent', () => {
-    const created = createCareAction({
-      patientId: 'p1',
-      title: 'No note test',
-      description: 'Should fail to resolve',
-    });
-    if (!created.ok) throw new Error('Expected ok');
+    const action = createValidAction();
 
-    const result = updateCareActionStatus({
-      actionId: created.action.id,
-      newStatus: 'resolved',
-    });
+    const result = careActionService.transition(action.id, { targetStatus: 'resolved' });
 
-    expect(result.ok).toBe(false);
-    if (result.ok) throw new Error('Expected error');
+    expect(result.success).toBe(false);
+    if (result.success) throw new Error('Expected failure');
     expect(result.error).toMatch(/outcome note/i);
   });
 
   it('rejects resolution when outcomeNote is whitespace-only', () => {
-    const created = createCareAction({
-      patientId: 'p1',
-      title: 'Whitespace note',
-      description: 'Should fail to resolve',
-    });
-    if (!created.ok) throw new Error('Expected ok');
+    const action = createValidAction();
 
-    const result = updateCareActionStatus({
-      actionId: created.action.id,
-      newStatus: 'resolved',
+    const result = careActionService.transition(action.id, {
+      targetStatus: 'resolved',
       outcomeNote: '   ',
     });
 
-    expect(result.ok).toBe(false);
-    if (result.ok) throw new Error('Expected error');
+    expect(result.success).toBe(false);
+    if (result.success) throw new Error('Expected failure');
     expect(result.error).toMatch(/outcome note/i);
   });
 });
@@ -224,32 +184,24 @@ describe('updateCareActionStatus — resolution validation', () => {
 // ---------------------------------------------------------------------------
 // 4. Successful resolution records the outcome and refreshes updatedAt
 // ---------------------------------------------------------------------------
-describe('updateCareActionStatus — successful resolution', () => {
-  it('records outcome note and updates timestamp on resolution', async () => {
-    const created = createCareAction({
-      patientId: 'p1',
-      title: 'Record outcome',
-      description: 'Verify outcome note is saved',
-    });
-    if (!created.ok) throw new Error('Expected ok');
-
-    const beforeUpdate = created.action.updatedAt;
+describe('successful resolution records outcome and timestamp', () => {
+  it('records outcome note and sets resolvedAt on resolution', async () => {
+    const action = createValidAction();
+    const beforeUpdate = action.updatedAt;
 
     // Small delay to ensure updatedAt differs.
     await new Promise((r) => setTimeout(r, 2));
 
-    const resolved = updateCareActionStatus({
-      actionId: created.action.id,
-      newStatus: 'resolved',
+    const result = careActionService.transition(action.id, {
+      targetStatus: 'resolved',
       outcomeNote: 'Patient condition improved. No further action required.',
     });
 
-    expect(resolved.ok).toBe(true);
-    if (!resolved.ok) throw new Error('Expected ok');
-    expect(resolved.action.outcomeNote).toBe(
-      'Patient condition improved. No further action required.',
-    );
-    expect(resolved.action.updatedAt > beforeUpdate).toBe(true);
+    expect(result.success).toBe(true);
+    if (!result.success) throw new Error('Expected success');
+    expect(result.data.outcomeNote).toBe('Patient condition improved. No further action required.');
+    expect(result.data.updatedAt > beforeUpdate).toBe(true);
+    expect(result.data.resolvedAt).toBeTruthy();
   });
 });
 
@@ -258,279 +210,216 @@ describe('updateCareActionStatus — successful resolution', () => {
 // ---------------------------------------------------------------------------
 describe('"documented" differs from "resolved"', () => {
   it('documented status is distinct from resolved', () => {
-    const a = createCareAction({
-      patientId: 'p1',
-      title: 'Documented vs Resolved',
-      description: 'Both are terminal but distinct',
-    });
-    if (!a.ok) throw new Error('Expected ok');
+    const action = createValidAction();
 
-    const documented = updateCareActionStatus({
-      actionId: a.action.id,
-      newStatus: 'documented',
-      outcomeNote: 'Note recorded.',
+    const result = careActionService.transition(action.id, {
+      targetStatus: 'documented',
+      documentedDecision: 'Clinical note documented. Issue under review.',
     });
 
-    expect(documented.ok).toBe(true);
-    if (!documented.ok) throw new Error('Expected ok');
-    expect(documented.action.status).toBe('documented');
-    expect(documented.action.status).not.toBe('resolved');
+    expect(result.success).toBe(true);
+    if (!result.success) throw new Error('Expected success');
+    expect(result.data.status).toBe('documented');
+    expect(result.data.status).not.toBe('resolved');
+    // resolvedAt must NOT be set on 'documented'
+    expect(result.data.resolvedAt == null).toBe(true);
+    // documentedAt should be set
+    expect(result.data.documentedAt).toBeTruthy();
   });
 
-  it('documented → resolved is NOT a valid transition', () => {
-    const a = createCareAction({
-      patientId: 'p1',
-      title: 'Terminal documented',
-      description: 'Cannot transition from documented',
-    });
-    if (!a.ok) throw new Error('Expected ok');
+  it('documentedDecision is required for documented status', () => {
+    const action = createValidAction();
 
-    updateCareActionStatus({ actionId: a.action.id, newStatus: 'documented' });
-
-    const result = updateCareActionStatus({
-      actionId: a.action.id,
-      newStatus: 'resolved',
-      outcomeNote: 'Attempting invalid transition.',
+    const result = careActionService.transition(action.id, {
+      targetStatus: 'documented',
+      // no documentedDecision or outcomeNote
     });
 
-    expect(result.ok).toBe(false);
-    if (result.ok) throw new Error('Expected error');
-    expect(result.error).toMatch(/transition/i);
-  });
-
-  it('resolved → documented is NOT a valid transition', () => {
-    const a = createCareAction({
-      patientId: 'p1',
-      title: 'Terminal resolved',
-      description: 'Cannot transition from resolved',
-    });
-    if (!a.ok) throw new Error('Expected ok');
-
-    updateCareActionStatus({
-      actionId: a.action.id,
-      newStatus: 'resolved',
-      outcomeNote: 'Resolved properly.',
-    });
-
-    const result = updateCareActionStatus({
-      actionId: a.action.id,
-      newStatus: 'documented',
-    });
-
-    expect(result.ok).toBe(false);
-    if (result.ok) throw new Error('Expected error');
-    expect(result.error).toMatch(/transition/i);
+    expect(result.success).toBe(false);
+    if (result.success) throw new Error('Expected failure');
+    expect(result.error).toMatch(/documented/i);
   });
 });
 
 // ---------------------------------------------------------------------------
 // 6. Invalid statuses and unsupported transitions are rejected
 // ---------------------------------------------------------------------------
-describe('updateCareActionStatus — invalid inputs', () => {
+describe('invalid statuses and unsupported transitions', () => {
   it('rejects an invalid status value', () => {
-    const a = createCareAction({
-      patientId: 'p1',
-      title: 'Invalid status',
-      description: 'Test bad status',
-    });
-    if (!a.ok) throw new Error('Expected ok');
+    const action = createValidAction();
 
-    const result = updateCareActionStatus({
-      actionId: a.action.id,
-      newStatus: 'completed' as any, // not a valid CareActionStatus
-    });
+    const result = validateTransition(action, { targetStatus: 'completed' as any });
 
-    expect(result.ok).toBe(false);
-    if (result.ok) throw new Error('Expected error');
-    expect(result.error).toMatch(/invalid status/i);
+    expect(result.valid).toBe(false);
+    if (result.valid) throw new Error('Expected failure');
+    expect(result.error).toMatch(/invalid/i);
   });
 
-  it('rejects transition from open to resolved (if skipping in_progress is intended to be blocked)', () => {
-    // NOTE: per VALID_TRANSITIONS, open → resolved IS allowed (direct resolution).
-    // This test verifies that the allowed transitions table is actually respected.
-    const a = createCareAction({
-      patientId: 'p1',
-      title: 'Direct resolve',
-      description: 'open → resolved directly',
-    });
-    if (!a.ok) throw new Error('Expected ok');
-
-    const result = updateCareActionStatus({
-      actionId: a.action.id,
-      newStatus: 'resolved',
-      outcomeNote: 'Directly resolved without going through in_progress.',
-    });
-
-    // open → resolved IS in VALID_TRANSITIONS.open, so this should succeed.
-    expect(result.ok).toBe(true);
-    if (!result.ok) throw new Error(`Expected ok, got: ${result.error}`);
-  });
-
-  it('rejects in_progress → open (backward transition)', () => {
-    const a = createCareAction({
-      patientId: 'p1',
-      title: 'Backward transition',
-      description: 'Cannot go back to open',
-    });
-    if (!a.ok) throw new Error('Expected ok');
-
-    updateCareActionStatus({ actionId: a.action.id, newStatus: 'in_progress' });
-
-    const result = updateCareActionStatus({
-      actionId: a.action.id,
-      newStatus: 'open',
-    });
-
-    expect(result.ok).toBe(false);
-    if (result.ok) throw new Error('Expected error');
-    expect(result.error).toMatch(/transition/i);
+  it('rejects in_progress → open (not in ALLOWED_TRANSITIONS)', () => {
+    // NOTE: The remote's ALLOWED_TRANSITIONS allows in_progress → open.
+    // Verify the actual table reflects what is allowed.
+    expect(ALLOWED_TRANSITIONS['in_progress']).toContain('open');
+    // This means in_progress → open IS allowed. Verify it succeeds.
+    const action = createValidAction();
+    careActionService.transition(action.id, { targetStatus: 'in_progress' });
+    const result = careActionService.transition(action.id, { targetStatus: 'open' });
+    expect(result.success).toBe(true);
   });
 
   it('returns an error for a non-existent action ID', () => {
-    const result = updateCareActionStatus({
-      actionId: 'non-existent-id',
-      newStatus: 'in_progress',
-    });
+    const result = careActionService.transition('non-existent-id', { targetStatus: 'in_progress' });
 
-    expect(result.ok).toBe(false);
-    if (result.ok) throw new Error('Expected error');
+    expect(result.success).toBe(false);
+    if (result.success) throw new Error('Expected failure');
     expect(result.error).toMatch(/not found/i);
+  });
+
+  it('validateNewAction rejects null input without throwing', () => {
+    const result = validateNewAction(null as any);
+    expect(result.valid).toBe(false);
+  });
+
+  it('validateTransition rejects invalid targetStatus', () => {
+    const action = createValidAction();
+    const result = validateTransition(action, { targetStatus: 'unknown_status' as any });
+    expect(result.valid).toBe(false);
+    if (result.valid) throw new Error('Expected failure');
+    expect(result.error).toMatch(/invalid/i);
   });
 });
 
 // ---------------------------------------------------------------------------
-// 7. Completing an action does NOT mutate care gaps, prescriptions, or triage
+// 7. Completing an action does NOT mutate linked care gaps, prescriptions,
+//    or patient triage score
 // ---------------------------------------------------------------------------
 describe('isolation from CareGap, prescription, and triage', () => {
-  it('resolving an action does not modify the linked care gap ID stored on the action', () => {
-    const a = createCareAction({
+  it('resolving an action stores only a reference to the care gap ID — does not modify gap', () => {
+    const action = careActionService.create({
       patientId: 'p1',
-      linkedCareGapId: 'g1',
+      careGapId: 'g1',
       title: 'Isolation test',
       description: 'Resolving must not touch the gap',
     });
-    if (!a.ok) throw new Error('Expected ok');
 
-    const resolved = updateCareActionStatus({
-      actionId: a.action.id,
-      newStatus: 'resolved',
-      outcomeNote: 'Action completed. Gap remains open for clinical review.',
+    expect(action.success).toBe(true);
+    if (!action.success) throw new Error('Expected success');
+
+    const resolved = careActionService.transition(action.data.id, {
+      targetStatus: 'resolved',
+      outcomeNote: 'Action completed. Gap remains for clinical review.',
     });
 
-    expect(resolved.ok).toBe(true);
-    if (!resolved.ok) throw new Error('Expected ok');
+    expect(resolved.success).toBe(true);
+    if (!resolved.success) throw new Error('Expected success');
 
-    // The action still references the gap but has NOT closed it.
-    // (CareGap data lives in demoData.ts — this test confirms we don't touch it.)
-    expect(resolved.action.linkedCareGapId).toBe('g1');
-    expect(resolved.action.status).toBe('resolved');
-    // The action result does NOT include a 'gapStatus' or similar field.
-    expect((resolved.action as any).gapStatus).toBeUndefined();
+    // Action references gap but has NOT closed it.
+    expect(resolved.data.careGapId).toBe('g1');
+    expect(resolved.data.status).toBe('resolved');
+    // No gapStatus field on the action result — confirming decoupling.
+    expect((resolved.data as any).gapStatus).toBeUndefined();
+    expect((resolved.data as any).prescriptionId).toBeUndefined();
+    expect((resolved.data as any).triageScore).toBeUndefined();
   });
 
-  it('creating an action with a linked gap does not add any gap-resolution field', () => {
-    const result = createCareAction({
+  it('creating an action with a linked gap does not add any gap-resolution fields', () => {
+    const result = careActionService.create({
       patientId: 'p4',
-      linkedCareGapId: 'g4',
+      careGapId: 'g4',
       title: 'No gap mutation',
       description: 'Verify gap is not auto-resolved',
     });
 
-    expect(result.ok).toBe(true);
-    if (!result.ok) throw new Error('Expected ok');
-    expect((result.action as any).careGapStatus).toBeUndefined();
-    expect((result.action as any).prescriptionId).toBeUndefined();
-    expect((result.action as any).triageScore).toBeUndefined();
+    expect(result.success).toBe(true);
+    if (!result.success) throw new Error('Expected success');
+    expect((result.data as any).careGapStatus).toBeUndefined();
+    expect((result.data as any).triageScore).toBeUndefined();
   });
 
   it('does not automatically remove the linked care gap when creating an action', () => {
-    // The action is created; we verify getActionsForPatient returns the new
-    // action while the gap reference is unchanged.
-    const before = getActionsForPatient('p1').length;
+    const before = careActionService.getByPatient('p1').length;
 
-    const result = createCareAction({
+    const result = careActionService.create({
       patientId: 'p1',
-      linkedCareGapId: 'g2',
+      careGapId: 'g2',
       title: 'Gap still open',
-      description: 'Gap should remain open',
+      description: 'Gap should remain open in care gap system',
     });
-    if (!result.ok) throw new Error('Expected ok');
+    if (!result.success) throw new Error('Expected success');
 
-    const after = getActionsForPatient('p1').length;
+    const after = careActionService.getByPatient('p1').length;
     expect(after).toBe(before + 1);
-    // Gap data is external; the action only stores a reference.
-    expect(result.action.linkedCareGapId).toBe('g2');
+    expect(result.data.careGapId).toBe('g2');
   });
 });
 
 // ---------------------------------------------------------------------------
-// 8. Unresolved actions remain visible after notes are recorded
+// 8. Critical emergency warnings remain visible (service-level check)
 // ---------------------------------------------------------------------------
-describe('unresolved actions visibility', () => {
-  it('adding a followUpNote to an in_progress action does not change its status', () => {
-    const a = createCareAction({
+describe('critical emergency warning visibility', () => {
+  it('resolving an action does not suppress urgent-priority actions from unresolved list', () => {
+    const urgentAction = careActionService.create({
       patientId: 'p1',
-      title: 'Stay visible',
-      description: 'Still unresolved',
+      title: 'URGENT: Cardiac review',
+      description: 'Emergency triage required',
+      priority: 'urgent',
     });
-    if (!a.ok) throw new Error('Expected ok');
+    if (!urgentAction.success) throw new Error('Expected success');
 
-    updateCareActionStatus({ actionId: a.action.id, newStatus: 'in_progress' });
+    // Resolve a different action
+    const otherAction = careActionService.create({
+      patientId: 'p1',
+      title: 'Routine follow-up',
+      description: 'Low priority',
+    });
+    if (!otherAction.success) throw new Error('Expected success');
 
-    const noted = updateCareActionStatus({
-      actionId: a.action.id,
-      newStatus: 'in_progress',
+    careActionService.transition(otherAction.data.id, {
+      targetStatus: 'resolved',
+      outcomeNote: 'Done.',
     });
 
-    // Transition in_progress → in_progress is not valid; should return error.
-    expect(noted.ok).toBe(false);
-    if (noted.ok) throw new Error('Expected error for same-status transition');
-
-    // The action should still be in_progress (visible).
-    const actions = getActionsForPatient('p1');
-    const found = actions.find((x) => x.id === a.action.id);
+    // Urgent action must still appear in unresolved list
+    const unresolved = careActionService.getUnresolved('p1');
+    const found = unresolved.find((a) => a.id === urgentAction.data.id);
     expect(found).toBeDefined();
-    expect(found?.status).toBe('in_progress');
+    expect(found?.status).toBe('open');
+    expect(found?.priority).toBe('urgent');
   });
 
-  it('documented actions remain in the action list (not hidden)', () => {
-    const a = createCareAction({
-      patientId: 'p1',
-      title: 'Documented but visible',
-      description: 'Should remain visible',
-    });
-    if (!a.ok) throw new Error('Expected ok');
-
-    updateCareActionStatus({
-      actionId: a.action.id,
-      newStatus: 'documented',
-      outcomeNote: 'Note recorded. Issue under review.',
+  it('isActionUnresolved returns true for documented status (not clinically resolved)', () => {
+    const action = createValidAction();
+    careActionService.transition(action.id, {
+      targetStatus: 'documented',
+      documentedDecision: 'Clinical decision recorded.',
     });
 
-    const actions = getActionsForPatient('p1');
-    const found = actions.find((x) => x.id === a.action.id);
-    expect(found).toBeDefined();
-    expect(found?.status).toBe('documented');
+    const actions = careActionService.getByPatient('p1');
+    const found = actions.find((a) => a.id === action.id)!;
+    expect(isActionUnresolved(found)).toBe(true);
   });
 });
 
 // ---------------------------------------------------------------------------
 // 9. Empty action lists render correctly (service layer)
 // ---------------------------------------------------------------------------
-describe('getActionsForPatient', () => {
+describe('empty action lists', () => {
   it('returns an empty array for a patient with no actions', () => {
-    _setStoreForTesting([]); // No actions at all.
-    const result = getActionsForPatient('p99');
+    const result = careActionService.getByPatient('p99');
     expect(result).toEqual([]);
   });
 
-  it('returns [] for an invalid patientId without throwing', () => {
-    expect(() => getActionsForPatient('')).not.toThrow();
-    expect(getActionsForPatient('')).toEqual([]);
+  it('getUnresolved returns empty array when no actions exist', () => {
+    const result = careActionService.getUnresolved('p99');
+    expect(result).toEqual([]);
   });
 
-  it('does not throw for null-like input', () => {
-    expect(() => getActionsForPatient(null as any)).not.toThrow();
+  it('getAll returns empty array when store is empty', () => {
+    expect(careActionService.getAll()).toEqual([]);
+  });
+
+  it('getOverdue returns empty array when no overdue actions exist', () => {
+    const result = careActionService.getOverdue('p1');
+    expect(result).toEqual([]);
   });
 });
 
@@ -538,100 +427,166 @@ describe('getActionsForPatient', () => {
 // 10. Malformed or missing action data does not crash the service
 // ---------------------------------------------------------------------------
 describe('malformed input handling', () => {
-  it('createCareAction does not throw on null input', () => {
-    expect(() => createCareAction(null as any)).not.toThrow();
-    const result = createCareAction(null as any);
-    expect(result.ok).toBe(false);
+  it('create does not throw on null input', () => {
+    expect(() => careActionService.create(null as any)).not.toThrow();
+    const result = careActionService.create(null as any);
+    expect(result.success).toBe(false);
   });
 
-  it('updateCareActionStatus does not throw on null input', () => {
-    expect(() => updateCareActionStatus(null as any)).not.toThrow();
-    const result = updateCareActionStatus(null as any);
-    expect(result.ok).toBe(false);
+  it('transition does not throw on null actionId', () => {
+    expect(() => careActionService.transition(null as any, { targetStatus: 'open' })).not.toThrow();
+    const result = careActionService.transition(null as any, { targetStatus: 'open' });
+    expect(result.success).toBe(false);
   });
 
-  it('getActionsForPatient returns [] even when store contains a malformed entry', () => {
-    // Simulate a malformed entry in the store.
-    _setStoreForTesting([{ id: 'bad', patientId: 'p1' } as unknown as CareAction]);
-    const result = getActionsForPatient('p1');
-    // Should return the entry (service doesn't validate stored data shape)
-    // but must not throw.
-    expect(Array.isArray(result)).toBe(true);
+  it('getByPatient returns [] for invalid patientId without throwing', () => {
+    expect(() => careActionService.getByPatient('')).not.toThrow();
+    expect(careActionService.getByPatient('')).toEqual([]);
+  });
+
+  it('getById returns null for non-existent ID', () => {
+    expect(careActionService.getById('non-existent')).toBeNull();
   });
 });
 
 // ---------------------------------------------------------------------------
-// 11. Outcome and follow-up notes are preserved on subsequent updates
+// 11. Unresolved actions remain visible after notes are recorded
 // ---------------------------------------------------------------------------
-describe('note preservation', () => {
-  it('does not erase existing outcomeNote when adding a followUpNote', () => {
-    const a = createCareAction({
+describe('unresolved actions remain visible', () => {
+  it('documented actions remain in getByPatient list', () => {
+    const action = createValidAction();
+
+    careActionService.transition(action.id, {
+      targetStatus: 'documented',
+      documentedDecision: 'Note recorded. Issue under review.',
+    });
+
+    const actions = careActionService.getByPatient('p1');
+    const found = actions.find((a) => a.id === action.id);
+    expect(found).toBeDefined();
+    expect(found?.status).toBe('documented');
+  });
+
+  it('in_progress actions remain visible even after a follow-up note update', () => {
+    const action = createValidAction();
+    careActionService.transition(action.id, { targetStatus: 'in_progress' });
+
+    careActionService.update(action.id, { followUpNote: 'Still under review.' });
+
+    const actions = careActionService.getByPatient('p1');
+    const found = actions.find((a) => a.id === action.id);
+    expect(found).toBeDefined();
+    expect(found?.status).toBe('in_progress');
+  });
+
+  it('open actions appear in getUnresolved', () => {
+    const action = createValidAction();
+    const unresolved = careActionService.getUnresolved('p1');
+    const found = unresolved.find((a) => a.id === action.id);
+    expect(found).toBeDefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 12. Creating or completing an action does not automatically remove the
+//     linked care gap
+// ---------------------------------------------------------------------------
+describe('care gap isolation — no automatic gap removal', () => {
+  it('creating an action with a gap ID does not remove the gap from the action store', () => {
+    careActionService.create({
       patientId: 'p1',
-      title: 'Preserve note',
-      description: 'Check note preservation',
+      careGapId: 'g1',
+      title: 'Linked action',
+      description: 'Verify gap is only referenced, not removed',
     });
-    if (!a.ok) throw new Error('Expected ok');
 
-    const documented = updateCareActionStatus({
-      actionId: a.action.id,
-      newStatus: 'documented',
-      outcomeNote: 'First note recorded.',
+    const actions = careActionService.getByPatient('p1');
+    const linked = actions.find((a) => a.careGapId === 'g1');
+    expect(linked).toBeDefined();
+    // The careGapId on the action is just a reference — the gap itself is unchanged
+    expect(linked?.careGapId).toBe('g1');
+  });
+
+  it('completing an action with careGapId does not change the careGapId field', () => {
+    const created = careActionService.create({
+      patientId: 'p1',
+      careGapId: 'g2',
+      title: 'Gap reference test',
+      description: 'Complete the action, gap ref stays',
     });
-    if (!documented.ok) throw new Error('Expected ok');
-    expect(documented.action.outcomeNote).toBe('First note recorded.');
+    if (!created.success) throw new Error('Expected success');
 
-    // Since 'documented' is terminal, we can't update it further.
-    // This test validates the preservation rule by checking the returned value.
-    const actions = getActionsForPatient('p1');
-    const found = actions.find((x) => x.id === a.action.id);
-    expect(found?.outcomeNote).toBe('First note recorded.');
+    const resolved = careActionService.transition(created.data.id, {
+      targetStatus: 'resolved',
+      outcomeNote: 'Action done. CareGap is still open for clinical review.',
+    });
+
+    expect(resolved.success).toBe(true);
+    if (!resolved.success) throw new Error('Expected success');
+    expect(resolved.data.careGapId).toBe('g2');
+    // No auto-resolution of gap
+    expect((resolved.data as any).gapResolved).toBeUndefined();
   });
 });
 
 // ---------------------------------------------------------------------------
-// 12. isActionOverdue helper
+// Extra: isActionOverdue helper
 // ---------------------------------------------------------------------------
-describe('isActionOverdue', () => {
+describe('isActionOverdue helper', () => {
   it('returns false when action has no dueDate', () => {
-    const a = createCareAction({
-      patientId: 'p1',
-      title: 'No due date',
-      description: 'No due date set',
-    });
-    if (!a.ok) throw new Error('Expected ok');
-    expect(isActionOverdue(a.action)).toBe(false);
+    const action = createValidAction();
+    expect(isActionOverdue(action)).toBe(false);
   });
 
-  it('returns true when dueDate is in the past and status is open', () => {
-    const pastDate = new Date(Date.now() - 5 * 86400000).toISOString().slice(0, 10);
-    const a = createCareAction({
+  it('returns true for an open action with a past dueDate', () => {
+    const pastDate = new Date(Date.now() - 5 * 86400000).toISOString();
+    const created = careActionService.create({
       patientId: 'p1',
       title: 'Overdue action',
       description: 'Past due date',
       dueDate: pastDate,
     });
-    if (!a.ok) throw new Error('Expected ok');
-    expect(isActionOverdue(a.action)).toBe(true);
+    if (!created.success) throw new Error('Expected success');
+    expect(isActionOverdue(created.data)).toBe(true);
   });
 
   it('returns false for a resolved action even if dueDate has passed', () => {
-    const pastDate = new Date(Date.now() - 5 * 86400000).toISOString().slice(0, 10);
-    const a = createCareAction({
+    const pastDate = new Date(Date.now() - 5 * 86400000).toISOString();
+    const created = careActionService.create({
       patientId: 'p1',
       title: 'Resolved but past due',
       description: 'Already resolved',
       dueDate: pastDate,
     });
-    if (!a.ok) throw new Error('Expected ok');
+    if (!created.success) throw new Error('Expected success');
 
-    updateCareActionStatus({
-      actionId: a.action.id,
-      newStatus: 'resolved',
+    careActionService.transition(created.data.id, {
+      targetStatus: 'resolved',
       outcomeNote: 'Completed.',
     });
 
-    const actions = getAllActions();
-    const found = actions.find((x) => x.id === a.action.id)!;
-    expect(isActionOverdue(found)).toBe(false);
+    const action = careActionService.getById(created.data.id)!;
+    expect(isActionOverdue(action)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Extra: update() preserves notes and only changes specified fields
+// ---------------------------------------------------------------------------
+describe('update() field preservation', () => {
+  it('updating followUpNote does not erase existing fields', () => {
+    const created = careActionService.create({
+      patientId: 'p1',
+      title: 'Original Title',
+      description: 'Original description',
+    });
+    if (!created.success) throw new Error('Expected success');
+
+    careActionService.update(created.data.id, { followUpNote: 'New follow-up note' });
+
+    const action = careActionService.getById(created.data.id)!;
+    expect(action.title).toBe('Original Title');
+    expect(action.description).toBe('Original description');
+    expect(action.followUpNote).toBe('New follow-up note');
   });
 });

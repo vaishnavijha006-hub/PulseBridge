@@ -1,14 +1,16 @@
 import { useState, useMemo } from 'react';
-import { Search, AlertTriangle, FileCheck, ChevronLeft, Clock, TrendingUp, Activity, ShieldAlert, MessageSquare, Pill } from 'lucide-react';
+import { Search, AlertTriangle, FileCheck, ChevronLeft, Clock, TrendingUp, Activity, ShieldAlert, MessageSquare, Pill, Check } from 'lucide-react';
 import { PulseBridgeLogo } from '@/components/PulseBridgeLogo';
 import { CursorGlow } from '@/components/CursorGlow';
 import { PatientStatusCard } from '@/components/PatientStatusCard';
 import { PrescriptionReview } from '@/components/PrescriptionReview';
 import { CareGapCard } from '@/components/CareGapCard';
 import { StatusBadge } from '@/components/StatusBadge';
+import { DemoBanner, DemoBadge } from '@/components/DemoBanner';
 import { useLanguage } from '@/i18n/LanguageContext';
 import { cn } from '@/utils/cn';
 import type { PatientSummary, CareGap, PrescriptionDraft, FollowUp } from '@/types';
+
 
 interface DoctorDashboardProps {
   summaries: PatientSummary[];
@@ -46,7 +48,17 @@ export function DoctorDashboard({
   const filteredSummaries = useMemo(() => {
     return summaries
       .filter(s => filter === 'all' || s.priority === filter)
-      .filter(s => !search || s.patient.name.toLowerCase().includes(search.toLowerCase()));
+      .filter(s => !search || s.patient.name.toLowerCase().includes(search.toLowerCase()))
+      .sort((a, b) => {
+        // 1. Critical safety emergency override always first
+        if (a.criticalSafetyOverride && !b.criticalSafetyOverride) return -1;
+        if (!a.criticalSafetyOverride && b.criticalSafetyOverride) return 1;
+        // 2. Triage score descending
+        const scoreDiff = (b.triageScore ?? 0) - (a.triageScore ?? 0);
+        if (scoreDiff !== 0) return scoreDiff;
+        // 3. Open care gaps count descending
+        return b.openGaps - a.openGaps;
+      });
   }, [summaries, filter, search]);
 
   if (selectedPatient) {
@@ -83,9 +95,16 @@ export function DoctorDashboard({
                 <ChevronLeft className="w-5 h-5" />
               </button>
               <PulseBridgeLogo variant="dark" size="md" />
+              <div className="hidden lg:block">
+                <DemoBanner variant="dark" />
+              </div>
             </div>
             <div className="flex items-center gap-3">
+              <div className="lg:hidden">
+                <DemoBadge variant="dark" />
+              </div>
               <div className="hidden sm:flex items-center gap-2 rounded-lg bg-navy-700 border border-navy-600 px-3 py-1.5">
+
                 <span className="text-xs font-medium text-navy-200">{new Date().toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
               </div>
               <div className="flex items-center gap-2">
@@ -262,7 +281,7 @@ function PatientDetail({
         </div>
 
         {activeTab === 'overview' && <OverviewTab summary={summary} followUps={followUps} />}
-        {activeTab === 'rx' && draft && <PrescriptionReview draft={draft} onConfirm={onConfirmCarePlan} />}
+        {activeTab === 'rx' && draft && <PrescriptionReview draft={draft} patientAllergies={summary.patient.allergies} onConfirm={onConfirmCarePlan} />}
         {activeTab === 'gaps' && (
           <div className="flex flex-col gap-3">
             {gaps.length === 0 ? (
@@ -308,10 +327,25 @@ function TabButton({ active, onClick, label, badge }: { active: boolean; onClick
 
 function OverviewTab({ summary, followUps }: { summary: PatientSummary; followUps: FollowUp[] }) {
   const { t } = useLanguage();
-  const { patient, dosesToday, adherence7Day, latestUpdate } = summary;
+  const { patient, dosesToday, adherence7Day, latestUpdate, triageScore, criticalSafetyOverride, criticalAlertMessage, scoreFactors } = summary;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Critical Safety Override banner */}
+      {criticalSafetyOverride && (
+        <div className="lg:col-span-2 rounded-2xl border border-danger-500 bg-danger-500/15 p-4 flex items-start gap-3 shadow-[0_0_20px_rgba(239,68,68,0.2)]">
+          <AlertTriangle className="w-5 h-5 text-danger-400 flex-shrink-0 mt-0.5 animate-pulse" />
+          <div className="flex flex-col gap-1">
+            <span className="text-sm font-bold text-danger-200 uppercase tracking-wide">
+              Critical Safety Override (Emergency Pathway Triggered)
+            </span>
+            <p className="text-sm text-danger-300">
+              {criticalAlertMessage || 'Patient reported possible emergency symptoms. Direct medical review required regardless of numerical triage score.'}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Patient info */}
       <div className="rounded-2xl border border-navy-600 bg-navy-700/50 p-5 flex flex-col gap-4">
         <h3 className="text-sm font-semibold text-navy-200 uppercase tracking-wide">Patient Information</h3>
@@ -337,15 +371,61 @@ function OverviewTab({ summary, followUps }: { summary: PatientSummary; followUp
         </div>
       </div>
 
-      {/* Adherence stats */}
+      {/* Adherence stats & Triage Score */}
       <div className="rounded-2xl border border-navy-600 bg-navy-700/50 p-5 flex flex-col gap-4">
-        <h3 className="text-sm font-semibold text-navy-200 uppercase tracking-wide">Recovery Stats</h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-navy-200 uppercase tracking-wide">Recovery & Triage</h3>
+          {typeof triageScore === 'number' && (
+            <span
+              className={cn(
+                'px-2.5 py-1 rounded-full text-xs font-extrabold border',
+                criticalSafetyOverride || triageScore >= 80
+                  ? 'bg-danger-500/20 text-danger-300 border-danger-500/40'
+                  : triageScore >= 50
+                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                  : 'bg-teal-500/20 text-teal-300 border-teal-500/40',
+              )}
+            >
+              {criticalSafetyOverride
+                ? `Triage Score: ${triageScore}/100 (Emergency Override)`
+                : `Triage Score: ${triageScore}/100`}
+            </span>
+          )}
+        </div>
         <div className="grid grid-cols-2 gap-3">
-          <StatBox icon={<Pill className="w-5 h-5" />} label={t('doctor_doses_today')} value={`${dosesToday.taken}/${dosesToday.total}`} color="teal" />
+          <StatBox icon={<Pill className="w-5 h-5" />} label={t('doctor_doses_today')} value={`${dosesToday.taken}/${dosesToday.total} (${dosesToday.missed} missed)`} color="teal" />
           <StatBox icon={<TrendingUp className="w-5 h-5" />} label={t('doctor_adherence')} value={`${adherence7Day}%`} color={adherence7Day >= 80 ? 'success' : 'amber'} />
           <StatBox icon={<AlertTriangle className="w-5 h-5" />} label={t('doctor_open_gaps')} value={String(summary.openGaps)} color={summary.openGaps > 0 ? 'danger' : 'success'} />
           <StatBox icon={<Clock className="w-5 h-5" />} label={t('doctor_last_update')} value={formatTimeAgo(summary.lastUpdateAt)} color="navy" />
         </div>
+
+        {scoreFactors && scoreFactors.length > 0 ? (
+          <div className="border-t border-navy-600/50 pt-3 flex flex-col gap-2">
+            <span className="text-xs font-semibold text-amber-400 uppercase">Triage Heuristic Factors</span>
+            <div className="flex flex-col gap-1.5">
+              {scoreFactors.map((f, i) => (
+                <div key={i} className="flex items-start gap-2 text-xs text-navy-200">
+                  <span className="text-amber-400 font-bold px-1.5 py-0.5 rounded bg-amber-500/10 flex-shrink-0">
+                    +{f.points}
+                  </span>
+                  <div>
+                    <span>{f.reason}</span>
+                    {f.evidence && <span className="text-navy-400 block text-[11px] italic">Evidence: {f.evidence}</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="border-t border-navy-600/50 pt-3 flex items-center gap-2 text-xs text-teal-300 bg-teal-500/10 border border-teal-500/20 rounded-lg p-2.5">
+            <Check className="w-4 h-4 flex-shrink-0 text-teal-400" />
+            <span>Care regimen on track: Zero missed doses, normal check-ins, and no open clinical gaps.</span>
+          </div>
+        )}
+
+        <p className="text-[10px] text-navy-400 italic pt-1 border-t border-navy-700">
+          * Queue-sorting heuristic only; not a diagnostic or medical risk prediction. Low score does not guarantee patient safety.
+        </p>
       </div>
 
       {/* Latest health update */}
