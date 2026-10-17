@@ -128,15 +128,24 @@ function notifyDemoListeners() {
  */
 function validatePrescriptionConfirmation(fields: PrescriptionField[]): string | null {
   const CRITICAL_KEYS = ['medicine', 'dosage', 'frequency', 'duration'];
-  const missingOrUncertain = fields.filter(
+
+  // 1. Ensure all critical keys exist in the fields array
+  const presentKeys = new Set(fields.map((f) => f.key));
+  const missingKeys = CRITICAL_KEYS.filter((k) => !presentKeys.has(k));
+  if (missingKeys.length > 0) {
+    return `Cannot confirm care plan: Missing required critical fields (${missingKeys.join(', ')}).`;
+  }
+
+  // 2. Ensure each critical field is verified and marked 'confirmed' (not 'uncertain' or 'editable')
+  const invalidFields = fields.filter(
     (f) =>
       CRITICAL_KEYS.includes(f.key) &&
-      (!f.value || !f.value.trim() || f.status === 'uncertain')
+      (!f.value || !f.value.trim() || f.status !== 'confirmed')
   );
 
-  if (missingOrUncertain.length > 0) {
-    const names = missingOrUncertain.map((f) => f.key).join(', ');
-    return `Cannot confirm care plan: Critical fields (${names}) must be verified and non-empty.`;
+  if (invalidFields.length > 0) {
+    const names = invalidFields.map((f) => `${f.key} (status: ${f.status || 'empty'})`).join(', ');
+    return `Cannot confirm care plan: Critical fields must be verified and confirmed (${names}).`;
   }
   return null;
 }
