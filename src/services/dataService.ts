@@ -991,12 +991,23 @@ const productionService: DataService = {
   async recordAdherence(scheduleId, status, reason, notes) {
     if (!supabase) return { error: 'Supabase client is not configured' };
 
+    // Lookup schedule to enrich adherence log with patient_id, medicine_name, and scheduled_time
+    const { data: sched } = await supabase
+      .from('medication_schedules')
+      .select('patient_id, medicine_name, scheduled_time')
+      .eq('id', scheduleId)
+      .maybeSingle();
+
     // Insert adherence log entry
     const noteText = [reason, notes].filter(Boolean).join(' - ') || null;
 
     const { error: logError } = await supabase.from('adherence_logs').insert({
       schedule_id: scheduleId,
+      patient_id: sched?.patient_id,
+      medicine_name: sched?.medicine_name ?? 'Prescribed Medicine',
+      scheduled_time: sched?.scheduled_time ?? '08:00',
       status,
+      reason: reason || null,
       notes: noteText,
       recorded_at: new Date().toISOString(),
     });
@@ -1007,6 +1018,11 @@ const productionService: DataService = {
     const updatePayload: Record<string, any> = { status };
     if (reason) {
       updatePayload.reason = reason;
+    }
+    if (status === 'snoozed') {
+      updatePayload.snoozed_until = calculateSnoozeTimestamp(10);
+    } else {
+      updatePayload.snoozed_until = null;
     }
 
     const { error: schedError } = await supabase
