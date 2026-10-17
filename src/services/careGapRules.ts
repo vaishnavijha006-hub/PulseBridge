@@ -54,7 +54,7 @@ export interface PatientTriageResult {
 }
 
 // Emergency red-flag symptoms requiring immediate clinical override regardless of score
-const EMERGENCY_SYMPTOM_PATTERNS = [
+export const EMERGENCY_SYMPTOM_PATTERNS = [
   /\b(chest pain|chest pressure|chest heaviness|chhati me dard|angina)\b/i,
   /\b(breathless(ness)?|shortness of breath|saans phoolna|dyspnea|difficulty breathing)\b/i,
   /\b(unconscious|fainted|behoshi|syncope)\b/i,
@@ -62,6 +62,65 @@ const EMERGENCY_SYMPTOM_PATTERNS = [
   /\b(stroke|facial droop|slurred speech)\b/i,
   /\b(anaphylaxis|swollen throat|severe allergy)\b/i,
 ];
+
+// Contextual triggers indicating that a symptom mention is negated, third-person, or informational
+export const NEGATION_PATTERNS = [
+  /\b(no|not|neither|nor|without|deny|denies|denied|don't have|do not have|does not have|doesn't have|free of|negative for|ruled out)\b/i,
+  /\b(nahi|nhi|na)\b/i,
+  /\b(absent|none|resolved|denied)\b/i,
+];
+
+export const THIRD_PARTY_OR_INFO_PATTERNS = [
+  /\b(my father|my mother|my brother|my sister|my parent|my parents|my friend|my husband|my wife|my son|my daughter|father had|mother had|brother had|sister had|family history|dad had|mom had)\b/i,
+  /\b(read an article|read about|watching|news about|documentary about|movie about|story about|article about|book about)\b/i,
+];
+
+/**
+ * Checks for affirmative emergency symptoms in patient narrative text.
+ * Filters out negated phrases (e.g., "no chest pain"), third-person/family history, and informational references.
+ * NOTE: Heuristic filter for doctor triage queue; not a clinically validated diagnostic engine.
+ */
+export function detectEmergencyOverride(text: string): {
+  isEmergency: boolean;
+  alertMessage?: string;
+  matchedClause?: string;
+} {
+  if (!text || !text.trim()) {
+    return { isEmergency: false };
+  }
+
+  // Split into clauses by punctuation or contrasting conjunctions
+  const clauses = text
+    .split(/(?:[.!?;,\n]|\b(?:but|however|except|yet|lekin|parantu|magar)\b)/i)
+    .map((c) => c.trim())
+    .filter(Boolean);
+
+  for (const clause of clauses) {
+    let matchesEmergency = false;
+    for (const pattern of EMERGENCY_SYMPTOM_PATTERNS) {
+      if (pattern.test(clause)) {
+        matchesEmergency = true;
+        break;
+      }
+    }
+
+    if (matchesEmergency) {
+      const isNegated = NEGATION_PATTERNS.some((p) => p.test(clause));
+      const isThirdPartyOrInfo = THIRD_PARTY_OR_INFO_PATTERNS.some((p) => p.test(clause));
+
+      if (!isNegated && !isThirdPartyOrInfo) {
+        return {
+          isEmergency: true,
+          alertMessage: `CRITICAL ALERT: Emergency symptom detected ("${clause}"). Immediate evaluation needed.`,
+          matchedClause: clause,
+        };
+      }
+    }
+  }
+
+  return { isEmergency: false };
+}
+
 
 /**
  * Detects clinically actionable CareGaps using deterministic safety rules.
@@ -291,12 +350,10 @@ export function calculatePatientTriageScore(
   let criticalAlertMessage: string | undefined;
 
   if (latestUpdate?.symptomDescription) {
-    for (const pattern of EMERGENCY_SYMPTOM_PATTERNS) {
-      if (pattern.test(latestUpdate.symptomDescription)) {
-        criticalSafetyOverride = true;
-        criticalAlertMessage = `CRITICAL ALERT: Emergency symptom detected ("${latestUpdate.symptomDescription}"). Immediate evaluation needed.`;
-        break;
-      }
+    const emergencyCheck = detectEmergencyOverride(latestUpdate.symptomDescription);
+    if (emergencyCheck.isEmergency) {
+      criticalSafetyOverride = true;
+      criticalAlertMessage = emergencyCheck.alertMessage;
     }
   }
 

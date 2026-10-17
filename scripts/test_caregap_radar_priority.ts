@@ -441,6 +441,81 @@ async function runCareGapRadarTests() {
   assert(mildEmergencyResult.criticalSafetyOverride === true, 'Emergency keywords trigger override regardless of patient self-reported "ok" state');
   assert(mildEmergencyResult.priority === 'urgent', 'Forces urgent review tier regardless of numerical score');
 
+  // Audit 2: Synthetic phrase verification for negation, family history, and informational contexts
+  // Phrase 1: Affirmative emergency symptoms
+  const affirmativeUpdate: HealthUpdate = {
+    id: 'upd-aff',
+    patientId: mockPatient.id,
+    submittedAt: new Date().toISOString(),
+    state: 'bad',
+    symptomDescription: 'I have chest heaviness and shortness of breath.',
+    source: 'patient',
+  };
+  const affRes = calculatePatientTriageScore(mockPatient, [affirmativeUpdate], onTrackSchedules, []);
+  assert(affRes.criticalSafetyOverride === true, 'Affirmative: "I have chest heaviness and shortness of breath." triggers override');
+  assert(affRes.priority === 'urgent', 'Affirmative emergency forces urgent priority');
+
+  // Phrase 2: Negated emergency symptoms
+  const negatedUpdate: HealthUpdate = {
+    id: 'upd-neg',
+    patientId: mockPatient.id,
+    submittedAt: new Date().toISOString(),
+    state: 'ok',
+    symptomDescription: 'I do not have chest pain or shortness of breath.',
+    source: 'patient',
+  };
+  const negRes = calculatePatientTriageScore(mockPatient, [negatedUpdate], onTrackSchedules, []);
+  assert(negRes.criticalSafetyOverride === false, 'Negation: "I do not have chest pain or shortness of breath." does NOT trigger false override');
+
+  // Phrase 3: Third-person / family history reference
+  const familyHistoryUpdate: HealthUpdate = {
+    id: 'upd-fam',
+    patientId: mockPatient.id,
+    submittedAt: new Date().toISOString(),
+    state: 'ok',
+    symptomDescription: 'My father had chest pain last year.',
+    source: 'patient',
+  };
+  const famRes = calculatePatientTriageScore(mockPatient, [familyHistoryUpdate], onTrackSchedules, []);
+  assert(famRes.criticalSafetyOverride === false, 'Family history: "My father had chest pain last year." does NOT trigger false override');
+
+  // Phrase 4: General absence of symptoms
+  const noSymptomsUpdate: HealthUpdate = {
+    id: 'upd-nosymp',
+    patientId: mockPatient.id,
+    submittedAt: new Date().toISOString(),
+    state: 'good',
+    symptomDescription: 'No symptoms today.',
+    source: 'patient',
+  };
+  const noSympRes = calculatePatientTriageScore(mockPatient, [noSymptomsUpdate], onTrackSchedules, []);
+  assert(noSympRes.criticalSafetyOverride === false, 'Absence: "No symptoms today." does NOT trigger override');
+
+  // Phrase 5: Informational / unrelated mention of an emergency keyword
+  const informationalUpdate: HealthUpdate = {
+    id: 'upd-info',
+    patientId: mockPatient.id,
+    submittedAt: new Date().toISOString(),
+    state: 'ok',
+    symptomDescription: 'I read an article about stroke yesterday.',
+    source: 'patient',
+  };
+  const infoRes = calculatePatientTriageScore(mockPatient, [informationalUpdate], onTrackSchedules, []);
+  assert(infoRes.criticalSafetyOverride === false, 'Informational: "I read an article about stroke yesterday." does NOT trigger false override');
+
+  // Phrase 6: Mixed clause — Negated chest pain, but affirmative shortness of breath
+  const mixedClauseUpdate: HealthUpdate = {
+    id: 'upd-mix',
+    patientId: mockPatient.id,
+    submittedAt: new Date().toISOString(),
+    state: 'bad',
+    symptomDescription: 'I do not have chest pain, but I have severe shortness of breath.',
+    source: 'patient',
+  };
+  const mixRes = calculatePatientTriageScore(mockPatient, [mixedClauseUpdate], onTrackSchedules, []);
+  assert(mixRes.criticalSafetyOverride === true, 'Contrasting clause with affirmative emergency symptom triggers override');
+
+
   console.log('');
 
   // -------------------------------------------------------------------------
