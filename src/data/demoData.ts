@@ -204,31 +204,90 @@ export const demoFamilyView: FamilyView = {
 export function getPatientSummaries(): PatientSummary[] {
   return demoPatients.map((patient) => {
     const schedules = demoSchedules[patient.id] ?? [];
+    const takenCount = schedules.filter((s) => s.status === 'taken').length;
+    const missedCount = schedules.filter((s) => s.status === 'missed' || s.status === 'cannot_take').length;
+    const pendingCount = schedules.filter((s) => s.status === 'pending' || s.status === 'snoozed').length;
+
     const dosesToday = {
-      taken: schedules.filter((s) => s.status === 'taken').length,
+      taken: takenCount,
+      missed: missedCount,
+      pending: pendingCount,
       total: schedules.length,
     };
+
     const adherence7Day = patient.id === 'p1' ? 64 : patient.id === 'p4' ? 78 : patient.id === 'p2' ? 90 : 95;
     const updates = demoHealthUpdates[patient.id] ?? [];
     const latestUpdate = updates[0] ?? null;
     const gaps = demoCareGaps[patient.id] ?? [];
-    const gapReasons = gaps.map((g) => g.evidence);
+    const followUps = demoFollowUps[patient.id] ?? [];
     const lastUpdateAt = latestUpdate?.submittedAt ?? new Date(Date.now() - 86400000).toISOString();
+    const draft = demoPrescriptionDrafts[patient.id];
+    const pendingRxCount = draft && !draft.confirmed ? 1 : 0;
+
+    // Calculate score using prototype heuristic
+    let score = 0;
+    const scoreFactors: { reason: string; points: number; evidence?: string }[] = [];
+
+    if (latestUpdate && latestUpdate.state === 'bad') {
+      score += 40;
+      scoreFactors.push({ reason: 'New or worsening symptom reported', points: 40, evidence: latestUpdate.symptomDescription });
+    }
+
+    if (gaps.some((g) => g.type === 'allergy_conflict' || g.type === 'duplicate_medicine')) {
+      score += 40;
+      scoreFactors.push({ reason: 'Safety flag: Allergy or duplicate medication', points: 40 });
+    }
+
+    if (missedCount >= 2) {
+      score += 30;
+      scoreFactors.push({ reason: 'Two or more missed doses in recovery window', points: 30 });
+    }
+
+    if (gaps.some((g) => g.type === 'missing_severity')) {
+      score += 20;
+      scoreFactors.push({ reason: 'Missing symptom severity rating', points: 20 });
+    }
+
+    const hasUnanswered = followUps.some((f) => f.status === 'pending');
+    if (hasUnanswered) {
+      score += 15;
+      scoreFactors.push({ reason: 'Unanswered follow-up question (>24h)', points: 15 });
+    }
+
+    let criticalSafetyOverride = false;
+    let criticalAlertMessage: string | undefined;
+
+    if (patient.id === 'p1' || (latestUpdate?.symptomDescription && /chest/i.test(latestUpdate.symptomDescription))) {
+      criticalSafetyOverride = true;
+      criticalAlertMessage = 'Possible emergency symptom reported (Chest heaviness): Immediate clinical review needed.';
+    }
 
     let priority: 'on_track' | 'needs_attention' | 'urgent' = 'on_track';
-    if (patient.id === 'p1') priority = 'urgent';
-    else if (patient.id === 'p4') priority = 'needs_attention';
-    else if (gaps.length > 0) priority = 'needs_attention';
+    if (criticalSafetyOverride || score >= 80) {
+      priority = 'urgent';
+    } else if (score >= 50) {
+      priority = 'needs_attention';
+    } else {
+      priority = 'on_track';
+    }
+
+    const gapReasons = scoreFactors.map((f) => `${f.reason} (+${f.points})`);
 
     return {
       patient,
       dosesToday,
       adherence7Day,
       latestUpdate,
-      openGaps: gaps.length,
-      gapReasons,
+      openGaps: gaps.filter((g) => g.status === 'open').length,
+      gapReasons: gapReasons.length > 0 ? gapReasons : gaps.map((g) => g.evidence),
       lastUpdateAt,
       priority,
+      triageScore: score,
+      criticalSafetyOverride,
+      criticalAlertMessage,
+      scoreFactors,
+      pendingRxCount,
     };
   });
 }
+

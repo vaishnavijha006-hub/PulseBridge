@@ -1,10 +1,19 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-// Retrieve credentials safely from Vite environment
-const rawUrl = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.trim();
+// Retrieve credentials safely from Vite environment or node environment
+const metaEnv = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env : undefined;
+const procEnv = typeof process !== 'undefined' && process.env ? process.env : undefined;
+
+const rawUrl = (
+  (metaEnv?.VITE_SUPABASE_URL as string | undefined) ??
+  (procEnv?.VITE_SUPABASE_URL as string | undefined)
+)?.trim();
+
 const rawKey = (
-  (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined) ??
-  (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined)
+  (metaEnv?.VITE_SUPABASE_ANON_KEY as string | undefined) ??
+  (metaEnv?.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined) ??
+  (procEnv?.VITE_SUPABASE_ANON_KEY as string | undefined) ??
+  (procEnv?.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined)
 )?.trim();
 
 /**

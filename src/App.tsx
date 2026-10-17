@@ -28,6 +28,7 @@ import type {
   FollowUp,
   PrescriptionField,
   PatientSummary,
+  FamilyView,
 } from '@/types';
 
 type View = 'landing' | 'patient_intake' | 'patient_processing' | 'patient_dashboard' | 'doctor' | 'family';
@@ -42,6 +43,7 @@ function AppContent() {
   const [prescriptionDrafts, setPrescriptionDrafts] = useState<Record<string, PrescriptionDraft>>(demoPrescriptionDrafts);
   const [followUps, setFollowUps] = useState<Record<string, FollowUp[]>>(demoFollowUps);
   const [patientProfile, setPatientProfile] = useState<Partial<PatientProfile> | null>(null);
+  const [familyView, setFamilyView] = useState<FamilyView>(demoFamilyView);
 
   const [summaries, setSummaries] = useState<PatientSummary[]>(getPatientSummaries());
 
@@ -49,12 +51,13 @@ function AppContent() {
     let mounted = true;
     async function loadData() {
       try {
-        const [sched, drafts, gaps, fUps, summs] = await Promise.all([
+        const [sched, drafts, gaps, fUps, summs, fam] = await Promise.all([
           dataService.fetchMedicationSchedules(DEMO_PATIENT_ID),
           dataService.fetchPrescriptionDraft(DEMO_PATIENT_ID),
           dataService.fetchCareGaps(DEMO_PATIENT_ID),
           dataService.fetchFollowUps(DEMO_PATIENT_ID),
           dataService.fetchPatientSummaries(),
+          dataService.fetchFamilyView(DEMO_PATIENT_ID),
         ]);
         if (!mounted) return;
         if (sched && sched.length > 0) setSchedules(sched);
@@ -62,13 +65,21 @@ function AppContent() {
         if (gaps && gaps.length > 0) setCareGaps((prev) => ({ ...prev, [DEMO_PATIENT_ID]: gaps }));
         if (fUps && fUps.length > 0) setFollowUps((prev) => ({ ...prev, [DEMO_PATIENT_ID]: fUps }));
         if (summs && summs.length > 0) setSummaries(summs);
+        if (fam) setFamilyView(fam);
       } catch (err) {
         console.warn('Could not fetch remote data, keeping initialized state:', err);
       }
     }
     void loadData();
+
+    // Subscribe to Realtime / Live updates across schedules, updates, gaps
+    const unsubscribe = dataService.subscribeToLiveUpdates(() => {
+      void loadData();
+    });
+
     return () => {
       mounted = false;
+      unsubscribe();
     };
   }, []);
 
@@ -96,15 +107,16 @@ function AppContent() {
     setView('patient_dashboard');
   }, []);
 
-  const handleDoseAction = useCallback(async (scheduleId: string, action: DoseStatus) => {
+  const handleDoseAction = useCallback(async (scheduleId: string, action: DoseStatus, reason?: string) => {
     setSchedules((prev) =>
-      prev.map((s) => (s.id === scheduleId ? { ...s, status: action } : s)),
+      prev.map((s) => (s.id === scheduleId ? { ...s, status: action, reason: reason || s.reason } : s)),
     );
-    const res = await dataService.recordAdherence(scheduleId, action);
+    const res = await dataService.recordAdherence(scheduleId, action, reason);
     if ('error' in res) {
       console.error('Failed to record adherence:', res.error);
     }
   }, []);
+
 
   const handleHealthUpdate = useCallback(async (state: HealthState, description: string) => {
     const patient = demoPatients.find((p) => p.id === DEMO_PATIENT_ID);
@@ -188,6 +200,15 @@ function AppContent() {
 
   const handleFamilyToggleAccess = useCallback(async (authorized: boolean) => {
     await dataService.updateCaregiverAccess(DEMO_PATIENT_ID, authorized);
+    const updated = await dataService.fetchFamilyView(DEMO_PATIENT_ID);
+    if (updated) {
+      setFamilyView(updated);
+    } else {
+      setFamilyView((prev) => ({
+        ...prev,
+        caregiverAccess: { ...prev.caregiverAccess, authorized },
+      }));
+    }
   }, []);
 
   void patientProfile;
@@ -235,7 +256,7 @@ function AppContent() {
       )}
       {view === 'family' && (
         <FamilyRecoveryCircle
-          view={{ ...demoFamilyView, caregiverAccess: { ...demoFamilyView.caregiverAccess } }}
+          view={familyView}
           onBack={() => setView('landing')}
           onToggleAccess={handleFamilyToggleAccess}
         />

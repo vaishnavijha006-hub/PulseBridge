@@ -11,6 +11,8 @@ import {
   demoAdherenceLogs,
   getPatientSummaries,
 } from '@/data/demoData';
+import { calculatePatientTriageScore } from '@/services/careGapRules';
+import { calculateSnoozeTimestamp } from '@/utils/reminderEngine';
 import type {
   PatientSummary,
   MedicationSchedule,
@@ -58,7 +60,12 @@ export interface DataService {
   ): Promise<{ ok: true } | { error: string }>;
 
   // 6. Recording medication adherence
-  recordAdherence(scheduleId: string, status: DoseStatus): Promise<{ ok: true } | { error: string }>;
+  recordAdherence(
+    scheduleId: string,
+    status: DoseStatus,
+    reason?: string,
+    notes?: string
+  ): Promise<{ ok: true } | { error: string }>;
   fetchAdherenceLogs(patientId: string): Promise<AdherenceLog[]>;
 
   // 7. Submitting patient health updates
@@ -86,6 +93,9 @@ export interface DataService {
   // 10. Follow-up questions
   fetchFollowUps(patientId: string): Promise<FollowUp[]>;
   updateFollowUp(followUpId: string, answer: string): Promise<{ ok: true } | { error: string }>;
+
+  // 11. Realtime / Live Synchronizations
+  subscribeToLiveUpdates(onUpdate: () => void): () => void;
 }
 
 // In-memory demo store for fully interactive demo mode without DB
@@ -99,6 +109,18 @@ const mutableDemoCaregiverAccess: Record<string, CaregiverAccess> = {
   p1: { ...demoCaregiverAccess },
 };
 const mutableDemoAdherenceLogs: Record<string, AdherenceLog[]> = { ...demoAdherenceLogs };
+
+// Listeners for demo mode live reactivity
+const demoListeners = new Set<() => void>();
+function notifyDemoListeners() {
+  demoListeners.forEach((listener) => {
+    try {
+      listener();
+    } catch (err) {
+      console.warn('Error in demo listener callback:', err);
+    }
+  });
+}
 
 /**
  * Validates critical prescription fields.
@@ -131,7 +153,42 @@ const demoService: DataService = {
   },
 
   async fetchPatientSummaries() {
-    return getPatientSummaries();
+    return mutableDemoPatients.map((patient) => {
+      const schedules = mutableDemoSchedules[patient.id] ?? [];
+      const updates = mutableDemoHealthUpdates[patient.id] ?? [];
+      const gaps = mutableDemoCareGaps[patient.id] ?? [];
+      const followUps = mutableDemoFollowUps[patient.id] ?? [];
+      const draft = mutableDemoPrescriptionDrafts[patient.id];
+
+      const taken = schedules.filter((s) => s.status === 'taken').length;
+      const missed = schedules.filter((s) => s.status === 'missed' || s.status === 'cannot_take').length;
+      const pending = schedules.filter((s) => s.status === 'pending' || s.status === 'snoozed').length;
+
+      const triageResult = calculatePatientTriageScore(patient, updates, schedules, followUps, gaps);
+      const latestUpdate = updates[0] ?? null;
+      const pendingRxCount = draft && !draft.confirmed ? 1 : 0;
+
+      return {
+        patient,
+        dosesToday: {
+          taken,
+          missed,
+          pending,
+          total: schedules.length,
+        },
+        adherence7Day: schedules.length > 0 ? Math.round((taken / schedules.length) * 100) : 100,
+        latestUpdate,
+        openGaps: gaps.filter((g) => g.status === 'open').length,
+        gapReasons: triageResult.reasons.length > 0 ? triageResult.reasons : gaps.map((g) => g.evidence),
+        lastUpdateAt: latestUpdate?.submittedAt ?? new Date().toISOString(),
+        priority: triageResult.priority,
+        triageScore: triageResult.score,
+        criticalSafetyOverride: triageResult.criticalSafetyOverride,
+        criticalAlertMessage: triageResult.criticalAlertMessage,
+        scoreFactors: triageResult.factors,
+        pendingRxCount,
+      };
+    });
   },
 
   async fetchMedicationSchedules(patientId) {
@@ -151,6 +208,7 @@ const demoService: DataService = {
       mutableDemoCareGaps[gap.patientId] = [];
     }
     mutableDemoCareGaps[gap.patientId].unshift(newGap);
+    notifyDemoListeners();
     return { data: newGap };
   },
 
@@ -181,25 +239,40 @@ const demoService: DataService = {
     const updates = mutableDemoHealthUpdates[patientId] ?? [];
 
     const isAuthorized = caregiverAccess.authorized;
+
+    // If caregiver access is revoked, return strictly redacted view
+    if (!isAuthorized) {
+      return {
+        patientName: patient?.name ?? demoFamilyView.patientName,
+        headlineKey: 'family_headline',
+        dosesToday: { taken: 0, total: 0 },
+        nextDoseTime: null,
+        healthUpdateStatus: 'Consent Revoked',
+        missedDose: false,
+        caregiverAccess: {
+          ...caregiverAccess,
+          contactNumber: null,
+        },
+      };
+    }
+
     const takenDoses = schedules.filter((s) => s.status === 'taken').length;
-    const hasMissed = schedules.some((s) => s.status === 'missed');
-    const nextDose = schedules.find((s) => s.status === 'pending')?.scheduledTime ?? null;
+    const hasMissed = schedules.some((s) => s.status === 'missed' || s.status === 'cannot_take');
+    const nextDose = schedules.find((s) => s.status === 'pending' || s.status === 'snoozed')?.scheduledTime ?? null;
 
     return {
       patientName: patient?.name ?? demoFamilyView.patientName,
       headlineKey: 'family_headline',
       dosesToday: { taken: takenDoses, total: schedules.length || 3 },
       nextDoseTime: nextDose,
-      healthUpdateStatus: isAuthorized
-        ? updates[0]
-          ? updates[0].state === 'good'
-            ? 'Feeling well'
-            : updates[0].state === 'ok'
-            ? 'Recovering steadily'
-            : 'Reported symptoms'
-          : 'Submitted'
-        : 'Consent Revoked',
-      missedDose: isAuthorized ? hasMissed : false,
+      healthUpdateStatus: updates[0]
+        ? updates[0].state === 'good'
+          ? 'Feeling well'
+          : updates[0].state === 'ok'
+          ? 'Recovering steadily'
+          : 'Reported symptoms'
+        : 'Submitted',
+      missedDose: hasMissed,
       caregiverAccess,
     };
   },
@@ -221,6 +294,7 @@ const demoService: DataService = {
     mutableDemoSchedules[newId] = [];
     mutableDemoCareGaps[newId] = [];
     mutableDemoHealthUpdates[newId] = [];
+    notifyDemoListeners();
     return { data: newPatient };
   },
 
@@ -243,6 +317,7 @@ const demoService: DataService = {
       confirmed: false,
     };
     mutableDemoPrescriptionDrafts[patientId] = draft;
+    notifyDemoListeners();
     return { data: draft };
   },
 
@@ -277,14 +352,22 @@ const demoService: DataService = {
       ];
     }
 
+    notifyDemoListeners();
     return { ok: true };
   },
 
-  async recordAdherence(scheduleId, status) {
+  async recordAdherence(scheduleId, status, reason, notes) {
     for (const pid of Object.keys(mutableDemoSchedules)) {
       const target = mutableDemoSchedules[pid]?.find((s) => s.id === scheduleId);
       if (target) {
         target.status = status;
+        if (status === 'snoozed') {
+          target.snoozedUntil = calculateSnoozeTimestamp(10);
+        } else {
+          target.snoozedUntil = null;
+        }
+        target.reason = reason || null;
+
         if (!mutableDemoAdherenceLogs[pid]) mutableDemoAdherenceLogs[pid] = [];
         mutableDemoAdherenceLogs[pid].push({
           id: `adh-${Date.now()}`,
@@ -293,10 +376,13 @@ const demoService: DataService = {
           scheduledTime: target.scheduledTime,
           status,
           recordedAt: new Date().toISOString(),
+          reason: reason || null,
+          notes: notes || null,
         });
         break;
       }
     }
+    notifyDemoListeners();
     return { ok: true };
   },
 
@@ -313,6 +399,7 @@ const demoService: DataService = {
       mutableDemoHealthUpdates[patientId] = [];
     }
     mutableDemoHealthUpdates[patientId].unshift(update);
+    notifyDemoListeners();
     return { data: update };
   },
 
@@ -324,6 +411,7 @@ const demoService: DataService = {
         break;
       }
     }
+    notifyDemoListeners();
     return { ok: true };
   },
 
@@ -337,6 +425,7 @@ const demoService: DataService = {
         break;
       }
     }
+    notifyDemoListeners();
     return { ok: true };
   },
 
@@ -345,7 +434,15 @@ const demoService: DataService = {
       mutableDemoCaregiverAccess[patientId] = { ...demoCaregiverAccess, patientId };
     }
     mutableDemoCaregiverAccess[patientId].authorized = authorized;
+    notifyDemoListeners();
     return { ok: true };
+  },
+
+  subscribeToLiveUpdates(onUpdate: () => void): () => void {
+    demoListeners.add(onUpdate);
+    return () => {
+      demoListeners.delete(onUpdate);
+    };
   },
 };
 
@@ -389,13 +486,109 @@ const productionService: DataService = {
 
   async fetchPatientSummaries() {
     if (!supabase) throw new Error('Supabase client is not configured');
-    // Query patient_summaries SQL view
-    const { data, error } = await supabase.from('patient_summaries').select('*');
-    if (error) {
-      console.error('Error fetching patient summaries view, falling back to manual aggregation:', error);
-      throw error;
+
+    // 1. Fetch patients
+    const { data: patientRows, error: pError } = await supabase.from('patients').select('*');
+    if (pError) throw pError;
+
+    const patients = (patientRows ?? []) as any[];
+
+    // 2. Fetch associated records to compute live heuristic scores and dose metrics
+    const summaries: PatientSummary[] = [];
+
+    for (const p of patients) {
+      const patientProfile: PatientProfile = {
+        id: p.id,
+        name: p.name,
+        age: p.age,
+        gender: p.gender,
+        phone: p.phone,
+        symptoms: p.symptoms ?? '',
+        allergies: p.allergies ?? 'None',
+        currentMeds: p.current_meds ?? '',
+        language: p.language ?? 'hi',
+      };
+
+      const [schedulesRes, updatesRes, gapsRes, followUpsRes, rxRes] = await Promise.all([
+        supabase.from('medication_schedules').select('*').eq('patient_id', p.id),
+        supabase.from('health_updates').select('*').eq('patient_id', p.id).order('submitted_at', { ascending: false }),
+        supabase.from('care_gaps').select('*').eq('patient_id', p.id).order('created_at', { ascending: false }),
+        supabase.from('follow_ups').select('*').eq('patient_id', p.id).order('asked_at', { ascending: false }),
+        supabase.from('prescriptions').select('id, confirmed').eq('patient_id', p.id).eq('confirmed', false),
+      ]);
+
+      const schedules: MedicationSchedule[] = (schedulesRes.data ?? []).map((s: any) => ({
+        id: s.id,
+        medicineId: s.care_plan_id ?? s.id,
+        medicineName: s.medicine_name,
+        dosage: s.dosage,
+        scheduledTime: s.scheduled_time,
+        status: s.status,
+        instructions: s.instructions ?? '',
+        patientId: s.patient_id,
+      }));
+
+      const updates: HealthUpdate[] = (updatesRes.data ?? []).map((u: any) => ({
+        id: u.id,
+        patientId: u.patient_id,
+        state: u.state,
+        symptomDescription: u.symptom_description ?? '',
+        submittedAt: u.submitted_at,
+        source: u.source ?? 'patient',
+      }));
+
+      const careGaps: CareGap[] = (gapsRes.data ?? []).map((g: any) => ({
+        id: g.id,
+        patientId: g.patient_id,
+        type: g.type,
+        evidence: g.evidence,
+        timestamp: g.created_at,
+        missingInfo: g.missing_info,
+        followupQuestion: g.followup_question,
+        status: g.status,
+      }));
+
+      const followUps: FollowUp[] = (followUpsRes.data ?? []).map((f: any) => ({
+        id: f.id,
+        patientId: f.patient_id,
+        question: f.question,
+        askedAt: f.asked_at,
+        answeredAt: f.answered_at,
+        answer: f.answer,
+        status: f.status,
+      }));
+
+      const pendingRxCount = rxRes.data?.length ?? 0;
+      const taken = schedules.filter((s) => s.status === 'taken').length;
+      const missed = schedules.filter((s) => s.status === 'missed' || s.status === 'cannot_take').length;
+      const pending = schedules.filter((s) => s.status === 'pending' || s.status === 'snoozed').length;
+
+      const triageResult = calculatePatientTriageScore(patientProfile, updates, schedules, followUps, careGaps);
+      const latestUpdate = updates[0] ?? null;
+
+      summaries.push({
+        patient: patientProfile,
+        dosesToday: {
+          taken,
+          missed,
+          pending,
+          total: schedules.length,
+        },
+        adherence7Day: schedules.length > 0 ? Math.round((taken / schedules.length) * 100) : 100,
+        latestUpdate,
+        openGaps: careGaps.filter((g) => g.status === 'open').length,
+        gapReasons: triageResult.reasons.length > 0 ? triageResult.reasons : careGaps.map((g) => g.evidence),
+        lastUpdateAt: latestUpdate?.submittedAt ?? p.created_at,
+        priority: triageResult.priority,
+        triageScore: triageResult.score,
+        criticalSafetyOverride: triageResult.criticalSafetyOverride,
+        criticalAlertMessage: triageResult.criticalAlertMessage,
+        scoreFactors: triageResult.factors,
+        pendingRxCount,
+      });
     }
-    return data as PatientSummary[];
+
+    return summaries;
   },
 
   async fetchMedicationSchedules(patientId) {
@@ -414,6 +607,7 @@ const productionService: DataService = {
       scheduledTime: row.scheduled_time,
       status: row.status as DoseStatus,
       instructions: row.instructions ?? '',
+      patientId: row.patient_id,
     })) as MedicationSchedule[];
   },
 
@@ -543,6 +737,7 @@ const productionService: DataService = {
       scheduledTime: row.scheduled_time,
       status: row.status as DoseStatus,
       recordedAt: row.recorded_at,
+      notes: row.notes,
     })) as AdherenceLog[];
   },
 
@@ -602,8 +797,8 @@ const productionService: DataService = {
 
     const schedList = (schedules ?? []) as any[];
     const takenCount = schedList.filter((s) => s.status === 'taken').length;
-    const hasMissed = schedList.some((s) => s.status === 'missed');
-    const nextDose = schedList.find((s) => s.status === 'pending')?.scheduled_time ?? null;
+    const hasMissed = schedList.some((s) => s.status === 'missed' || s.status === 'cannot_take');
+    const nextDose = schedList.find((s) => s.status === 'pending' || s.status === 'snoozed')?.scheduled_time ?? null;
 
     const { data: updates } = await supabase
       .from('health_updates')
@@ -793,22 +988,30 @@ const productionService: DataService = {
     return { ok: true };
   },
 
-  async recordAdherence(scheduleId, status) {
+  async recordAdherence(scheduleId, status, reason, notes) {
     if (!supabase) return { error: 'Supabase client is not configured' };
 
     // Insert adherence log entry
+    const noteText = [reason, notes].filter(Boolean).join(' - ') || null;
+
     const { error: logError } = await supabase.from('adherence_logs').insert({
       schedule_id: scheduleId,
       status,
+      notes: noteText,
       recorded_at: new Date().toISOString(),
     });
 
     if (logError) return { error: logError.message };
 
-    // Update schedule current status
+    // Update schedule current status without altering prescribed scheduled_time
+    const updatePayload: Record<string, any> = { status };
+    if (reason) {
+      updatePayload.reason = reason;
+    }
+
     const { error: schedError } = await supabase
       .from('medication_schedules')
-      .update({ status })
+      .update(updatePayload)
       .eq('id', scheduleId);
 
     if (schedError) return { error: schedError.message };
@@ -880,6 +1083,29 @@ const productionService: DataService = {
     if (error) return { error: error.message };
     return { ok: true };
   },
+
+  subscribeToLiveUpdates(onUpdate: () => void): () => void {
+    const client = supabase;
+    if (!client) return () => {};
+
+    const channel = client
+      .channel('pulsebridge-live-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'medication_schedules' }, () => onUpdate())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'health_updates' }, () => onUpdate())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'care_gaps' }, () => onUpdate())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'prescriptions' }, () => onUpdate())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'adherence_logs' }, () => onUpdate())
+      .subscribe((status, err) => {
+        if (err || status === 'CHANNEL_ERROR') {
+          console.warn('[PulseBridge Realtime] Live channel notice:', status, err?.message);
+        }
+      });
+
+    return () => {
+      client.removeChannel(channel);
+    };
+  },
+
 };
 
 export const dataService: DataService = isDemoMode ? demoService : productionService;
