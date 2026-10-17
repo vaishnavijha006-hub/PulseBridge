@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { ArrowLeft, ArrowRight, Mic, MicOff, User } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Mic, MicOff, User, CreditCard, AlertCircle, Info } from 'lucide-react';
 import { PulseBridgeLogo } from '@/components/PulseBridgeLogo';
 import { PulseProgress } from '@/components/PulseProgress';
 import { LanguageToggle } from '@/components/LanguageToggle';
@@ -12,6 +12,12 @@ import { useLanguage } from '@/i18n/LanguageContext';
 import type { TranslationKey } from '@/i18n/translations';
 import type { Language, PatientProfile } from '@/types';
 import { cn } from '@/utils/cn';
+import {
+  validateAbhaNumber,
+  validateAbhaAddress,
+  formatAbhaNumber,
+  resolveAbhaVerificationStatus,
+} from '@/utils/abha';
 
 interface PatientIntakeWizardProps {
   onComplete: (profile: Partial<PatientProfile>, prescriptionFile: File | null) => void;
@@ -38,6 +44,7 @@ export function PatientIntakeWizard({ onComplete, onBack }: PatientIntakeWizardP
   const [prescriptionFile, setPrescriptionFile] = useState<File | null>(null);
   const [voiceActive, setVoiceActive] = useState(false);
   const [voiceSupported, setVoiceSupported] = useState(false);
+  const [abhaError, setAbhaError] = useState<string | null>(null);
 
   const voice = useVoiceGuidance();
   const step = STEPS[stepIdx];
@@ -53,8 +60,30 @@ export function PatientIntakeWizard({ onComplete, onBack }: PatientIntakeWizardP
   }, [stepIdx, lang, voice.isEnabled]);
 
   const next = () => {
+    if (step === 'profile') {
+      if (profile.abhaNumber && profile.abhaNumber.trim()) {
+        const numVal = validateAbhaNumber(profile.abhaNumber);
+        if (!numVal.valid) {
+          setAbhaError(numVal.error || t('intake_abha_format_error'));
+          return;
+        }
+      }
+      if (profile.abhaAddress && profile.abhaAddress.trim()) {
+        const addrVal = validateAbhaAddress(profile.abhaAddress);
+        if (!addrVal.valid) {
+          setAbhaError(addrVal.error || t('intake_abha_address_error'));
+          return;
+        }
+      }
+      setAbhaError(null);
+    }
+
     if (isLast) {
-      onComplete(profile, prescriptionFile);
+      const finalProfile: Partial<PatientProfile> = {
+        ...profile,
+        abhaVerificationStatus: resolveAbhaVerificationStatus(profile),
+      };
+      onComplete(finalProfile, prescriptionFile);
     } else {
       setStepIdx((i) => Math.min(i + 1, STEPS.length - 1));
     }
@@ -101,7 +130,14 @@ export function PatientIntakeWizard({ onComplete, onBack }: PatientIntakeWizardP
       <main className="flex-1 mx-auto max-w-2xl w-full px-4 sm:px-6 py-8">
         <div key={step} className="animate-slide-up">
           {step === 'language' && <LanguageStep current={lang} onSelect={(l) => { setLang(l); setProfile({ ...profile, language: l }); }} />}
-          {step === 'profile' && <ProfileStep profile={profile} setProfile={setProfile} />}
+          {step === 'profile' && (
+            <ProfileStep
+              profile={profile}
+              setProfile={setProfile}
+              abhaError={abhaError}
+              setAbhaError={setAbhaError}
+            />
+          )}
           {step === 'symptoms' && <TextStep
             title={t('intake_symptoms_q')}
             hint={t('intake_symptoms_hint')}
@@ -218,7 +254,17 @@ function LanguageStep({ current, onSelect }: { current: Language; onSelect: (l: 
   );
 }
 
-function ProfileStep({ profile, setProfile }: { profile: Partial<PatientProfile>; setProfile: (p: Partial<PatientProfile>) => void }) {
+function ProfileStep({
+  profile,
+  setProfile,
+  abhaError,
+  setAbhaError,
+}: {
+  profile: Partial<PatientProfile>;
+  setProfile: (p: Partial<PatientProfile>) => void;
+  abhaError: string | null;
+  setAbhaError: (err: string | null) => void;
+}) {
   const { t } = useLanguage();
   return (
     <div className="flex flex-col gap-5">
@@ -268,6 +314,74 @@ function ProfileStep({ profile, setProfile }: { profile: Partial<PatientProfile>
             placeholder="9876543210"
           />
         </Field>
+
+        {/* Optional ABHA Details Card */}
+        <div className="rounded-2xl border border-teal-200/80 bg-teal-50/30 p-4.5 flex flex-col gap-3 mt-1">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <CreditCard className="w-4 h-4 text-teal-600" />
+              <span className="text-sm font-bold text-navy-800">{t('intake_abha_heading')}</span>
+            </div>
+            <span className="text-[11px] font-semibold text-teal-700 bg-teal-100/70 border border-teal-200 px-2 py-0.5 rounded-full">
+              {t('intake_abha_optional_badge')}
+            </span>
+          </div>
+
+          <Field label={t('intake_abha_number_label')}>
+            <input
+              type="text"
+              value={profile.abhaNumber ?? ''}
+              onChange={(e) => {
+                setProfile({ ...profile, abhaNumber: e.target.value });
+                setAbhaError(null);
+              }}
+              onBlur={() => {
+                if (profile.abhaNumber) {
+                  setProfile({ ...profile, abhaNumber: formatAbhaNumber(profile.abhaNumber) });
+                }
+              }}
+              className="w-full rounded-xl border border-surface-border bg-white px-4 py-3 text-base text-navy-800 focus:border-teal-400 focus:ring-1 focus:ring-teal-400 outline-none transition-colors"
+              placeholder={t('intake_abha_number_placeholder')}
+              maxLength={17}
+            />
+          </Field>
+
+          <Field label={t('intake_abha_address_label')}>
+            <input
+              type="text"
+              value={profile.abhaAddress ?? ''}
+              onChange={(e) => {
+                setProfile({ ...profile, abhaAddress: e.target.value });
+                setAbhaError(null);
+              }}
+              className="w-full rounded-xl border border-surface-border bg-white px-4 py-3 text-base text-navy-800 focus:border-teal-400 focus:ring-1 focus:ring-teal-400 outline-none transition-colors"
+              placeholder={t('intake_abha_address_placeholder')}
+            />
+          </Field>
+
+          {/* Inline Validation Error */}
+          {abhaError && (
+            <div className="flex items-start gap-2 rounded-xl bg-danger-50 border border-danger-200 p-2.5 text-xs text-danger-700 font-medium">
+              <AlertCircle className="w-4 h-4 text-danger-600 flex-shrink-0 mt-0.5" />
+              <span>{abhaError}</span>
+            </div>
+          )}
+
+          {/* Truthful Verification Status Explainer (Visible when details are entered) */}
+          {(Boolean(profile.abhaNumber?.trim()) || Boolean(profile.abhaAddress?.trim())) && !abhaError && (
+            <div className="flex items-start gap-2 rounded-xl bg-amber-50/80 border border-amber-200/80 p-2.5 text-xs text-amber-800">
+              <Info className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div className="flex flex-col gap-0.5">
+                <span className="font-semibold">
+                  {t('abha_badge_unverified')}
+                </span>
+                <span className="text-[11px] text-amber-700 leading-snug">
+                  {t('intake_abha_notice')}
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

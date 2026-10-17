@@ -96,6 +96,19 @@ export type TranslationKey =
   | 'intake_voice'
   | 'intake_optional'
   | 'intake_none'
+  | 'intake_abha_heading'
+  | 'intake_abha_optional_badge'
+  | 'intake_abha_number_label'
+  | 'intake_abha_number_placeholder'
+  | 'intake_abha_address_label'
+  | 'intake_abha_address_placeholder'
+  | 'intake_abha_notice'
+  | 'intake_abha_format_error'
+  | 'intake_abha_address_error'
+  | 'abha_badge_unverified'
+  | 'abha_badge_verified'
+  | 'abha_badge_not_provided'
+  | 'abha_status_explainer'
   | 'gender_male'
   | 'gender_female'
   | 'gender_other'
@@ -408,6 +421,31 @@ const dict: Dictionary = {
   intake_voice: { en: 'Speak', hi: 'बोलें' },
   intake_optional: { en: 'Optional', hi: 'वैकल्पिक' },
   intake_none: { en: 'None', hi: 'कोई नहीं' },
+  intake_abha_heading: { en: 'Ayushman Bharat Health Account (ABHA)', hi: 'आयुष्मान भारत स्वास्थ्य खाता (आभा - ABHA)' },
+  intake_abha_optional_badge: { en: 'Optional · Government Health ID', hi: 'वैकल्पिक · सरकारी स्वास्थ्य आईडी' },
+  intake_abha_number_label: { en: 'ABHA Number (14 digits)', hi: 'आभा संख्या (14 अंक)' },
+  intake_abha_number_placeholder: { en: '12-3456-7890-1234', hi: '12-3456-7890-1234' },
+  intake_abha_address_label: { en: 'ABHA Address / PHR Handle', hi: 'आभा पता / PHR हैंडल' },
+  intake_abha_address_placeholder: { en: 'e.g. username@abdm', hi: 'उदा. username@abdm' },
+  intake_abha_notice: {
+    en: 'Not verified — official ABDM verification is not configured.',
+    hi: 'सत्यापित नहीं है — आधिकारिक ABDM सत्यापन कॉन्फ़िगर नहीं है।'
+  },
+  intake_abha_format_error: {
+    en: 'Invalid ABHA Number. Must be exactly 14 digits (e.g. 12-3456-7890-1234).',
+    hi: 'अमान्य आभा संख्या। यह ठीक 14 अंकों की होनी चाहिए (उदा. 12-3456-7890-1234)।'
+  },
+  intake_abha_address_error: {
+    en: 'Invalid ABHA Address format (e.g. username@abdm).',
+    hi: 'अमान्य आभा पता प्रारूप (उदा. username@abdm)।'
+  },
+  abha_badge_unverified: { en: 'ABHA (Unverified)', hi: 'आभा (असत्यापित)' },
+  abha_badge_verified: { en: 'ABHA (Verified)', hi: 'आभा (सत्यापित)' },
+  abha_badge_not_provided: { en: 'ABHA Not Provided', hi: 'आभा उपलब्ध नहीं' },
+  abha_status_explainer: {
+    en: 'Self-declared patient record · Official government ABDM gateway verification is not configured.',
+    hi: 'मरीज द्वारा स्व-घोषित रिकॉर्ड · आधिकारिक सरकारी ABDM गेटवे सत्यापन कॉन्फ़िगर नहीं है।'
+  },
   gender_male: { en: 'Male', hi: 'पुरुष' },
   gender_female: { en: 'Female', hi: 'महिला' },
   gender_other: { en: 'Other', hi: 'अन्य' },

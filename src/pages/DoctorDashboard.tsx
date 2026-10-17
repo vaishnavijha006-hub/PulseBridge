@@ -974,6 +974,46 @@ function OverviewTab({ summary, followUps }: { summary: PatientSummary; followUp
             <span className="text-sm text-white">{patient.symptoms || 'None reported'}</span>
           </div>
         </div>
+
+        {/* ABHA Integration & Verification Display */}
+        <div className="border-t border-navy-600/50 pt-3 flex flex-col gap-2">
+          <span className="text-[11px] font-semibold text-slate-400 uppercase">
+            Ayushman Bharat Health Account (ABHA)
+          </span>
+          {patient.abhaNumber || patient.abhaAddress ? (
+            <div className="flex flex-col gap-2">
+              <div className="grid grid-cols-2 gap-3">
+                {patient.abhaNumber && (
+                  <InfoRow label="ABHA Number" value={patient.abhaNumber} />
+                )}
+                {patient.abhaAddress && (
+                  <InfoRow label="ABHA Address" value={patient.abhaAddress} />
+                )}
+              </div>
+              <div className="flex items-center gap-2 mt-1">
+                <span
+                  className={cn(
+                    'px-2 py-0.5 rounded text-[11px] font-bold border',
+                    patient.abhaVerificationStatus === 'verified'
+                      ? 'bg-success-500/20 text-success-300 border-success-500/40'
+                      : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                  )}
+                >
+                  {patient.abhaVerificationStatus === 'verified'
+                    ? 'ABHA Verified'
+                    : 'ABHA Unverified'}
+                </span>
+                <span className="text-[11px] text-slate-400">
+                  {patient.abhaVerificationStatus === 'verified'
+                    ? 'Official ABDM Verification Confirmed'
+                    : 'Official ABDM verification not configured'}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <span className="text-xs text-slate-500 italic">Not provided</span>
+          )}
+        </div>
       </div>
 
       {/* Adherence stats & Triage Score */}

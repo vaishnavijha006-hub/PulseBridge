@@ -31,7 +31,9 @@ import type {
   AdherenceLog,
   MedicalReport,
   ReportSummary,
+  AbhaVerificationStatus,
 } from '@/types';
+import { formatAbhaNumber, resolveAbhaVerificationStatus } from '@/utils/abha';
 
 export interface PrescriptionScanResult {
   data: PrescriptionDraft;
@@ -583,6 +585,14 @@ const demoService: DataService = {
 
   async savePatientIntake(profile) {
     const newId = `p-${Date.now()}`;
+    const formattedAbha = profile.abhaNumber ? formatAbhaNumber(profile.abhaNumber) : undefined;
+    const cleanAddr = profile.abhaAddress ? profile.abhaAddress.trim().toLowerCase() : undefined;
+    const verificationStatus = resolveAbhaVerificationStatus({
+      abhaNumber: formattedAbha,
+      abhaAddress: cleanAddr,
+      abhaVerificationStatus: profile.abhaVerificationStatus,
+    });
+
     const newPatient: PatientProfile = {
       id: newId,
       name: profile.name || 'New Patient',
@@ -593,6 +603,9 @@ const demoService: DataService = {
       allergies: profile.allergies || 'None',
       currentMeds: profile.currentMeds || '',
       language: profile.language || 'hi',
+      abhaNumber: formattedAbha,
+      abhaAddress: cleanAddr,
+      abhaVerificationStatus: verificationStatus,
     };
     mutableDemoPatients.unshift(newPatient);
     mutableDemoSchedules[newId] = [];
@@ -794,6 +807,9 @@ const productionService: DataService = {
       allergies: row.allergies ?? 'None',
       currentMeds: row.current_meds ?? '',
       language: row.language ?? 'hi',
+      abhaNumber: row.abha_number ?? undefined,
+      abhaAddress: row.abha_address ?? undefined,
+      abhaVerificationStatus: (row.abha_verification_status as AbhaVerificationStatus) ?? (row.abha_number ? 'unverified' : 'not_provided'),
     })) as PatientProfile[];
   },
 
@@ -812,6 +828,9 @@ const productionService: DataService = {
       allergies: data.allergies ?? 'None',
       currentMeds: data.current_meds ?? '',
       language: data.language ?? 'hi',
+      abhaNumber: data.abha_number ?? undefined,
+      abhaAddress: data.abha_address ?? undefined,
+      abhaVerificationStatus: (data.abha_verification_status as AbhaVerificationStatus) ?? (data.abha_number ? 'unverified' : 'not_provided'),
     } as PatientProfile;
   },
 
@@ -838,6 +857,9 @@ const productionService: DataService = {
         allergies: p.allergies ?? 'None',
         currentMeds: p.current_meds ?? '',
         language: p.language ?? 'hi',
+        abhaNumber: p.abha_number ?? undefined,
+        abhaAddress: p.abha_address ?? undefined,
+        abhaVerificationStatus: (p.abha_verification_status as AbhaVerificationStatus) ?? (p.abha_number ? 'unverified' : 'not_provided'),
       };
 
       const [schedulesRes, updatesRes, gapsRes, followUpsRes, rxRes] = await Promise.all([
@@ -1181,6 +1203,14 @@ const productionService: DataService = {
 
   async savePatientIntake(profile) {
     if (!supabase) return { error: 'Supabase client is not configured' };
+    const formattedAbha = profile.abhaNumber ? formatAbhaNumber(profile.abhaNumber) : null;
+    const cleanAddr = profile.abhaAddress ? profile.abhaAddress.trim().toLowerCase() : null;
+    const verificationStatus = resolveAbhaVerificationStatus({
+      abhaNumber: formattedAbha,
+      abhaAddress: cleanAddr,
+      abhaVerificationStatus: profile.abhaVerificationStatus,
+    });
+
     const { data, error } = await supabase
       .from('patients')
       .insert({
@@ -1192,6 +1222,9 @@ const productionService: DataService = {
         allergies: profile.allergies || 'None',
         current_meds: profile.currentMeds || '',
         language: profile.language || 'hi',
+        abha_number: formattedAbha,
+        abha_address: cleanAddr,
+        abha_verification_status: verificationStatus,
       })
       .select()
       .single();
@@ -1209,6 +1242,9 @@ const productionService: DataService = {
         allergies: data.allergies ?? 'None',
         currentMeds: data.current_meds ?? '',
         language: data.language ?? 'hi',
+        abhaNumber: data.abha_number ?? undefined,
+        abhaAddress: data.abha_address ?? undefined,
+        abhaVerificationStatus: (data.abha_verification_status as AbhaVerificationStatus) ?? 'not_provided',
       },
     };
   },

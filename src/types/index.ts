@@ -138,6 +138,8 @@ export interface Reminder {
   escalated?: boolean;
 }
 
+export type AbhaVerificationStatus = 'not_provided' | 'unverified' | 'verified';
+
 export interface PatientProfile {
   id: string;
   name: string;
@@ -148,6 +150,9 @@ export interface PatientProfile {
   allergies: string;
   currentMeds: string;
   language: Language;
+  abhaNumber?: string;
+  abhaAddress?: string;
+  abhaVerificationStatus?: AbhaVerificationStatus;
 }
 
 export interface PatientSummary {

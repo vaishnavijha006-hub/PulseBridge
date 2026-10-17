@@ -81,6 +81,23 @@ export function PatientStatusCard({ summary, onClick }: PatientStatusCardProps) 
           <span className="text-xs text-navy-300">
             {patient.age} yrs · {patient.gender} · ID: {patient.id.toUpperCase()}
           </span>
+          {(patient.abhaNumber || patient.abhaAddress) && (
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <span className="text-[11px] text-teal-300 font-mono">
+                ABHA: {patient.abhaNumber || patient.abhaAddress}
+              </span>
+              <span
+                className={cn(
+                  'px-1.5 py-0.2 rounded text-[10px] font-sans font-semibold border',
+                  patient.abhaVerificationStatus === 'verified'
+                    ? 'bg-success-500/20 text-success-300 border-success-500/30'
+                    : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                )}
+              >
+                {patient.abhaVerificationStatus === 'verified' ? 'Verified' : 'Unverified'}
+              </span>
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-1.5 flex-wrap justify-end">
           {overdueFollowUpsCount > 0 && (
