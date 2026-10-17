@@ -264,16 +264,6 @@ npm run build
 
 Copy `.env.example` to `.env` if connecting to live cloud services:
 
-```env
-# Supabase Project URL (e.g. https://xyzcompany.supabase.co)
-VITE_SUPABASE_URL=
-
-# Supabase Anonymous / Publishable Key (safe for frontend distribution)
-VITE_SUPABASE_ANON_KEY=
-
-# Optional: ElevenLabs Voice API Key (for real-time speech generation)
-VITE_ELEVENLABS_API_KEY=
-```
 
 *Note: If environment variables are omitted, PulseBridge AI automatically operates in fully functional, interactive Demo Mode.*
 
