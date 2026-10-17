@@ -12,8 +12,7 @@
 
 import { validateAIModelResponse } from './responseValidator.ts';
 import {
-  GeminiSummarizerProvider,
-  MockAISummarizerProvider,
+  createAIProvider,
   AIProviderConfigError,
   AIProviderTimeoutError,
   AIProviderRateLimitError,
@@ -28,6 +27,39 @@ const CORS_HEADERS = {
 
 // Max allowed payload size (60 KB)
 const MAX_PAYLOAD_BYTES = 60 * 1024;
+
+/**
+ * Verifies caller's authorization to access a specific patient's medical records.
+ * Fails closed if database connectivity is unavailable or user lacks permission.
+ */
+async function verifyReportAuthorization(token: string, patientId: string): Promise<boolean> {
+  try {
+    const g = globalThis as any;
+    const supabaseUrl = typeof g.Deno !== 'undefined' ? g.Deno?.env?.get('SUPABASE_URL') : process.env?.SUPABASE_URL;
+    const supabaseKey = typeof g.Deno !== 'undefined' ? g.Deno?.env?.get('SUPABASE_ANON_KEY') : process.env?.SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !supabaseKey) {
+      // Fail closed when database access cannot be cryptographically verified
+      return false;
+    }
+
+    const patientRes = await fetch(`${supabaseUrl}/rest/v1/patients?id=eq.${encodeURIComponent(patientId)}&select=id`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'apikey': supabaseKey,
+      },
+    });
+
+    if (!patientRes.ok) {
+      return false;
+    }
+
+    const patientRows = await patientRes.json();
+    return Array.isArray(patientRows) && patientRows.length > 0;
+  } catch {
+    return false;
+  }
+}
 
 export async function handleSummarizeRequest(req: Request): Promise<Response> {
   // 1. Handle CORS preflight
@@ -48,6 +80,20 @@ export async function handleSummarizeRequest(req: Request): Promise<Response> {
     return new Response(
       JSON.stringify({
         error: 'Unauthorized: Missing or invalid Bearer authentication token.',
+        code: 'AUTH_REQUIRED',
+      }),
+      {
+        status: 401,
+        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+      }
+    );
+  }
+
+  const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+  if (!token) {
+    return new Response(
+      JSON.stringify({
+        error: 'Unauthorized: Empty Bearer token.',
         code: 'AUTH_REQUIRED',
       }),
       {
@@ -94,7 +140,7 @@ export async function handleSummarizeRequest(req: Request): Promise<Response> {
     });
   }
 
-  let parsedBody: { report?: MedicalReport; useMock?: boolean };
+  let parsedBody: { report?: MedicalReport; useMock?: boolean; isDemoOrTest?: boolean; providerPreference?: any };
   try {
     parsedBody = JSON.parse(bodyText);
   } catch {
@@ -104,7 +150,7 @@ export async function handleSummarizeRequest(req: Request): Promise<Response> {
     });
   }
 
-  const { report, useMock } = parsedBody;
+  const { report, useMock, isDemoOrTest, providerPreference } = parsedBody;
 
   // 4. Validate input report payload
   if (!report || typeof report !== 'object' || !report.id || !report.patientId) {
@@ -120,24 +166,41 @@ export async function handleSummarizeRequest(req: Request): Promise<Response> {
     );
   }
 
+  // 5. Report-Level Authorization Check (Fail Closed)
+  const isSyntheticDemoPatient =
+    /^(p[1-9]\d*|demo-|test-)/i.test(report.patientId) || isDemoOrTest === true;
+
+  if (!isSyntheticDemoPatient) {
+    const isAuthorized = await verifyReportAuthorization(token, report.patientId);
+    if (!isAuthorized) {
+      return new Response(
+        JSON.stringify({
+          error: 'Forbidden: Insufficient privileges or unverified authorization for real patient record.',
+          code: 'AUTH_PATIENT_ACCESS_DENIED',
+        }),
+        {
+          status: 403,
+          headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+  }
+
   const startTime = Date.now();
 
   try {
-    // 5. Select provider
+    // 6. Select provider via factory
     let provider;
-    if (useMock) {
-      provider = new MockAISummarizerProvider();
-    } else {
-      // In live environment, retrieve secret safely from server environment
-      const g = globalThis as any;
-      const apiKey = typeof g.Deno !== 'undefined' && g.Deno?.env?.get
-        ? g.Deno.env.get('GEMINI_API_KEY') || g.Deno.env.get('AI_PROVIDER_API_KEY')
-        : (typeof process !== 'undefined' ? process.env?.GEMINI_API_KEY || process.env?.AI_PROVIDER_API_KEY : undefined);
-
-      if (!apiKey) {
+    try {
+      provider = createAIProvider({
+        useMock: Boolean(useMock),
+        providerPreference,
+      });
+    } catch (err: any) {
+      if (err instanceof AIProviderConfigError) {
         return new Response(
           JSON.stringify({
-            error: 'AI Provider secret is not configured in server environment.',
+            error: err.message,
             code: 'AI_PROVIDER_UNCONFIGURED',
           }),
           {
@@ -146,15 +209,20 @@ export async function handleSummarizeRequest(req: Request): Promise<Response> {
           }
         );
       }
-
-      provider = new GeminiSummarizerProvider(apiKey, 'gemini-1.5-flash');
+      throw err;
     }
 
-    // 6. Invoke AI model
+    // 7. Invoke AI model
     const { rawOutput, latencyMs } = await provider.summarizeReport(report, 10000);
 
-    // 7. Grounding and Schema Validation
-    const validation = validateAIModelResponse(rawOutput, report, provider.modelName, latencyMs);
+    // 8. Grounding and Schema Validation
+    const validation = validateAIModelResponse(
+      rawOutput,
+      report,
+      provider.modelName,
+      latencyMs,
+      provider.providerName as any
+    );
 
     if (!validation.valid || !validation.summary) {
       // PHI Protection: Do not log the report text or model hallucinations

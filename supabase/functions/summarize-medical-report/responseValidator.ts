@@ -26,8 +26,9 @@ export interface ValidationResult {
 export function validateAIModelResponse(
   rawOutput: unknown,
   sourceReport: Readonly<MedicalReport>,
-  modelName: string = 'gemini-1.5-flash',
-  latencyMs: number = 0
+  modelName: string = 'qwen/qwen3.8-27b',
+  latencyMs: number = 0,
+  providerName: 'groq' | 'gemini' | 'anthropic' | 'openai' | 'mock_test_provider' | 'none' = 'groq'
 ): ValidationResult {
   const errors: string[] = [];
 
@@ -249,7 +250,7 @@ export function validateAIModelResponse(
     disclaimer: CLINICAL_DISCLAIMER_TEXT,
     engineMode: 'ai_assisted' as SummaryEngineMode,
     aiMetadata: {
-      provider: 'gemini',
+      provider: providerName,
       modelName,
       verifiedGrounded: true,
       latencyMs,

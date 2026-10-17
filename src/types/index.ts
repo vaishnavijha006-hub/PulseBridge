@@ -247,7 +247,7 @@ export interface ReportSummary {
   disclaimer: string;
   engineMode: SummaryEngineMode;
   aiMetadata?: {
-    provider: 'gemini' | 'anthropic' | 'openai' | 'mock_test_provider' | 'none';
+    provider: 'groq' | 'gemini' | 'anthropic' | 'openai' | 'mock_test_provider' | 'none';
     modelName: string;
     verifiedGrounded: boolean;
     latencyMs?: number;

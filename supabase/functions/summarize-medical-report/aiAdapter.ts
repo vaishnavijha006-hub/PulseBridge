@@ -39,7 +39,7 @@ export interface AISummarizerProvider {
  */
 export const CLINICAL_SUMMARIZATION_SYSTEM_PROMPT = `
 You are PulseBridge AI, an automated clinical laboratory and diagnostic report extraction assistant.
-Your task is to analyze the supplied medical report and extract a strictly grounded structured summary.
+Your task is to analyze the supplied medical report and extract a strictly grounded structured summary formatted as a valid JSON object.
 
 CRITICAL CLINICAL SAFETY RULES:
 1. Grounding: Every extracted finding must strictly exist in the report. Never invent tests, numbers, units, or clinical diagnoses.
@@ -48,6 +48,50 @@ CRITICAL CLINICAL SAFETY RULES:
 4. Abnormal Findings: Include in "abnormalValues" ONLY tests where the result falls outside the explicitly stated reference range or where the laboratory explicitly labeled it abnormal/elevated/low.
 5. Unreadable Content: If any portion of the report is smudged, illegible, or incomplete, record it in "missingOrUncertainInfo" and flag it for clinician review.
 6. Zero Autonomous Actions: Do not recommend starting, stopping, or altering medications or care plans.
+
+OUTPUT JSON SCHEMA:
+{
+  "reportOverview": {
+    "title": "string",
+    "reportType": "lab",
+    "date": "string",
+    "facility": "string | null",
+    "orderingDoctor": "string | null",
+    "sourceIntegrity": "complete" | "incomplete" | "unreadable" | "empty"
+  },
+  "keyFindings": [
+    {
+      "name": "string",
+      "value": "string",
+      "unit": "string | null",
+      "referenceRange": "string",
+      "flag": "normal" | "abnormal" | "unspecified_range",
+      "sourceEvidence": "string"
+    }
+  ],
+  "abnormalValues": [
+    {
+      "name": "string",
+      "value": "string",
+      "unit": "string | null",
+      "referenceRange": "string",
+      "interpretation": "string",
+      "sourceEvidence": "string"
+    }
+  ],
+  "missingOrUncertainInfo": [
+    {
+      "item": "string",
+      "reason": "string"
+    }
+  ],
+  "needsClinicianReview": [
+    {
+      "questionOrFinding": "string",
+      "context": "string"
+    }
+  ]
+}
 `;
 
 /**
@@ -62,6 +106,96 @@ function getServerEnv(name: string): string | undefined {
     return process.env[name];
   }
   return undefined;
+}
+
+export class GroqSummarizerProvider implements AISummarizerProvider {
+  public readonly providerName = 'groq';
+  public readonly modelName: string;
+  private apiKey: string;
+
+  constructor(apiKey?: string, modelName?: string) {
+    const key = apiKey || getServerEnv('GROQ_API_KEY') || getServerEnv('AI_PROVIDER_API_KEY');
+    if (!key) {
+      throw new AIProviderConfigError('GROQ_API_KEY or AI_PROVIDER_API_KEY is not configured on the server.');
+    }
+    this.apiKey = key;
+    this.modelName = modelName || getServerEnv('GROQ_MODEL') || 'qwen/qwen3.8-27b';
+  }
+
+  public async summarizeReport(
+    report: Readonly<MedicalReport>,
+    timeoutMs: number = 10000
+  ): Promise<{ rawOutput: unknown; latencyMs: number }> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    const startTime = Date.now();
+
+    const userPrompt = `Please summarize this medical report according to the clinical safety guidelines:
+
+Title: ${report.title}
+Report Type: ${report.reportType}
+Date: ${report.date}
+Facility: ${report.facilityOrLab || 'Not specified'}
+Doctor: ${report.orderingDoctor || 'Not specified'}
+
+RAW REPORT CONTENT:
+${report.rawText || ''}
+
+STRUCTURED FINDINGS ON FILE:
+${JSON.stringify(report.structuredFindings || [], null, 2)}`;
+
+    try {
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: this.modelName,
+          messages: [
+            { role: 'system', content: CLINICAL_SUMMARIZATION_SYSTEM_PROMPT },
+            { role: 'user', content: userPrompt },
+          ],
+          response_format: { type: 'json_object' },
+          temperature: 0.1,
+        }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+      const latencyMs = Date.now() - startTime;
+
+      if (response.status === 429) {
+        throw new AIProviderRateLimitError('Groq API rate limit exceeded. Please retry shortly.');
+      }
+
+      if (response.status === 401 || response.status === 403) {
+        throw new AIProviderConfigError('Groq API authentication rejected. Verify server-side API key.');
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => '');
+        throw new Error(`Groq API error (HTTP ${response.status}): ${errorText.slice(0, 150)}`);
+      }
+
+      const responseData = await response.json();
+      const content = responseData?.choices?.[0]?.message?.content;
+
+      if (!content) {
+        throw new Error('Groq API returned an empty completion content.');
+      }
+
+      const parsedJSON = JSON.parse(content);
+      return { rawOutput: parsedJSON, latencyMs };
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      if (err.name === 'AbortError' || controller.signal.aborted) {
+        throw new AIProviderTimeoutError(`AI provider timed out after ${timeoutMs}ms.`);
+      }
+      throw err;
+    }
+  }
 }
 
 export class GeminiSummarizerProvider implements AISummarizerProvider {
@@ -253,3 +387,41 @@ export class MockAISummarizerProvider implements AISummarizerProvider {
     return { rawOutput, latencyMs };
   }
 }
+
+/**
+ * AI Provider Factory with automatic environment detection
+ */
+export function createAIProvider(options?: {
+  useMock?: boolean;
+  providerPreference?: 'groq' | 'gemini' | 'mock_test_provider';
+  apiKey?: string;
+  modelName?: string;
+  mockOptions?: { shouldTimeout?: boolean; shouldFailAuth?: boolean; shouldRateLimit?: boolean };
+}): AISummarizerProvider {
+  if (options?.useMock) {
+    return new MockAISummarizerProvider(options.mockOptions);
+  }
+
+  const groqKey = options?.apiKey || getServerEnv('GROQ_API_KEY');
+  const geminiKey = options?.apiKey || getServerEnv('GEMINI_API_KEY') || getServerEnv('AI_PROVIDER_API_KEY');
+
+  if (options?.providerPreference === 'groq' && groqKey) {
+    return new GroqSummarizerProvider(groqKey, options.modelName);
+  }
+  if (options?.providerPreference === 'gemini' && geminiKey) {
+    return new GeminiSummarizerProvider(geminiKey, options.modelName);
+  }
+
+  // Auto-detect based on configured server secrets
+  if (groqKey) {
+    return new GroqSummarizerProvider(groqKey, options?.modelName);
+  }
+  if (geminiKey) {
+    return new GeminiSummarizerProvider(geminiKey, options?.modelName);
+  }
+
+  throw new AIProviderConfigError(
+    'No supported AI provider secret found on server. Configure GROQ_API_KEY or GEMINI_API_KEY.'
+  );
+}
+

@@ -3,16 +3,19 @@
  * PulseBridge AI Phase 4
  *
  * Verifies:
- * 1. Security & Edge Function Authorization (rejection of unauthorized calls, payload limits, secret isolation).
+ * 1. Security & Edge Function Authorization (rejection of unauthorized calls, fail closed on unverified real patient, payload limits, secret isolation).
  * 2. Model Response Validation & Grounding (schema validation, rejecting hallucinations, exact string preservation, missing range protection).
  * 3. Provider Failures & Transparent Fallback (timeouts, rate limits, unconfigured key fallback labeled honestly as 'ai_unavailable_fallback').
  * 4. Regression tests (existing deterministic summarizer behavior preserved).
+ * 5. Live AI Provider Execution (Groq HTTPS API with qwen/qwen3.8-27b).
  */
 
 import { handleSummarizeRequest } from '../supabase/functions/summarize-medical-report/index';
 import { validateAIModelResponse, CLINICAL_DISCLAIMER_TEXT } from '../supabase/functions/summarize-medical-report/responseValidator';
 import {
   MockAISummarizerProvider,
+  GroqSummarizerProvider,
+  createAIProvider,
   AIProviderTimeoutError,
   AIProviderRateLimitError,
   AIProviderConfigError,
@@ -58,7 +61,63 @@ async function runTests() {
     assert(json.code === 'AUTH_REQUIRED', 'Error code specifies AUTH_REQUIRED');
   }
 
-  // Test 1.2: Rejection of oversized payload (> 60 KB)
+  // Test 1.2: Rejection of unauthorized request (empty Bearer token)
+  {
+    const req = new Request('https://edge.supabase.co/functions/v1/summarize-medical-report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' },
+      body: JSON.stringify({ report: demoMedicalReports['p1'][0] }),
+    });
+
+    const res = await handleSummarizeRequest(req);
+    assert(res.status === 401, 'Unauthorized request with empty Bearer token rejected with HTTP 401');
+  }
+
+  // Test 1.3: Report-level authorization gate fails closed for unverified real patient
+  {
+    const realPatientReport: MedicalReport = {
+      id: 'rep-real-uuid-001',
+      patientId: 'real-patient-uuid-9999',
+      title: 'Real Inpatient Cardiology Panel',
+      reportType: 'lab',
+      date: '2026-10-17',
+      facilityOrLab: 'Metropolitan Hospital',
+      orderingDoctor: 'Dr. John Doe',
+      rawText: 'Troponin: 0.04 ng/mL',
+      structuredFindings: [{ testOrParameter: 'Troponin', value: '0.04', unit: 'ng/mL', referenceRange: '< 0.01', isAbnormal: true }],
+    };
+
+    const req = new Request('https://edge.supabase.co/functions/v1/summarize-medical-report', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer test-valid-jwt-token',
+      },
+      body: JSON.stringify({ report: realPatientReport }),
+    });
+
+    const res = await handleSummarizeRequest(req);
+    assert(res.status === 403, 'Unverified real patient report access fails closed with HTTP 403');
+    const json = await res.json();
+    assert(json.code === 'AUTH_PATIENT_ACCESS_DENIED', 'Error code is AUTH_PATIENT_ACCESS_DENIED');
+  }
+
+  // Test 1.4: Synthetic / demo patient report is permitted when authenticated
+  {
+    const req = new Request('https://edge.supabase.co/functions/v1/summarize-medical-report', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer test-valid-jwt-token',
+      },
+      body: JSON.stringify({ report: demoMedicalReports['p1'][0], useMock: true }),
+    });
+
+    const res = await handleSummarizeRequest(req);
+    assert(res.status === 200, 'Authenticated request with synthetic demo patient succeeds with HTTP 200');
+  }
+
+  // Test 1.5: Rejection of oversized payload (> 60 KB)
   {
     const largeText = 'A'.repeat(65 * 1024);
     const oversizedReport = {
@@ -82,7 +141,7 @@ async function runTests() {
     assert(json.code === 'PAYLOAD_TOO_LARGE', 'Error code specifies PAYLOAD_TOO_LARGE');
   }
 
-  // Test 1.3: Rejection of malformed / missing report IDs
+  // Test 1.6: Rejection of malformed / missing report IDs
   {
     const req = new Request('https://edge.supabase.co/functions/v1/summarize-medical-report', {
       method: 'POST',
@@ -97,7 +156,7 @@ async function runTests() {
     assert(res.status === 400, 'Report without id or patientId rejected with HTTP 400');
   }
 
-  // Test 1.4: Zero secret leakage in response payload
+  // Test 1.7: Zero secret leakage in response payload
   {
     const req = new Request('https://edge.supabase.co/functions/v1/summarize-medical-report', {
       method: 'POST',
@@ -114,6 +173,7 @@ async function runTests() {
     assert(!responseText.includes('apiKey'), 'Zero apiKey references leaked in response');
     assert(!responseText.includes('service_role'), 'Zero service_role keys leaked in response');
     assert(!responseText.includes('GEMINI_API_KEY'), 'Zero GEMINI_API_KEY environment variable names leaked');
+    assert(!responseText.includes('GROQ_API_KEY'), 'Zero GROQ_API_KEY environment variable names leaked');
   }
 
   // ---------------------------------------------------------------------------
@@ -163,10 +223,11 @@ async function runTests() {
       ],
     };
 
-    const result = validateAIModelResponse(validModelOutput, sourceReport, 'gemini-1.5-flash', 150);
+    const result = validateAIModelResponse(validModelOutput, sourceReport, 'qwen/qwen3.8-27b', 150, 'groq');
     assert(result.valid === true, 'Grounded model output passes validation');
     assert(result.summary?.engineMode === 'ai_assisted', 'Engine mode set to ai_assisted');
-    assert(result.summary?.aiMetadata?.modelName === 'gemini-1.5-flash', 'Model metadata preserved');
+    assert(result.summary?.aiMetadata?.provider === 'groq', 'Provider recorded as groq');
+    assert(result.summary?.aiMetadata?.modelName === 'qwen/qwen3.8-27b', 'Model metadata preserved');
     assert(result.summary?.aiMetadata?.verifiedGrounded === true, 'Marked verified grounded');
     assert(result.summary?.disclaimer.includes('clinical judgment'), 'Standard clinical disclaimer attached');
   }
@@ -307,18 +368,85 @@ async function runTests() {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Suite 5: Live Real AI Provider Verification (Groq API)
+  // ---------------------------------------------------------------------------
+  console.log('\nSUITE 5: Live Real AI Provider Verification (Groq API)');
+  const groqKey = process.env.GROQ_API_KEY;
+
+  if (groqKey) {
+    try {
+      const groqProvider = new GroqSummarizerProvider(groqKey, 'qwen/qwen3.8-27b');
+      assert(groqProvider.providerName === 'groq', 'Groq provider initialized');
+      assert(groqProvider.modelName === 'qwen/qwen3.8-27b', 'Verified target model identifier');
+
+      const liveReport: MedicalReport = {
+        id: 'rep-live-test-01',
+        patientId: 'p1',
+        title: 'Diagnostic Lipid & Cardiac Chemistry',
+        reportType: 'lab',
+        date: '2026-10-15',
+        facilityOrLab: 'Apex Laboratories',
+        orderingDoctor: 'Dr. Anita Desai',
+        rawText: 'Total Cholesterol: 215 mg/dL (Ref: < 200)\nHigh-Sensitivity Troponin I: 48 ng/L (Ref: < 14)\nRandom Glucose: 142 mg/dL',
+        structuredFindings: [
+          { testOrParameter: 'Total Cholesterol', value: '215', unit: 'mg/dL', referenceRange: '< 200', isAbnormal: true },
+          { testOrParameter: 'High-Sensitivity Troponin I', value: '48', unit: 'ng/L', referenceRange: '< 14', isAbnormal: true },
+          { testOrParameter: 'Random Glucose', value: '142', unit: 'mg/dL', referenceRange: null, isAbnormal: null },
+        ],
+      };
+
+      const startTime = Date.now();
+      const { rawOutput, latencyMs } = await groqProvider.summarizeReport(liveReport, 15000);
+      const elapsed = Date.now() - startTime;
+
+      assert(Boolean(rawOutput && typeof rawOutput === 'object'), `Live Groq API responded in ${latencyMs}ms (total ${elapsed}ms)`);
+
+      const validation = validateAIModelResponse(rawOutput, liveReport, groqProvider.modelName, latencyMs, 'groq');
+      assert(validation.valid === true, 'Live model output passed clinical grounding and schema validation');
+
+      if (validation.summary) {
+        assert(validation.summary.engineMode === 'ai_assisted', 'Engine mode labeled ai_assisted');
+        assert(validation.summary.aiMetadata?.provider === 'groq', 'Provider metadata correctly recorded as groq');
+        assert(validation.summary.aiMetadata?.modelName === 'qwen/qwen3.8-27b', 'Model name metadata recorded');
+        assert(validation.summary.aiMetadata?.verifiedGrounded === true, 'Grounded validation flag is true');
+        assert(
+          validation.summary.keyFindings.some((kf) => kf.name.includes('Cholesterol') && kf.value === '215'),
+          'Preserves exact value "215" for Total Cholesterol'
+        );
+        assert(
+          validation.summary.keyFindings.some((kf) => kf.name.includes('Troponin') && kf.value === '48'),
+          'Preserves exact value "48" for High-Sensitivity Troponin I'
+        );
+        const glucose = validation.summary.keyFindings.find((kf) => kf.name.includes('Glucose'));
+        assert(
+          glucose?.flag === 'unspecified_range',
+          'Safely sets flag to unspecified_range when reference interval is unstated'
+        );
+        assert(
+          validation.summary.disclaimer.includes('clinical judgment'),
+          'Includes mandatory clinical review disclaimer'
+        );
+      }
+    } catch (err: any) {
+      assert(false, `Live Groq provider request failed: ${err.message}`);
+    }
+  } else {
+    console.log('  [INFO] GROQ_API_KEY environment variable not set. Live provider network test skipped.');
+  }
+
   console.log('\n----------------------------------------------------------------');
   console.log(`SUMMARY: ${passedTests} passed, ${failedTests} failed.`);
   console.log('----------------------------------------------------------------\n');
 
   if (failedTests > 0) {
-    process.exit(1);
+    process.exitCode = 1;
   } else {
-    process.exit(0);
+    process.exitCode = 0;
   }
 }
 
 runTests().catch((err) => {
   console.error('Test runner fatal error:', err);
-  process.exit(1);
+  process.exitCode = 1;
 });

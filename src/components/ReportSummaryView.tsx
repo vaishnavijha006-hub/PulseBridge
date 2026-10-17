@@ -114,7 +114,7 @@ export function ReportSummaryView({ reports, className }: ReportSummaryViewProps
             )}
           >
             <Sparkles className="w-3.5 h-3.5" />
-            <span>AI-Assisted (Gemini 1.5)</span>
+            <span>AI-Assisted Summary</span>
           </button>
           <button
             onClick={() => setSelectedEngine('rule_based_mvp')}
@@ -137,7 +137,7 @@ export function ReportSummaryView({ reports, className }: ReportSummaryViewProps
           <RefreshCw className="w-8 h-8 text-teal-400 animate-spin" />
           <p className="text-sm font-semibold text-white">
             {selectedEngine === 'ai_assisted'
-              ? 'Invoking Secure Server-Side AI (Gemini 1.5 Flash)...'
+              ? 'Invoking Secure Server-Side AI...'
               : 'Running Deterministic Clinical Parser...'}
           </p>
           <p className="text-xs text-navy-400">
@@ -215,7 +215,7 @@ export function ReportSummaryView({ reports, className }: ReportSummaryViewProps
                 {summary.engineMode === 'ai_assisted' ? (
                   <span className="text-[10px] px-2.5 py-1 rounded-md bg-purple-500/20 border border-purple-500/40 text-purple-200 font-bold flex items-center gap-1.5 shadow-sm">
                     <Sparkles className="w-3 h-3 text-purple-400" />
-                    AI-Assisted ({summary.aiMetadata?.modelName || 'Gemini 1.5 Flash'})
+                    AI-Assisted ({summary.aiMetadata?.modelName || 'AI Model'}{summary.aiMetadata?.latencyMs ? ` · ${summary.aiMetadata.latencyMs}ms` : ''})
                   </span>
                 ) : summary.engineMode === 'ai_unavailable_fallback' ? (
                   <span className="text-[10px] px-2.5 py-1 rounded-md bg-amber-500/15 border border-amber-500/30 text-amber-300 font-semibold flex items-center gap-1">

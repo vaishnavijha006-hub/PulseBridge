@@ -15,8 +15,6 @@ import {
 import { calculatePatientTriageScore } from '@/services/careGapRules';
 import { calculateSnoozeTimestamp } from '@/utils/reminderEngine';
 import { summarizeMedicalReport } from '@/services/reportSummarizer';
-import { MockAISummarizerProvider } from '../../supabase/functions/summarize-medical-report/aiAdapter';
-import { validateAIModelResponse } from '../../supabase/functions/summarize-medical-report/responseValidator';
 import type {
   PatientSummary,
   MedicationSchedule,
@@ -479,28 +477,30 @@ const demoService: DataService = {
     if (!report) return null;
 
     if (options?.preferAI) {
-      try {
-        const mockProvider = new MockAISummarizerProvider();
-        const { rawOutput, latencyMs } = await mockProvider.summarizeReport(report);
-        const validated = validateAIModelResponse(rawOutput, report, 'gemini-1.5-flash', latencyMs);
-        if (validated.valid && validated.summary) {
-          return validated.summary;
+      if (supabase) {
+        try {
+          const { data, error } = await supabase.functions.invoke('summarize-medical-report', {
+            body: { report, isDemoOrTest: true },
+          });
+          if (error) throw error;
+          if (data && data.data) return data.data as ReportSummary;
+        } catch (err: any) {
+          console.warn('[Demo AI Summarizer] Edge function failed or unreachable:', err.message);
         }
-        throw new Error(validated.errors.join('; '));
-      } catch (err: any) {
-        console.warn('[Demo AI Summarizer] AI processing note, using labeled fallback:', err.message);
-        const fallback = summarizeMedicalReport(report);
-        return {
-          ...fallback,
-          engineMode: 'ai_unavailable_fallback',
-          aiMetadata: {
-            provider: 'none',
-            modelName: 'none',
-            verifiedGrounded: true,
-            failureReason: err.message || 'AI service unavailable in demo environment',
-          },
-        };
       }
+
+      // Safe fallback: never label mock as real AI
+      const fallback = summarizeMedicalReport(report);
+      return {
+        ...fallback,
+        engineMode: 'ai_unavailable_fallback',
+        aiMetadata: {
+          provider: 'none',
+          modelName: 'none',
+          verifiedGrounded: true,
+          failureReason: 'AI service unavailable in demo environment; showing rule-based fallback.',
+        },
+      };
     }
 
     return summarizeMedicalReport(report);
