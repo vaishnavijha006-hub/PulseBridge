@@ -1,8 +1,8 @@
 # PulseBridge
 
-[![Open in Bolt](https://bolt.new/static/open-in-bolt.svg)](https://bolt.new/~/sb1-6ykwyue8)
-
 PulseBridge is an AI-augmented care-coordination platform designed to bridge communication gaps among doctors, patients, and caregivers during post-consultation recovery.
+
+> **Local Development & Live Preview**: Run `npm run dev` in the project root to open the platform at `http://localhost:5173`. Instant dashboard role switchers are provided in the top navigation.
 
 ---
 

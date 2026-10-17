@@ -89,8 +89,9 @@ function AppContent() {
     };
   }, []);
 
-  const handleRoleSelect = useCallback((role: 'patient' | 'doctor' | 'family' | 'admin') => {
-    if (role === 'patient') setView('patient_intake');
+  const handleRoleSelect = useCallback((role: 'patient' | 'doctor' | 'family' | 'admin' | 'patient_intake') => {
+    if (role === 'patient') setView('patient_dashboard');
+    else if (role === 'patient_intake') setView('patient_intake');
     else if (role === 'doctor') setView('doctor');
     else if (role === 'admin') setView('admin');
     else setView('family');

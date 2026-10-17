@@ -40,6 +40,26 @@ export function LandingPage({ onRoleSelect }: LandingPageProps) {
               <div className="hidden lg:block">
                 <DemoBanner variant="dark" />
               </div>
+              <div className="hidden md:flex items-center gap-1 border-l border-r border-navy-600/70 px-2.5 py-1">
+                <button
+                  onClick={() => onRoleSelect('patient')}
+                  className="px-2 py-1 text-xs rounded-md text-teal-300 bg-teal-500/10 hover:bg-teal-500/20 font-semibold transition-colors"
+                >
+                  {t('role_patient')}
+                </button>
+                <button
+                  onClick={() => onRoleSelect('doctor')}
+                  className="px-2 py-1 text-xs rounded-md text-slate-200 hover:text-teal-300 hover:bg-navy-700 font-semibold transition-colors"
+                >
+                  {t('role_doctor')}
+                </button>
+                <button
+                  onClick={() => onRoleSelect('admin')}
+                  className="px-2 py-1 text-xs rounded-md text-slate-200 hover:text-teal-300 hover:bg-navy-700 font-semibold transition-colors"
+                >
+                  {t('role_admin')}
+                </button>
+              </div>
               <LanguageToggle variant="dark" />
               <button
                 onClick={() => onRoleSelect('patient')}
