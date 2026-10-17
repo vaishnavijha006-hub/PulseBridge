@@ -261,6 +261,27 @@ export type TranslationKey =
   | 'family_shared_appointments_title'
   | 'family_notifications_title'
   | 'family_mark_all_read'
+  | 'family_perm_profile'
+  | 'family_perm_profile_desc'
+  | 'family_perm_appointments'
+  | 'family_perm_appointments_desc'
+  | 'family_perm_care_actions'
+  | 'family_perm_care_actions_desc'
+  | 'family_review_title'
+  | 'family_review_subtitle'
+  | 'family_review_recipient'
+  | 'family_review_categories'
+  | 'family_review_restricted'
+  | 'family_review_revocation_notice'
+  | 'family_review_acceptance_notice'
+  | 'family_review_confirm_btn'
+  | 'family_audit_title'
+  | 'family_audit_subtitle'
+  | 'family_audit_no_logs'
+  | 'family_tab_consent_members'
+  | 'family_tab_consent_invitations'
+  | 'family_tab_consent_audit'
+  | 'family_past_data_disclosure'
   | 'reminder_dose'
   | 'reminder_missed'
   | 'reminder_followup'
@@ -529,6 +550,42 @@ const dict: Dictionary = {
   family_shared_appointments_title: { en: 'Authorized Follow-up Consultations', hi: 'अधिकृत फॉलो-अप परामर्श' },
   family_notifications_title: { en: 'Recovery Notifications', hi: 'रिकवरी सूचनाएं' },
   family_mark_all_read: { en: 'Mark all as read', hi: 'सभी को पढ़ा हुआ चिह्नित करें' },
+  family_perm_profile: { en: 'Patient Display Profile', hi: 'मरीज प्रोफाइल नाम' },
+  family_perm_profile_desc: { en: 'Share display name and relationship label', hi: 'नाम और रिश्ता साझा करें' },
+  family_perm_appointments: { en: 'Doctor Consultations & Appointments', hi: 'डॉक्टर परामर्श एवं अपॉइंटमेंट' },
+  family_perm_appointments_desc: { en: 'Share doctor-scheduled follow-up dates and times', hi: 'डॉक्टर द्वारा निर्धारित फॉलो-अप तारीख और समय' },
+  family_perm_care_actions: { en: 'Recovery Goals & Care Actions', hi: 'रिकवरी लक्ष्य एवं केयर एक्शन' },
+  family_perm_care_actions_desc: { en: 'Share milestone achievements and permitted support tasks', hi: 'मील के पत्थर और सहायता कार्य साझा करें' },
+  family_review_title: { en: 'Consent Review & Privacy Disclosure', hi: 'सहमति समीक्षा एवं गोपनीयता प्रकटीकरण' },
+  family_review_subtitle: {
+    en: 'Please carefully review what will be shared before confirming.',
+    hi: 'कृपया पुष्टि करने से पहले ध्यानपूर्वक जांचें कि क्या साझा किया जाएगा।',
+  },
+  family_review_recipient: { en: 'Authorized Family Member', hi: 'अधिकृत परिवार का सदस्य' },
+  family_review_categories: { en: 'Explicitly Permitted Categories', hi: 'स्पष्ट रूप से अनुमत श्रेणियां' },
+  family_review_restricted: { en: 'What Remains Strictly Private', hi: 'क्या पूरी तरह से निजी रहेगा' },
+  family_review_revocation_notice: {
+    en: 'You can modify permissions or revoke access immediately at any time from this dashboard.',
+    hi: 'आप इस डैशबोर्ड से किसी भी समय तुरंत अनुमतियाँ बदल सकते हैं या पहुंच वापस ले सकते हैं।',
+  },
+  family_review_acceptance_notice: {
+    en: 'Access will begin only after the recipient confirms invitation from their email.',
+    hi: 'पहुंच प्राप्तकर्ता द्वारा अपने ईमेल से पुष्टि करने के बाद ही शुरू होगी।',
+  },
+  family_review_confirm_btn: { en: 'Confirm & Send Invitation', hi: 'पुष्टि करें और निमंत्रण भेजें' },
+  family_audit_title: { en: 'Consent Audit History', hi: 'सहमति ऑडिट इतिहास' },
+  family_audit_subtitle: {
+    en: 'Immutable, tamper-evident record of all invitation, consent, and revocation events.',
+    hi: 'सभी निमंत्रण, सहमति और निरस्तीकरण घटनाओं का अपरिवर्तनीय रिकॉर्ड।',
+  },
+  family_audit_no_logs: { en: 'No consent audit events recorded yet.', hi: 'अभी तक कोई ऑडिट रिकॉर्ड दर्ज नहीं है।' },
+  family_tab_consent_members: { en: 'Circle Members', hi: 'सर्कल सदस्य' },
+  family_tab_consent_invitations: { en: 'Invitations', hi: 'निमंत्रण' },
+  family_tab_consent_audit: { en: 'Audit Trail', hi: 'ऑडिट ट्रेल' },
+  family_past_data_disclosure: {
+    en: 'Important: Immediate revocation prevents all future reads. However, it cannot erase information previously viewed or saved.',
+    hi: 'महत्वपूर्ण: तत्काल निरस्तीकरण भविष्य के सभी अनुरोधों को रोकता है। हालांकि, यह पहले से देखी गई जानकारी को मिटा नहीं सकता।',
+  },
   reminder_dose: { en: 'Dose reminder', hi: 'दवाई रिमाइंडर' },
   reminder_missed: { en: 'Missed-dose reminder', hi: 'छूटी खुराक रिमाइंडर' },
   reminder_followup: { en: 'Follow-up reminder', hi: 'फॉलो-अप रिमाइंडर' },

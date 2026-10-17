@@ -187,26 +187,34 @@ The **Consent-Based Family Recovery Circle** enables patients to keep loved ones
 ```
 
 #### Key Capabilities & Security Boundaries
-1. **Granular Consent Controls**:
-   - `shareMedicationStatus`: Share daily dose counts and upcoming schedule times.
-   - `shareDailyVitals`: Share high-level recovery check-in status (e.g. "Recovering steadily").
-   - `allowDirectCalling`: Allow family member to call the patient's phone directly.
-   - `shareCareInstructions`: Share doctor-approved discharge care & dietary guidelines.
-2. **Fail-Closed Privacy Redaction**:
-   - Implemented in `src/services/familyConsentService.ts` and Supabase SQL function `public.get_granular_family_view`.
-   - If consent is missing, pending, expired, or revoked, all sensitive clinical fields are returned as `null` with a clear revocation notice.
-   - Doctor clinical notes, unconfirmed prescription scans, triage scores, and internal care gap logs are never exposed to family under any circumstance.
-3. **Zero Self-Authorization**:
-   - Family members cannot modify permissions or grant themselves access. Only the patient holds the authority to invite, grant permissions, revoke, or restore access.
-4. **Recovery Coordination & Support Notes**:
-   - Family members can send notes of encouragement to their loved one, fostering emotional support throughout recovery.
+1. **Cryptographic Invitations & Recipient Email Binding**:
+   - Authenticated patients create invitations with SHA-256 token hashing and 7-day expiration.
+   - Acceptance workflow strictly validates recipient email match (preventing token misuse if a URL or code is leaked).
+2. **Granular Information Categories**:
+   - `shareProfile`: Basic patient profile name & relationship.
+   - `shareMedicationStatus`: Daily dose counts and upcoming schedule times.
+   - `shareDailyVitals`: High-level daily wellness status (e.g. "Recovering steadily").
+   - `shareAppointments`: Doctor-scheduled follow-up visits & consultations.
+   - `shareCareInstructions`: Discharge care guidelines, diet, and recovery tips.
+   - `shareCareActions`: Permitted care milestones & support tasks.
+   - `allowDirectCalling`: Direct phone calling access.
+3. **Consent Review & Disclosure Screen**:
+   - Explicit multi-step wizard requires the patient to review what will be shared, what remains strictly private, and acknowledge that access begins only after email acceptance.
+4. **Immediate Revocation & Past Data Disclosure**:
+   - Patient can revoke single categories or a family member's entire access with one click.
+   - Subsequent reads are immediately blocked fail-closed.
+   - Includes transparent disclosure that revocation prevents all future reads but cannot erase data already downloaded or viewed prior to revocation.
+5. **Immutable Append-Only Consent Audit Trail**:
+   - Every invitation creation, acceptance, category toggle, and revocation is recorded in an immutable, append-only log with timestamps, actor roles, and sanitized metadata (never exposing medical content or tokens).
+6. **Zero Self-Authorization & Tenant Isolation**:
+   - Family members cannot elevate their own permissions or access records belonging to another patient.
 
 ---
 
 ### 4. Verification & Quality Assurance
-- **Unit & Integration Tests**: `npm run test` &rarr; **69/69 passing tests** across 5 test suites:
-  - [`familyConsentService.test.ts`](src/services/familyConsentService.test.ts) (8 tests)
-  - [`FamilyRecoveryCircle.test.tsx`](src/pages/FamilyRecoveryCircle.test.tsx) (5 tests)
+- **Unit & Integration Tests**: `npm run test` &rarr; **75/75 passing tests** across 5 test suites:
+  - [`familyConsentService.test.ts`](src/services/familyConsentService.test.ts) (11 tests)
+  - [`FamilyRecoveryCircle.test.tsx`](src/pages/FamilyRecoveryCircle.test.tsx) (8 tests)
   - [`careActionService.test.ts`](src/services/careActionService.test.ts) (44 tests)
   - [`ClosedLoopCareView.test.tsx`](src/components/ClosedLoopCareView.test.tsx) (5 tests)
   - [`Dashboards.test.tsx`](src/pages/Dashboards.test.tsx) (7 tests)

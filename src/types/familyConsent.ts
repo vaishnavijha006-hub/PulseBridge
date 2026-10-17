@@ -4,14 +4,20 @@
  */
 
 export interface GranularConsentPermissions {
+  /** Permission to view basic patient profile name & relationship */
+  shareProfile: boolean;
   /** Permission to view today's medication dose counts and completion status */
   shareMedicationStatus: boolean;
   /** Permission to view high-level daily health check-in status (e.g. Feeling well) */
   shareDailyVitals: boolean;
-  /** Permission to view direct contact number to call the patient */
-  allowDirectCalling: boolean;
+  /** Permission to view doctor-scheduled follow-up visits & consultations */
+  shareAppointments: boolean;
   /** Permission to view doctor-approved discharge care guidelines & dietary tips */
   shareCareInstructions: boolean;
+  /** Permission to view permitted care milestones & support actions */
+  shareCareActions: boolean;
+  /** Permission to view direct contact number to call the patient */
+  allowDirectCalling: boolean;
 }
 
 export type FamilyConsentStatus = 'pending' | 'accepted' | 'declined' | 'revoked' | 'expired';
@@ -27,6 +33,7 @@ export interface FamilyCircleMember {
   status: FamilyConsentStatus;
   permissions: GranularConsentPermissions;
   inviteCode: string;
+  tokenHash?: string;
   invitedAt: string;
   authorizedAt: string | null;
   revokedAt: string | null;
@@ -43,6 +50,44 @@ export interface FamilySupportNote {
   sentAt: string;
 }
 
+export interface FamilyInvitation {
+  id: string;
+  patientId: string;
+  recipientEmail: string;
+  caregiverName: string;
+  relationship: string;
+  tokenHash: string;
+  status: FamilyConsentStatus;
+  permissions: GranularConsentPermissions;
+  createdAt: string;
+  expiresAt: string;
+  acceptedAt?: string | null;
+  acceptedByUserId?: string | null;
+}
+
+export type ConsentAuditAction =
+  | 'invite_created'
+  | 'invite_accepted'
+  | 'invite_cancelled'
+  | 'permission_granted'
+  | 'permission_revoked'
+  | 'member_revoked'
+  | 'member_restored'
+  | 'member_removed'
+  | 'access_denied_unauthorized';
+
+export interface ConsentAuditLogEntry {
+  id: string;
+  patientId: string;
+  caregiverId?: string | null;
+  caregiverName?: string | null;
+  action: ConsentAuditAction;
+  category?: keyof GranularConsentPermissions | 'all';
+  timestamp: string;
+  details: string;
+  actorRole: 'patient' | 'caregiver' | 'system';
+}
+
 export interface InviteFamilyMemberInput {
   patientId: string;
   caregiverName: string;
@@ -50,6 +95,12 @@ export interface InviteFamilyMemberInput {
   contactNumber?: string;
   email?: string;
   permissions?: Partial<GranularConsentPermissions>;
+}
+
+export interface AcceptInvitationInput {
+  token: string;
+  recipientEmail: string;
+  userId: string;
 }
 
 export interface UpdateConsentPermissionsInput {

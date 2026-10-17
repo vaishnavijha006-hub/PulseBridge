@@ -189,4 +189,72 @@ describe('PatientDashboard — Family Consent Management', () => {
 
     expect(screen.getAllByText('Access Active')[0]).toBeInTheDocument();
   });
+
+  it('allows patient to view invitations, audit trail, and multi-step consent review wizard', () => {
+    render(
+      <LanguageProvider initialLang="en">
+        <PatientDashboard
+          schedules={demoSchedules['p1']}
+          followUps={demoFollowUps['p1']}
+          reports={demoMedicalReports['p1']}
+          onDoseAction={vi.fn()}
+          onHealthUpdate={vi.fn()}
+          onFollowUpAnswer={vi.fn()}
+          onBack={vi.fn()}
+        />
+      </LanguageProvider>
+    );
+
+    const familyTab = screen.getByText('Family Circle');
+    fireEvent.click(familyTab);
+
+    // Switch to Invitations Tab
+    const invitesTab = screen.getByText('Invitations');
+    fireEvent.click(invitesTab);
+    expect(screen.getByText('Email-Bound Cryptographic Invitations')).toBeInTheDocument();
+    expect(screen.getByText('amit.sharma@example.com')).toBeInTheDocument();
+
+    // Switch to Audit Trail Tab
+    const auditTab = screen.getByText('Audit Trail');
+    fireEvent.click(auditTab);
+    expect(screen.getByText('Consent Audit History')).toBeInTheDocument();
+    expect(screen.getAllByText(/INVITE ACCEPTED/i)[0]).toBeInTheDocument();
+
+    // Open Multi-Step Invite Wizard
+    const inviteBtn = screen.getByText('Invite Family Member');
+    fireEvent.click(inviteBtn);
+
+    expect(screen.getByText('Invite Family Member (Step 1 of 3)')).toBeInTheDocument();
+
+    // Fill Step 1
+    fireEvent.change(screen.getByPlaceholderText(/e.g. Priya Sharma/i), { target: { value: 'Rohan Sharma' } });
+    fireEvent.change(screen.getByPlaceholderText(/e.g. Daughter, Son, Spouse/i), { target: { value: 'Brother' } });
+    fireEvent.change(screen.getByPlaceholderText(/e.g. priya@example.com/i), { target: { value: 'rohan@example.com' } });
+
+    // Click Next to Step 2
+    fireEvent.click(screen.getByText(/Next: Granular Consent/i));
+    expect(screen.getByText('Select Granular Categories (Step 2 of 3)')).toBeInTheDocument();
+
+    // Click Next to Step 3 (Review & Disclosure)
+    fireEvent.click(screen.getByText(/Next: Consent Review/i));
+    expect(screen.getByText('Consent Review & Privacy Disclosure')).toBeInTheDocument();
+    expect(screen.getByText(/Rohan Sharma \(Brother\) • rohan@example.com/i)).toBeInTheDocument();
+    expect(screen.getByText(/What Remains Strictly Private/i)).toBeInTheDocument();
+
+    // Submit button is disabled before explicit review confirmation
+    const submitBtn = screen.getByRole('button', { name: /Confirm & Send Invitation/i });
+    expect(submitBtn).toBeDisabled();
+
+    // Explicitly confirm review
+    const confirmCheckbox = screen.getByRole('checkbox', { name: /I have reviewed the information categories/i });
+    fireEvent.click(confirmCheckbox);
+    expect(submitBtn).not.toBeDisabled();
+
+    // Confirm and submit
+    fireEvent.click(submitBtn);
+
+    // Verify invitation sent and member listed
+    expect(screen.getByText('Rohan Sharma')).toBeInTheDocument();
+  });
 });
+
