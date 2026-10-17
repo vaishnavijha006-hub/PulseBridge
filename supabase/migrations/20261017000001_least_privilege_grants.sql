@@ -1,20 +1,23 @@
 -- =============================================================================
--- PulseBridge AI — Phase 4 Remediation Migration: Explicit Deny-by-Default & Hardened Immutability
+-- PulseBridge AI — Phase 4 Remediation Migration: Strict Least-Privilege & Hardened Clinical Triggers
 -- File: supabase/migrations/20261017000001_least_privilege_grants.sql
--- Revision: Final Hardened Interim Policy (Explicit Deny-by-Default RLS & Confirmed Prescription Immutability)
+-- Revision: Final Pre-Execution Hardening (Dynamic Policy Drop, Restrictive Deny, Full Rx Immutability)
 --
 -- PURPOSE:
 -- 1. Revoke broad "GRANT ALL" and lock down DEFAULT PRIVILEGES for role postgres and invoking role.
--- 2. Drop all permissive RLS policies (USING true) from initial schema across all 9 sensitive tables.
--- 3. Deploy explicit interim deny-by-default RLS policies (USING false) for anon and authenticated.
+-- 2. Dynamically drop ALL existing policies on sensitive tables from pg_policies to ensure no
+--    permissive policy survives.
+-- 3. Deploy explicit interim RESTRICTIVE deny-by-default RLS policies (USING false) for anon & authenticated.
 -- 4. Set security_invoker = true on patient_summaries view to respect underlying table RLS.
--- 5. Revoke execution of get_family_view from anon and authenticated until verified caregiver identity is implemented.
+-- 5. Revoke execution of get_family_view from anon, authenticated, and PUBLIC until verified
+--    caregiver identity (caregiver_user_id) and server-side relationship checks are implemented.
 -- 6. Deploy hardened prescription confirmation trigger:
 --    - Covers INSERT and UPDATE
---    - Enforces strict immutability on confirmed prescriptions (prohibits unconfirming or altering fields)
---    - Rejects duplicate critical keys, null statuses, empty values, and missing keys
+--    - Enforces strict immutability on confirmed prescriptions (prohibits unconfirming or altering fields,
+--      patient_id, image_url, confirmed_at, or doctor_notes)
+--    - Rejects duplicate critical keys, null/unexpected statuses, empty values, and missing keys
 --    - Sets search_path = public, pg_temp
--- 7. Secure internal trigger functions with explicit search_path and revoked public execution.
+-- 7. Secure internal trigger functions with explicit search_path and revoked execution.
 -- =============================================================================
 
 -- Step 1: Revoke existing overbroad privileges from anon, authenticated, and PUBLIC
@@ -35,59 +38,58 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON FUNCTIONS FROM anon, aut
 GRANT USAGE ON SCHEMA public TO authenticated;
 GRANT USAGE ON SCHEMA public TO anon;
 
--- Step 4: Drop All Existing Permissive RLS Policies (USING true) from Phase 3
-DROP POLICY IF EXISTS "Doctors can read all patients" ON public.patients;
-DROP POLICY IF EXISTS "Patients and doctors can create patient records" ON public.patients;
-DROP POLICY IF EXISTS "Patients and doctors can update patient records" ON public.patients;
+-- Step 4: Dynamically Drop ALL Existing Policies on Sensitive Tables
+-- Inspects pg_policies dynamically to ensure NO legacy permissive policy survives
+DO $$
+DECLARE
+  r record;
+BEGIN
+  FOR r IN (
+    SELECT schemaname, tablename, policyname
+    FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename IN (
+        'patients', 'prescriptions', 'care_plans',
+        'medication_schedules', 'adherence_logs',
+        'health_updates', 'care_gaps', 'caregiver_consent',
+        'follow_ups'
+      )
+  )
+  LOOP
+    EXECUTE format('DROP POLICY IF EXISTS %I ON %I.%I;', r.policyname, r.schemaname, r.tablename);
+  END LOOP;
+END;
+$$;
 
-DROP POLICY IF EXISTS "Authorized users can read prescriptions" ON public.prescriptions;
-DROP POLICY IF EXISTS "Authorized users can insert prescriptions" ON public.prescriptions;
-DROP POLICY IF EXISTS "Doctors can update prescription confirmation" ON public.prescriptions;
+-- Step 5: Deploy Explicit Interim RESTRICTIVE Deny-by-Default RLS Policies
+-- Using AS RESTRICTIVE ensures that all queries are evaluated with an AND condition,
+-- guaranteeing that even if a permissive policy is added later, access is denied.
+CREATE POLICY "Interim restrictive deny access to patients"
+  ON public.patients AS RESTRICTIVE FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);
 
-DROP POLICY IF EXISTS "Users can read care plans" ON public.care_plans;
-DROP POLICY IF EXISTS "Doctors can create and update care plans" ON public.care_plans;
+CREATE POLICY "Interim restrictive deny access to prescriptions"
+  ON public.prescriptions AS RESTRICTIVE FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);
 
-DROP POLICY IF EXISTS "Read medication schedules" ON public.medication_schedules;
-DROP POLICY IF EXISTS "Update medication schedules" ON public.medication_schedules;
-DROP POLICY IF EXISTS "Insert medication schedules" ON public.medication_schedules;
+CREATE POLICY "Interim restrictive deny access to care_plans"
+  ON public.care_plans AS RESTRICTIVE FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);
 
-DROP POLICY IF EXISTS "Read adherence logs" ON public.adherence_logs;
-DROP POLICY IF EXISTS "Insert adherence logs" ON public.adherence_logs;
+CREATE POLICY "Interim restrictive deny access to medication_schedules"
+  ON public.medication_schedules AS RESTRICTIVE FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);
 
-DROP POLICY IF EXISTS "Health updates access" ON public.health_updates;
-DROP POLICY IF EXISTS "Care gaps access" ON public.care_gaps;
-DROP POLICY IF EXISTS "Follow ups access" ON public.follow_ups;
-DROP POLICY IF EXISTS "Caregiver consent access" ON public.caregiver_consent;
+CREATE POLICY "Interim restrictive deny access to adherence_logs"
+  ON public.adherence_logs AS RESTRICTIVE FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);
 
--- Step 5: Deploy Explicit Interim Deny-by-Default RLS Policies
--- Until Supabase Auth user identity verification is deployed, all direct client access
--- to sensitive patient data by anon and authenticated roles is denied.
-CREATE POLICY "Interim deny all client access to patients"
-  ON public.patients FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);
+CREATE POLICY "Interim restrictive deny access to health_updates"
+  ON public.health_updates AS RESTRICTIVE FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);
 
-CREATE POLICY "Interim deny all client access to prescriptions"
-  ON public.prescriptions FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);
+CREATE POLICY "Interim restrictive deny access to care_gaps"
+  ON public.care_gaps AS RESTRICTIVE FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);
 
-CREATE POLICY "Interim deny all client access to care_plans"
-  ON public.care_plans FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);
+CREATE POLICY "Interim restrictive deny access to caregiver_consent"
+  ON public.caregiver_consent AS RESTRICTIVE FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);
 
-CREATE POLICY "Interim deny all client access to medication_schedules"
-  ON public.medication_schedules FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);
-
-CREATE POLICY "Interim deny all client access to adherence_logs"
-  ON public.adherence_logs FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);
-
-CREATE POLICY "Interim deny all client access to health_updates"
-  ON public.health_updates FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);
-
-CREATE POLICY "Interim deny all client access to care_gaps"
-  ON public.care_gaps FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);
-
-CREATE POLICY "Interim deny all client access to caregiver_consent"
-  ON public.caregiver_consent FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);
-
-CREATE POLICY "Interim deny all client access to follow_ups"
-  ON public.follow_ups FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);
+CREATE POLICY "Interim restrictive deny access to follow_ups"
+  ON public.follow_ups AS RESTRICTIVE FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);
 
 -- Step 6: View Security Invoker Setting
 -- Set security_invoker = true so view queries execute with calling user permissions
@@ -96,8 +98,7 @@ ALTER VIEW public.patient_summaries SET (security_invoker = true);
 REVOKE ALL ON public.patient_summaries FROM anon, authenticated, PUBLIC;
 
 -- Step 7: Secure get_family_view RPC & Search Path Hardening
--- Revoke execution from anon, authenticated, and PUBLIC.
--- Enforce explicit search_path = public, pg_temp to prevent hijacking.
+-- Revoke execution from anon, authenticated, and PUBLIC until verified caregiver identity is implemented.
 REVOKE EXECUTE ON FUNCTION public.get_family_view(text) FROM anon, authenticated, PUBLIC;
 
 CREATE OR REPLACE FUNCTION public.get_family_view(p_patient_id text)
@@ -188,7 +189,9 @@ $$;
 
 -- Step 8: Hardened Prescription Immutability & Clinical Validation Trigger
 -- Covers INSERT and UPDATE.
--- 1. Enforces strict immutability on confirmed prescriptions (prohibits unconfirming or altering fields).
+-- 1. Enforces strict immutability on confirmed prescriptions:
+--    Prohibits unconfirming (confirmed = false or null) and prohibits altering fields,
+--    patient_id, image_url, confirmed_at, or doctor_notes.
 -- 2. Validates clinical payload: non-empty JSON array, no duplicate critical keys, non-null status,
 --    and confirmed status on medicine, dosage, frequency, and duration.
 CREATE OR REPLACE FUNCTION public.trg_validate_prescription_confirmation()
@@ -210,15 +213,18 @@ BEGIN
   -- 1. IMMUTABILITY OF CONFIRMED PRESCRIPTIONS:
   -- Once confirmed, a prescription is an immutable legal medical record.
   IF TG_OP = 'UPDATE' AND OLD.confirmed = true THEN
-    IF NEW.confirmed = false THEN
-      RAISE EXCEPTION 'Prescription security error: A confirmed prescription cannot be unconfirmed. To modify a treatment plan, the doctor must issue a new prescription draft.';
+    -- Prohibit unconfirming (false or null)
+    IF NEW.confirmed IS DISTINCT FROM true THEN
+      RAISE EXCEPTION 'Prescription security error: A confirmed prescription cannot be unconfirmed. To modify a treatment plan, the doctor must issue a replacement prescription draft.';
     END IF;
 
+    -- Prohibit altering any clinically relevant column
     IF NEW.fields IS DISTINCT FROM OLD.fields
        OR NEW.patient_id IS DISTINCT FROM OLD.patient_id
        OR NEW.image_url IS DISTINCT FROM OLD.image_url
-       OR NEW.confirmed_at IS DISTINCT FROM OLD.confirmed_at THEN
-      RAISE EXCEPTION 'Prescription security error: Confirmed prescriptions are immutable clinical records. To change medications, issue a replacement prescription draft.';
+       OR NEW.confirmed_at IS DISTINCT FROM OLD.confirmed_at
+       OR NEW.doctor_notes IS DISTINCT FROM OLD.doctor_notes THEN
+      RAISE EXCEPTION 'Prescription security error: Confirmed prescriptions are immutable clinical records. Modifying fields, patient, image, confirmation timestamp, or doctor notes is forbidden. To change medication or instructions, issue a replacement prescription draft.';
     END IF;
   END IF;
 
