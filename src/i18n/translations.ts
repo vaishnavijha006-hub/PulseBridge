@@ -109,6 +109,15 @@ export type TranslationKey =
   | 'abha_badge_verified'
   | 'abha_badge_not_provided'
   | 'abha_status_explainer'
+  | 'landing_hero_badge'
+  | 'landing_cta_doctor'
+  | 'landing_cta_demo'
+  | 'landing_preview_doctor_title'
+  | 'landing_preview_patient_title'
+  | 'landing_cap_title'
+  | 'landing_cap_subtitle'
+  | 'landing_transparency_title'
+  | 'landing_disclaimer'
   | 'gender_male'
   | 'gender_female'
   | 'gender_other'
@@ -445,6 +454,42 @@ const dict: Dictionary = {
   abha_status_explainer: {
     en: 'Self-declared patient record · Official government ABDM gateway verification is not configured.',
     hi: 'मरीज द्वारा स्व-घोषित रिकॉर्ड · आधिकारिक सरकारी ABDM गेटवे सत्यापन कॉन्फ़िगर नहीं है।'
+  },
+  landing_hero_badge: {
+    en: 'Hospital-to-Home Closed-Loop Coordination',
+    hi: 'अस्पताल से घर तक सतत देखभाल समन्वय'
+  },
+  landing_cta_doctor: {
+    en: 'Doctor Command Center',
+    hi: 'डॉक्टर कमांड सेंटर'
+  },
+  landing_cta_demo: {
+    en: 'Explore Demo Patient (Ravi Sharma)',
+    hi: 'डेमो मरीज देखें (रवि शर्मा)'
+  },
+  landing_preview_doctor_title: {
+    en: 'Physician Clinical Command',
+    hi: 'फिजिशियन क्लीनिकल कमांड'
+  },
+  landing_preview_patient_title: {
+    en: 'Patient & Family Companion',
+    hi: 'मरीज एवं परिवार साथी'
+  },
+  landing_cap_title: {
+    en: 'Engineered for Real-World Clinical Safety',
+    hi: 'सख्त क्लीनिकल सुरक्षा के लिए निर्मित'
+  },
+  landing_cap_subtitle: {
+    en: 'Four core pillars designed to eliminate care gaps between discharge and home recovery.',
+    hi: 'अस्पताल डिस्चार्ज और घर पर रिकवरी के बीच की दूरी पाटने वाले चार मुख्य स्तंभ।'
+  },
+  landing_transparency_title: {
+    en: 'ABHA Support & Transparent Verification Disclosures',
+    hi: 'आभा (ABHA) समर्थन एवं पारदर्शी सत्यापन विवरण'
+  },
+  landing_disclaimer: {
+    en: 'PulseBridge AI is a clinical coordination system designed to assist healthcare teams and patients. It does not replace professional clinical judgment or emergency medical services.',
+    hi: 'PulseBridge AI एक क्लीनिकल समन्वय प्रणाली है जो स्वास्थ्य टीमों और मरीजों की सहायता के लिए डिज़ाइन की गई है। यह पेशेवर डॉक्टर के निर्णय या आपातकालीन चिकित्सा सेवाओं का विकल्प नहीं है।'
   },
   gender_male: { en: 'Male', hi: 'पुरुष' },
   gender_female: { en: 'Female', hi: 'महिला' },
