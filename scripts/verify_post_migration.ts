@@ -1,6 +1,5 @@
 import { supabase, isSupabaseConfigured } from '../src/lib/supabase';
 import { dataService } from '../src/services/dataService';
-import { calculatePatientTriageScore } from '../src/services/careGapRules';
 import { demoPatients } from '../src/data/demoData';
 
 interface VerificationResult {
@@ -9,6 +8,7 @@ interface VerificationResult {
   expected: string;
   actual: string;
   status: 'PASS' | 'FAIL' | 'PRE_MIGRATION_PENDING';
+  denialType?: 'PRIVILEGE_MISSING' | 'RLS_FILTER' | 'RLS_WITH_CHECK' | 'NONE';
 }
 
 const results: VerificationResult[] = [];
@@ -18,16 +18,19 @@ function recordResult(
   target: string,
   expected: string,
   actual: string,
-  status: 'PASS' | 'FAIL' | 'PRE_MIGRATION_PENDING'
+  status: 'PASS' | 'FAIL' | 'PRE_MIGRATION_PENDING',
+  denialType: 'PRIVILEGE_MISSING' | 'RLS_FILTER' | 'RLS_WITH_CHECK' | 'NONE' = 'NONE'
 ) {
-  results.push({ step, target, expected, actual, status });
-  const icon = status === 'PASS' ? '✅ PASS' : status === 'PRE_MIGRATION_PENDING' ? '⏳ PENDING (Phase 3 Active)' : '❌ FAIL';
-  console.log(`${icon} [${step}] ${target}: ${actual}`);
+  results.push({ step, target, expected, actual, status, denialType });
+  const icon = status === 'PASS' ? '✅ PASS' : status === 'PRE_MIGRATION_PENDING' ? '⏳ UNVERIFIED / PENDING' : '❌ FAIL';
+  const tag = denialType !== 'NONE' ? ` [${denialType}]` : '';
+  console.log(`${icon}${tag} [${step}] ${target}: ${actual}`);
 }
 
 export async function runPostMigrationVerification() {
   console.log('======================================================================');
   console.log('  PulseBridge AI — Phase 4 Post-Migration Regression & Safety Suite  ');
+  console.log('  Verifying Privilege Grants, RLS Denials, and Client Resilience     ');
   console.log('======================================================================\n');
 
   if (!isSupabaseConfigured || !supabase) {
@@ -37,6 +40,7 @@ export async function runPostMigrationVerification() {
 
   // -------------------------------------------------------------------------
   // 1. VERIFY ANONYMOUS READ BOUNDARIES (All 9 Sensitive Tables + 1 View)
+  // Distinguishes Missing Table Grants from Effective RLS Access Denial
   // -------------------------------------------------------------------------
   console.log('--- 1. Anonymous Read Boundary Verification ---');
   const sensitiveTables = [
@@ -58,24 +62,27 @@ export async function runPostMigrationVerification() {
         'Table SELECT',
         table,
         'Access Denied (42501)',
-        `Denied as expected: ${error.message} (code ${error.code})`,
-        'PASS'
+        `Denied at Privilege Layer (Missing/Revoked Table Grant): ${error.message}`,
+        'PASS',
+        'PRIVILEGE_MISSING'
       );
     } else if (data && data.length > 0) {
       recordResult(
         'Table SELECT',
         table,
         'Access Denied / Empty',
-        `Accessible: returned ${data.length} row(s) to anonymous key`,
-        'PRE_MIGRATION_PENDING'
+        `UNVERIFIED: remote database returned ${data.length} row(s) to anonymous key (Phase 3 active)`,
+        'PRE_MIGRATION_PENDING',
+        'NONE'
       );
     } else {
       recordResult(
         'Table SELECT',
         table,
         'Access Denied / Empty',
-        'Zero rows accessible to anonymous key',
-        'PASS'
+        'Effective Access Denial via RLS (0 rows returned)',
+        'PASS',
+        'RLS_FILTER'
       );
     }
   }
@@ -87,29 +94,33 @@ export async function runPostMigrationVerification() {
       'View SELECT',
       'patient_summaries',
       'Access Denied (42501)',
-      `Denied as expected: ${viewErr.message} (code ${viewErr.code})`,
-      'PASS'
+      `Denied at Privilege/Invoker Layer: ${viewErr.message}`,
+      'PASS',
+      'PRIVILEGE_MISSING'
     );
   } else if (viewData && viewData.length > 0) {
     recordResult(
       'View SELECT',
       'patient_summaries',
       'Access Denied / Empty',
-      `Accessible: returned ${viewData.length} summary row(s)`,
-      'PRE_MIGRATION_PENDING'
+      `UNVERIFIED: remote database returned ${viewData.length} summary row(s) to anonymous key`,
+      'PRE_MIGRATION_PENDING',
+      'NONE'
     );
   } else {
     recordResult(
       'View SELECT',
       'patient_summaries',
       'Access Denied / Empty',
-      'Zero view rows accessible to anonymous key',
-      'PASS'
+      'Effective Access Denial via RLS (0 rows returned)',
+      'PASS',
+      'RLS_FILTER'
     );
   }
 
   // -------------------------------------------------------------------------
   // 2. VERIFY ANONYMOUS WRITE & MUTATION BOUNDARIES (INSERT, UPDATE, DELETE)
+  // Distinguishes Missing Table Grants from RLS WITH CHECK Violations
   // -------------------------------------------------------------------------
   console.log('\n--- 2. Anonymous Mutation Boundary Verification ---');
   // 2.1 Anonymous INSERT on patients
@@ -120,32 +131,26 @@ export async function runPostMigrationVerification() {
     gender: 'female',
     phone: '0000000000',
   });
-  if (insPatientErr && (insPatientErr.code === '42501' || insPatientErr.message.toLowerCase().includes('permission denied'))) {
+  if (insPatientErr) {
+    const isRls = insPatientErr.message.toLowerCase().includes('row-level security');
     recordResult(
       'Mutation Denial',
       'INSERT public.patients',
       'Denied (42501)',
-      `Denied as expected: ${insPatientErr.message}`,
-      'PASS'
+      `Denied: ${insPatientErr.message}`,
+      'PASS',
+      isRls ? 'RLS_WITH_CHECK' : 'PRIVILEGE_MISSING'
     );
-  } else if (!insPatientErr) {
-    recordResult(
-      'Mutation Denial',
-      'INSERT public.patients',
-      'Denied (42501)',
-      'Allowed: Anonymous user can insert patient records',
-      'PRE_MIGRATION_PENDING'
-    );
-    // Cleanup if allowed in pre-migration state
-    await supabase.from('patients').delete().like('id', 'probe_ins_%');
   } else {
     recordResult(
       'Mutation Denial',
       'INSERT public.patients',
-      'Denied',
-      insPatientErr.message,
-      'PASS'
+      'Denied (42501)',
+      'UNVERIFIED: Anonymous user can insert patient records (Phase 3 active)',
+      'PRE_MIGRATION_PENDING',
+      'NONE'
     );
+    await supabase.from('patients').delete().like('id', 'probe_ins_%');
   }
 
   // 2.2 Anonymous INSERT on health_updates
@@ -155,31 +160,26 @@ export async function runPostMigrationVerification() {
     symptom_description: 'Unauthorized health update probe',
     source: 'patient',
   });
-  if (insUpdateErr && (insUpdateErr.code === '42501' || insUpdateErr.message.toLowerCase().includes('permission denied'))) {
+  if (insUpdateErr) {
+    const isRls = insUpdateErr.message.toLowerCase().includes('row-level security');
     recordResult(
       'Mutation Denial',
       'INSERT public.health_updates',
       'Denied (42501)',
-      `Denied as expected: ${insUpdateErr.message}`,
-      'PASS'
+      `Denied: ${insUpdateErr.message}`,
+      'PASS',
+      isRls ? 'RLS_WITH_CHECK' : 'PRIVILEGE_MISSING'
     );
-  } else if (!insUpdateErr) {
-    recordResult(
-      'Mutation Denial',
-      'INSERT public.health_updates',
-      'Denied (42501)',
-      'Allowed: Anonymous user can insert health updates for any patient',
-      'PRE_MIGRATION_PENDING'
-    );
-    await supabase.from('health_updates').delete().eq('symptom_description', 'Unauthorized health update probe');
   } else {
     recordResult(
       'Mutation Denial',
       'INSERT public.health_updates',
-      'Denied',
-      insUpdateErr.message,
-      'PASS'
+      'Denied (42501)',
+      'UNVERIFIED: Anonymous user can insert health updates for any patient (Phase 3 active)',
+      'PRE_MIGRATION_PENDING',
+      'NONE'
     );
+    await supabase.from('health_updates').delete().eq('symptom_description', 'Unauthorized health update probe');
   }
 
   // 2.3 Anonymous UPDATE on prescriptions
@@ -187,21 +187,24 @@ export async function runPostMigrationVerification() {
     .from('prescriptions')
     .update({ confirmed: false })
     .eq('id', '00000000-0000-0000-0000-000000000000');
-  if (updRxErr && (updRxErr.code === '42501' || updRxErr.message.toLowerCase().includes('permission denied'))) {
+  if (updRxErr) {
+    const isRls = updRxErr.message.toLowerCase().includes('row-level security');
     recordResult(
       'Mutation Denial',
       'UPDATE public.prescriptions',
       'Denied (42501)',
-      `Denied as expected: ${updRxErr.message}`,
-      'PASS'
+      `Denied: ${updRxErr.message}`,
+      'PASS',
+      isRls ? 'RLS_WITH_CHECK' : 'PRIVILEGE_MISSING'
     );
   } else {
     recordResult(
       'Mutation Denial',
       'UPDATE public.prescriptions',
       'Denied (42501)',
-      updRxErr ? updRxErr.message : 'No error returned (pre-migration grants active)',
-      updRxErr ? 'PASS' : 'PRE_MIGRATION_PENDING'
+      'UNVERIFIED: UPDATE privileges active on prescriptions (Phase 3 active)',
+      'PRE_MIGRATION_PENDING',
+      'NONE'
     );
   }
 
@@ -210,21 +213,24 @@ export async function runPostMigrationVerification() {
     .from('patients')
     .delete()
     .eq('id', '00000000-0000-0000-0000-000000000000');
-  if (delPatientErr && (delPatientErr.code === '42501' || delPatientErr.message.toLowerCase().includes('permission denied'))) {
+  if (delPatientErr) {
+    const isRls = delPatientErr.message.toLowerCase().includes('row-level security');
     recordResult(
       'Mutation Denial',
       'DELETE public.patients',
       'Denied (42501)',
-      `Denied as expected: ${delPatientErr.message}`,
-      'PASS'
+      `Denied: ${delPatientErr.message}`,
+      'PASS',
+      isRls ? 'RLS_WITH_CHECK' : 'PRIVILEGE_MISSING'
     );
   } else {
     recordResult(
       'Mutation Denial',
       'DELETE public.patients',
       'Denied (42501)',
-      delPatientErr ? delPatientErr.message : 'Allowed: Anonymous user has DELETE privileges',
-      delPatientErr ? 'PASS' : 'PRE_MIGRATION_PENDING'
+      'UNVERIFIED: Anonymous user has DELETE privileges on patients (Phase 3 active)',
+      'PRE_MIGRATION_PENDING',
+      'NONE'
     );
   }
 
@@ -233,21 +239,24 @@ export async function runPostMigrationVerification() {
     .from('adherence_logs')
     .delete()
     .eq('id', '00000000-0000-0000-0000-000000000000');
-  if (delLogErr && (delLogErr.code === '42501' || delLogErr.message.toLowerCase().includes('permission denied'))) {
+  if (delLogErr) {
+    const isRls = delLogErr.message.toLowerCase().includes('row-level security');
     recordResult(
       'Mutation Denial',
       'DELETE public.adherence_logs',
       'Denied (42501)',
-      `Denied as expected: ${delLogErr.message}`,
-      'PASS'
+      `Denied: ${delLogErr.message}`,
+      'PASS',
+      isRls ? 'RLS_WITH_CHECK' : 'PRIVILEGE_MISSING'
     );
   } else {
     recordResult(
       'Mutation Denial',
       'DELETE public.adherence_logs',
       'Denied (42501)',
-      delLogErr ? delLogErr.message : 'Allowed: Anonymous user can delete clinical audit logs',
-      delLogErr ? 'PASS' : 'PRE_MIGRATION_PENDING'
+      'UNVERIFIED: Anonymous user can delete clinical audit logs (Phase 3 active)',
+      'PRE_MIGRATION_PENDING',
+      'NONE'
     );
   }
 
@@ -255,22 +264,24 @@ export async function runPostMigrationVerification() {
   // 3. VERIFY RPC EXECUTION REVOCATION (get_family_view)
   // -------------------------------------------------------------------------
   console.log('\n--- 3. RPC Execution Boundary Verification ---');
-  const { data: rpcData, error: rpcErr } = await supabase.rpc('get_family_view', { p_patient_id: 'p1' });
+  const { error: rpcErr } = await supabase.rpc('get_family_view', { p_patient_id: 'p1' });
   if (rpcErr && (rpcErr.code === '42501' || rpcErr.message.toLowerCase().includes('permission denied'))) {
     recordResult(
       'RPC Revocation',
       'get_family_view(text)',
       'Revoked (42501)',
-      `Execution blocked as expected: ${rpcErr.message} (code ${rpcErr.code})`,
-      'PASS'
+      `Execution blocked at Routine Privilege Layer: ${rpcErr.message}`,
+      'PASS',
+      'PRIVILEGE_MISSING'
     );
   } else if (!rpcErr) {
     recordResult(
       'RPC Revocation',
       'get_family_view(text)',
       'Revoked (42501)',
-      `Executable by anonymous caller: returned caregiver data for patient p1`,
-      'PRE_MIGRATION_PENDING'
+      'UNVERIFIED: Executable by anonymous caller without authentication (Phase 3 active)',
+      'PRE_MIGRATION_PENDING',
+      'NONE'
     );
   } else {
     recordResult(
@@ -278,7 +289,8 @@ export async function runPostMigrationVerification() {
       'get_family_view(text)',
       'Revoked (42501)',
       `RPC returned error: ${rpcErr.message}`,
-      'PASS'
+      'PASS',
+      'PRIVILEGE_MISSING'
     );
   }
 
@@ -286,7 +298,6 @@ export async function runPostMigrationVerification() {
   // 4. VERIFY CLIENT APPLICATION RESILIENCE (Demo Mode & Fallback)
   // -------------------------------------------------------------------------
   console.log('\n--- 4. Client Application Resilience Verification ---');
-  // When remote queries are denied, dataService falls back to in-memory demo data
   const patients = await dataService.fetchPatients();
   if (patients && patients.length > 0) {
     recordResult(
@@ -309,7 +320,7 @@ export async function runPostMigrationVerification() {
   // Verify client clinical gate validation
   const testDraft = [
     { key: 'medicine', labelKey: 'rx_medicine', value: 'Aspirin', status: 'confirmed' as const },
-    { key: 'dosage', labelKey: 'rx_dosage', value: '75mg', status: 'uncertain' as const }, // Uncertain status
+    { key: 'dosage', labelKey: 'rx_dosage', value: '75mg', status: 'uncertain' as const },
     { key: 'frequency', labelKey: 'rx_frequency', value: 'Daily', status: 'confirmed' as const },
     { key: 'duration', labelKey: 'rx_duration', value: '30 days', status: 'confirmed' as const },
   ];
@@ -341,15 +352,16 @@ export async function runPostMigrationVerification() {
   const fails = results.filter((r) => r.status === 'FAIL').length;
 
   console.log(`Verification Summary:`);
-  console.log(`  ✅ Passed:   ${passes}`);
-  console.log(`  ⏳ Pending:  ${pending} (Items that will convert to PASS once migration is applied)`);
-  console.log(`  ❌ Failed:   ${fails}`);
+  console.log(`  ✅ Passed:      ${passes}`);
+  console.log(`  ⏳ Unverified:  ${pending} (Open vectors on remote instance pending migration execution)`);
+  console.log(`  ❌ Failed:      ${fails}`);
   console.log('======================================================================\n');
 
   if (pending > 0) {
-    console.log(`NOTE: The ${pending} "PENDING" items reflect the current Phase 3 state of the remote database.`);
-    console.log('Once migration 20261017000001_least_privilege_grants.sql is executed,');
-    console.log('all PENDING items will become PASS, confirming full least-privilege lockdown.');
+    console.log(`CRITICAL: ${pending} security checks remain UNVERIFIED on the remote database.`);
+    console.log('The remote instance is currently running the unpatched Phase 3 schema.');
+    console.log('Production is NOT secured until migration 20261017000001_least_privilege_grants.sql');
+    console.log('is executed in Supabase and this suite is rerun to confirm 0 unverified items.\n');
   }
 }
 

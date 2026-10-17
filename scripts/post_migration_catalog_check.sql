@@ -1,9 +1,13 @@
 -- =============================================================================
 -- PulseBridge AI — Phase 4 Post-Migration Catalog & Security Verification Script
 -- Run this in the Supabase SQL Editor AFTER executing the migration to verify all security controls.
+-- Compatible with Supabase Web SQL Editor (Standard PostgreSQL DDL/DML, No psql meta-commands).
 -- =============================================================================
 
+-- =============================================================================
 -- 1. VERIFY ROW LEVEL SECURITY (relrowsecurity) ON ALL 9 TABLES
+-- Confirms that PostgreSQL evaluates RLS policies for every query on these tables.
+-- =============================================================================
 SELECT
   c.relname AS table_name,
   c.relrowsecurity AS rls_enabled,
@@ -18,9 +22,16 @@ WHERE n.nspname = 'public'
     'follow_ups'
   )
 ORDER BY c.relname;
--- EXPECTED: All 9 rows show rls_enabled = true.
+-- EXPECTED OUTCOME: Exactly 9 rows returned, all with rls_enabled = true.
 
+-- =============================================================================
 -- 2. VERIFY RLS POLICIES (Only Restrictive Deny Policies Active, 0 Permissive Policies)
+-- Confirms:
+--   a) Only restrictive deny policies exist (permissive = 'RESTRICTIVE').
+--   b) qual = 'false' and with_check = 'false' enforce complete row denial.
+--   c) Policies apply explicitly to both 'anon' and 'authenticated' roles.
+--   d) Zero permissive 'USING (true)' policies survive.
+-- =============================================================================
 SELECT
   tablename,
   policyname,
@@ -38,10 +49,22 @@ WHERE schemaname = 'public'
     'follow_ups'
   )
 ORDER BY tablename;
--- EXPECTED: Exactly 9 policies, all with permissive = 'RESTRICTIVE', qual = 'false', with_check = 'false'.
--- Zero permissive 'USING (true)' policies should exist.
+-- EXPECTED OUTCOME: Exactly 9 policies returned.
+-- tablename: each of the 9 tables.
+-- permissive: 'RESTRICTIVE'.
+-- roles: '{anon,authenticated}'.
+-- cmd: 'ALL'.
+-- qual: 'false'.
+-- with_check: 'false'.
 
--- 3. VERIFY DIRECT TABLE PRIVILEGES FOR CLIENT ROLES
+-- =============================================================================
+-- 3. DISTINGUISHING MISSING TABLE GRANTS FROM RLS POLICY DENIAL
+--
+-- LEVEL 1: Table Grants (Privilege Layer)
+-- In PostgreSQL, if role_table_grants has no row for (grantee, table_name, privilege),
+-- queries fail immediately at the privilege layer with SQLSTATE 42501 ("permission denied for table ...")
+-- before Row Level Security is ever evaluated.
+-- =============================================================================
 SELECT
   grantee,
   table_name,
@@ -55,26 +78,39 @@ WHERE table_schema = 'public'
     'health_updates', 'care_gaps', 'caregiver_consent',
     'follow_ups', 'patient_summaries'
   );
--- EXPECTED: 0 rows (all privileges revoked from client roles).
+-- EXPECTED OUTCOME: 0 rows (all direct DML privileges revoked from client roles).
+-- NOTE: If a future migration grants SELECT to authenticated, Level 1 will pass,
+-- and Level 2 (the AS RESTRICTIVE policy from Check #2) will still independently deny access.
 
--- 4. VERIFY VIEW SECURITY INVOKER PROPERTY
+-- =============================================================================
+-- 4. VERIFY DEFAULT PRIVILEGES (Future Object Lockdown)
+-- Confirms that new tables, sequences, or functions will not automatically inherit broad grants.
+-- =============================================================================
 SELECT
-  viewname,
-  definition
-FROM pg_views
-WHERE schemaname = 'public'
-  AND viewname = 'patient_summaries';
--- Check view options in pg_class:
+  defaclrole::regrole AS grantor,
+  defaclobjtype AS object_type,
+  defaclacl AS default_access_control_list
+FROM pg_default_acl
+WHERE defaclnamespace = (SELECT oid FROM pg_namespace WHERE nspname = 'public');
+-- EXPECTED OUTCOME: Shows revoked default privileges (no automatic grants to anon, authenticated, or PUBLIC).
+
+-- =============================================================================
+-- 5. VERIFY VIEW SECURITY INVOKER PROPERTY
+-- Confirms that patient_summaries executes with caller privileges, respecting table RLS.
+-- =============================================================================
 SELECT
-  c.relname,
-  c.reloptions
+  c.relname AS view_name,
+  c.reloptions AS view_options
 FROM pg_class c
 JOIN pg_namespace n ON n.oid = c.relnamespace
 WHERE n.nspname = 'public'
   AND c.relname = 'patient_summaries';
--- EXPECTED: reloptions contains 'security_invoker=true'.
+-- EXPECTED OUTCOME: reloptions contains 'security_invoker=true'.
 
--- 5. VERIFY ROUTINE EXECUTION PRIVILEGES FOR CLIENT ROLES
+-- =============================================================================
+-- 6. VERIFY ROUTINE EXECUTION PRIVILEGES FOR CLIENT ROLES
+-- Confirms that get_family_view and internal triggers cannot be directly executed by client roles.
+-- =============================================================================
 SELECT
   routine_name,
   grantee,
@@ -87,20 +123,23 @@ WHERE specific_schema = 'public'
     'trg_validate_prescription_confirmation',
     'trg_adherence_logs_fill'
   );
--- EXPECTED: 0 rows (direct execution revoked).
+-- EXPECTED OUTCOME: 0 rows (direct execution revoked from anon, authenticated, and PUBLIC).
 
--- 6. TRANSACTIONAL TRIGGER INTEGRITY TEST (Rolls back automatically)
+-- =============================================================================
+-- 7. TRANSACTIONAL TRIGGER INTEGRITY TEST (Runs in isolated block and rolls back)
+-- Tests confirmed prescription immutability, duplicate key rejection, and uncertain field rejection.
+-- =============================================================================
 DO $$
 DECLARE
   v_test_patient_id text := 'audit_test_p_' || floor(random() * 100000)::text;
   v_rx_id uuid := gen_random_uuid();
   v_err_caught boolean := false;
 BEGIN
-  -- Insert temporary test patient & draft prescription
+  -- Insert temporary test patient
   INSERT INTO public.patients (id, name, age, gender, phone)
   VALUES (v_test_patient_id, 'Trigger Test Patient', 50, 'female', '9990001111');
 
-  -- Test 6.1: Reject unconfirmed critical fields on confirmation
+  -- Test 7.1: Reject unconfirmed critical fields on confirmation
   BEGIN
     INSERT INTO public.prescriptions (id, patient_id, fields, confirmed)
     VALUES (
@@ -123,7 +162,7 @@ BEGIN
     END IF;
   END;
 
-  -- Test 6.2: Reject duplicate critical keys
+  -- Test 7.2: Reject duplicate critical keys
   BEGIN
     INSERT INTO public.prescriptions (id, patient_id, fields, confirmed)
     VALUES (
@@ -147,7 +186,7 @@ BEGIN
     END IF;
   END;
 
-  -- Test 6.3: Valid confirmation succeeds
+  -- Test 7.3: Valid confirmation succeeds
   INSERT INTO public.prescriptions (id, patient_id, fields, confirmed)
   VALUES (
     v_rx_id,
@@ -161,7 +200,7 @@ BEGIN
     true
   );
 
-  -- Test 6.4: Prohibit unconfirming
+  -- Test 7.4: Prohibit unconfirming
   BEGIN
     UPDATE public.prescriptions SET confirmed = false WHERE id = v_rx_id;
     RAISE EXCEPTION 'TEST FAILED: Trigger allowed unconfirming confirmed prescription!';
@@ -173,7 +212,7 @@ BEGIN
     END IF;
   END;
 
-  -- Test 6.5: Prohibit modifying clinical fields on confirmed prescription
+  -- Test 7.5: Prohibit modifying clinical fields on confirmed prescription
   BEGIN
     UPDATE public.prescriptions
     SET fields = jsonb_build_array(
