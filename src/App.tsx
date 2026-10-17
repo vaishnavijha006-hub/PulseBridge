@@ -17,6 +17,7 @@ import {
   demoFamilyView,
   demoPatients,
   demoHealthUpdates,
+  demoMedicalReports,
 } from '@/data/demoData';
 import type {
   PatientProfile,
@@ -29,6 +30,7 @@ import type {
   PrescriptionField,
   PatientSummary,
   FamilyView,
+  MedicalReport,
 } from '@/types';
 
 type View = 'landing' | 'patient_intake' | 'patient_processing' | 'patient_dashboard' | 'doctor' | 'family';
@@ -42,6 +44,7 @@ function AppContent() {
   const [careGaps, setCareGaps] = useState<Record<string, CareGap[]>>(demoCareGaps);
   const [prescriptionDrafts, setPrescriptionDrafts] = useState<Record<string, PrescriptionDraft>>(demoPrescriptionDrafts);
   const [followUps, setFollowUps] = useState<Record<string, FollowUp[]>>(demoFollowUps);
+  const [reports, setReports] = useState<Record<string, MedicalReport[]>>(demoMedicalReports);
   const [patientProfile, setPatientProfile] = useState<Partial<PatientProfile> | null>(null);
   const [familyView, setFamilyView] = useState<FamilyView>(demoFamilyView);
 
@@ -51,13 +54,14 @@ function AppContent() {
     let mounted = true;
     async function loadData() {
       try {
-        const [sched, drafts, gaps, fUps, summs, fam] = await Promise.all([
+        const [sched, drafts, gaps, fUps, summs, fam, rep] = await Promise.all([
           dataService.fetchMedicationSchedules(DEMO_PATIENT_ID),
           dataService.fetchPrescriptionDraft(DEMO_PATIENT_ID),
           dataService.fetchCareGaps(DEMO_PATIENT_ID),
           dataService.fetchFollowUps(DEMO_PATIENT_ID),
           dataService.fetchPatientSummaries(),
           dataService.fetchFamilyView(DEMO_PATIENT_ID),
+          dataService.fetchMedicalReports(DEMO_PATIENT_ID),
         ]);
         if (!mounted) return;
         if (sched && sched.length > 0) setSchedules(sched);
@@ -66,6 +70,7 @@ function AppContent() {
         if (fUps && fUps.length > 0) setFollowUps((prev) => ({ ...prev, [DEMO_PATIENT_ID]: fUps }));
         if (summs && summs.length > 0) setSummaries(summs);
         if (fam) setFamilyView(fam);
+        if (rep && rep.length > 0) setReports((prev) => ({ ...prev, [DEMO_PATIENT_ID]: rep }));
       } catch (err) {
         console.warn('Could not fetch remote data, keeping initialized state:', err);
       }
@@ -249,6 +254,7 @@ function AppContent() {
           careGaps={careGaps}
           prescriptionDrafts={prescriptionDrafts}
           followUps={followUps}
+          reports={reports}
           onConfirmCarePlan={handleConfirmCarePlan}
           onCareGapAction={handleCareGapAction}
           onBack={() => setView('landing')}

@@ -9,10 +9,12 @@ import {
   demoFamilyView,
   demoCaregiverAccess,
   demoAdherenceLogs,
+  demoMedicalReports,
   getPatientSummaries,
 } from '@/data/demoData';
 import { calculatePatientTriageScore } from '@/services/careGapRules';
 import { calculateSnoozeTimestamp } from '@/utils/reminderEngine';
+import { summarizeMedicalReport } from '@/services/reportSummarizer';
 import type {
   PatientSummary,
   MedicationSchedule,
@@ -27,6 +29,8 @@ import type {
   PrescriptionField,
   PatientProfile,
   AdherenceLog,
+  MedicalReport,
+  ReportSummary,
 } from '@/types';
 
 export interface DataService {
@@ -96,6 +100,10 @@ export interface DataService {
 
   // 11. Realtime / Live Synchronizations
   subscribeToLiveUpdates(onUpdate: () => void): () => void;
+
+  // 12. Medical Reports & Safe Summarization MVP
+  fetchMedicalReports(patientId: string): Promise<MedicalReport[]>;
+  getReportSummary(reportId: string, patientId: string): Promise<ReportSummary | null>;
 }
 
 // In-memory demo store for fully interactive demo mode without DB
@@ -109,6 +117,7 @@ const mutableDemoCaregiverAccess: Record<string, CaregiverAccess> = {
   p1: { ...demoCaregiverAccess },
 };
 const mutableDemoAdherenceLogs: Record<string, AdherenceLog[]> = { ...demoAdherenceLogs };
+const mutableDemoMedicalReports: Record<string, MedicalReport[]> = { ...demoMedicalReports };
 
 // Listeners for demo mode live reactivity
 const demoListeners = new Set<() => void>();
@@ -452,6 +461,17 @@ const demoService: DataService = {
     return () => {
       demoListeners.delete(onUpdate);
     };
+  },
+
+  async fetchMedicalReports(patientId) {
+    return mutableDemoMedicalReports[patientId] ?? [];
+  },
+
+  async getReportSummary(reportId, patientId) {
+    const reports = await this.fetchMedicalReports(patientId);
+    const report = reports.find((r) => r.id === reportId);
+    if (!report) return null;
+    return summarizeMedicalReport(report);
   },
 };
 
@@ -1131,6 +1151,13 @@ const productionService: DataService = {
     };
   },
 
+  async fetchMedicalReports(patientId) {
+    return demoService.fetchMedicalReports(patientId);
+  },
+
+  async getReportSummary(reportId, patientId) {
+    return demoService.getReportSummary(reportId, patientId);
+  },
 };
 
 export const dataService: DataService = isDemoMode ? demoService : productionService;

@@ -182,3 +182,68 @@ export interface FamilyView {
   missedDose: boolean;
   caregiverAccess: CaregiverAccess;
 }
+
+export type MedicalReportType = 'lab' | 'cardiology' | 'discharge' | 'radiology' | 'other';
+
+export interface MedicalReportFinding {
+  testOrParameter: string;
+  value: string;
+  unit?: string | null;
+  referenceRange?: string | null;
+  isAbnormal?: boolean | null; // true = outside range; false = in range; null = range not provided
+  clinicalNotes?: string;
+  sourceEvidence?: string;
+}
+
+export interface MedicalReport {
+  id: string;
+  patientId: string;
+  title: string;
+  reportType: MedicalReportType;
+  date: string;
+  facilityOrLab?: string;
+  orderingDoctor?: string;
+  rawText: string;
+  structuredFindings?: MedicalReportFinding[];
+}
+
+export interface ReportSummary {
+  reportId: string;
+  patientId: string;
+  reportOverview: {
+    title: string;
+    reportType: string;
+    date: string;
+    facility?: string;
+    orderingDoctor?: string;
+    sourceIntegrity: 'complete' | 'incomplete' | 'unreadable' | 'empty';
+  };
+  keyFindings: {
+    name: string;
+    value: string;
+    unit?: string | null;
+    referenceRange?: string | null;
+    flag: 'normal' | 'abnormal' | 'unspecified_range';
+    sourceEvidence: string;
+  }[];
+  abnormalValues: {
+    name: string;
+    value: string;
+    unit?: string | null;
+    referenceRange: string;
+    interpretation: string;
+    sourceEvidence: string;
+  }[];
+  missingOrUncertainInfo: {
+    item: string;
+    reason: string;
+  }[];
+  needsClinicianReview: {
+    questionOrFinding: string;
+    context: string;
+  }[];
+  disclaimer: string;
+  engineMode: 'rule_based_mvp';
+  generatedAt: string;
+}
+
