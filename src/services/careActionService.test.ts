@@ -19,6 +19,9 @@ import {
   isActionUnresolved,
   ALLOWED_TRANSITIONS,
 } from '@/services/careActionService';
+import { calculatePatientTriageScore } from '@/services/careGapRules';
+import { demoPatients, demoHealthUpdates, demoSchedules, demoFollowUps } from '@/data/demoData';
+import { demoCareActions } from '@/data/demoCareActions';
 import type { CareAction } from '@/types/careAction';
 
 // ---------------------------------------------------------------------------
@@ -588,5 +591,91 @@ describe('update() field preservation', () => {
     expect(action.title).toBe('Original Title');
     expect(action.description).toBe('Original description');
     expect(action.followUpNote).toBe('New follow-up note');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 13. Criterion 10 & 11: Patient triage score & emergency override immutability
+// ---------------------------------------------------------------------------
+describe('triage score and emergency override immutability', () => {
+  it('action operations do not mutate patient triage numerical score or priority tier', () => {
+    const p1 = demoPatients[0];
+    const p1Updates = demoHealthUpdates['p1'] ?? [];
+    const p1Schedules = demoSchedules['p1'] ?? [];
+    const p1FollowUps = demoFollowUps['p1'] ?? [];
+
+    const triageBefore = calculatePatientTriageScore(p1, p1Updates, p1Schedules, p1FollowUps);
+
+    // Create, update, document, and resolve actions
+    const a1 = careActionService.create({
+      patientId: 'p1',
+      title: 'Triage immutability test',
+      description: 'Ensure triage is unaffected',
+    });
+    expect(a1.success).toBe(true);
+
+    if (a1.success) {
+      careActionService.transition(a1.data.id, {
+        targetStatus: 'resolved',
+        outcomeNote: 'Action resolved without mutating clinical triage.',
+      });
+    }
+
+    const triageAfter = calculatePatientTriageScore(p1, p1Updates, p1Schedules, p1FollowUps);
+
+    expect(triageAfter.score).toBe(triageBefore.score);
+    expect(triageAfter.priority).toBe(triageBefore.priority);
+    expect(triageAfter.criticalSafetyOverride).toBe(triageBefore.criticalSafetyOverride);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 14. Criterion 15: Seed initialization does not create duplicate records
+// ---------------------------------------------------------------------------
+describe('seed initialization idempotency', () => {
+  it('calling seed() multiple times does not create duplicate records', () => {
+    careActionService.reset([]);
+    expect(careActionService.getAll().length).toBe(0);
+
+    // Seed first time
+    careActionService.seed(demoCareActions);
+    const initialCount = careActionService.getAll().length;
+    expect(initialCount).toBe(demoCareActions.length);
+
+    // Seed second time (simulating re-render or re-initialization)
+    careActionService.seed(demoCareActions);
+    expect(careActionService.getAll().length).toBe(initialCount);
+
+    // Seed third time
+    careActionService.seed(demoCareActions);
+    expect(careActionService.getAll().length).toBe(initialCount);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 15. Criterion 16: Persistence limitation accurately reflected in service
+// ---------------------------------------------------------------------------
+describe('in-memory persistence limitation', () => {
+  it('service data resets on reset() and does not persist across store resets', () => {
+    careActionService.reset([]);
+
+    // Create new action in session
+    const created = careActionService.create({
+      patientId: 'p1',
+      title: 'Ephemeral session action',
+      description: 'Must reset when session is cleared',
+    });
+    expect(created.success).toBe(true);
+    expect(careActionService.getAll().length).toBe(1);
+
+    // Reset store (simulating page reload or session restart)
+    careActionService.reset(demoCareActions);
+    const reloadedActions = careActionService.getAll();
+
+    // The ephemeral action created in the prior session is gone
+    if (created.success) {
+      expect(careActionService.getById(created.data.id)).toBeNull();
+    }
+    expect(reloadedActions.length).toBe(demoCareActions.length);
   });
 });
