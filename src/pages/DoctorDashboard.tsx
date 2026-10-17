@@ -14,6 +14,7 @@ import {
   ArrowUpDown,
   RefreshCw,
   LayoutDashboard,
+  User,
   Users,
   Radar,
   RotateCcw,
@@ -82,6 +83,25 @@ export function DoctorDashboard({
   const [selectedPatient, setSelectedPatient] = useState<string | null>(null);
   const [activeNav, setActiveNav] = useState<DoctorNavTab>('overview');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [globalPatientId, setGlobalPatientId] = useState<string>('');
+
+  const currentGlobalPatient = useMemo(() => {
+    if (globalPatientId) {
+      const found = summaries.find((s) => s.patient.id === globalPatientId);
+      if (found) return found.patient;
+    }
+    return summaries[0]?.patient ?? {
+      id: 'p1',
+      name: 'Ravi Sharma',
+      age: 62,
+      gender: 'male' as const,
+      phone: '9876543210',
+      symptoms: 'Chest heaviness',
+      allergies: 'Penicillin',
+      currentMeds: 'Aspirin, Metformin',
+      language: 'hi' as const,
+    };
+  }, [summaries, globalPatientId]);
 
   const allGaps = useMemo(
     () =>
@@ -574,11 +594,29 @@ export function DoctorDashboard({
           {/* VIEW: CLOSED-LOOP CARE ACTIONS */}
           {activeNav === 'actions' && (
             <div className="flex flex-col gap-4 animate-fade-in">
+              {summaries.length > 0 && (
+                <div className="flex items-center gap-2 px-1">
+                  <User className="w-4 h-4 text-teal-400" />
+                  <span className="text-xs font-semibold text-slate-300">Selected Patient:</span>
+                  <select
+                    aria-label="Select patient for closed-loop care actions"
+                    value={currentGlobalPatient.id}
+                    onChange={(e) => setGlobalPatientId(e.target.value)}
+                    className="bg-navy-800 border border-navy-600 text-white rounded-lg px-2.5 py-1 text-xs focus:ring-1 focus:ring-teal-500"
+                  >
+                    {summaries.map((s) => (
+                      <option key={s.patient.id} value={s.patient.id}>
+                        {s.patient.name} ({s.patient.id})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div className="rounded-2xl border border-navy-600 bg-navy-800/50 p-6">
                 <ClosedLoopCareView
-                  patientId={summaries[0]?.patient?.id || 'p1'}
-                  patientName={summaries[0]?.patient?.name || 'Ravi Sharma'}
-                  careGaps={allGaps}
+                  patientId={currentGlobalPatient.id}
+                  patientName={currentGlobalPatient.name}
+                  careGaps={careGaps[currentGlobalPatient.id] ?? allGaps}
                 />
               </div>
             </div>
@@ -587,9 +625,27 @@ export function DoctorDashboard({
           {/* VIEW: DIAGNOSTIC LAB REPORTS & AI */}
           {activeNav === 'reports' && (
             <div className="flex flex-col gap-4 animate-fade-in">
+              {summaries.length > 0 && (
+                <div className="flex items-center gap-2 px-1">
+                  <User className="w-4 h-4 text-teal-400" />
+                  <span className="text-xs font-semibold text-slate-300">Selected Patient:</span>
+                  <select
+                    aria-label="Select patient for diagnostic reports"
+                    value={currentGlobalPatient.id}
+                    onChange={(e) => setGlobalPatientId(e.target.value)}
+                    className="bg-navy-800 border border-navy-600 text-white rounded-lg px-2.5 py-1 text-xs focus:ring-1 focus:ring-teal-500"
+                  >
+                    {summaries.map((s) => (
+                      <option key={s.patient.id} value={s.patient.id}>
+                        {s.patient.name} ({s.patient.id})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div className="rounded-2xl border border-navy-600 bg-navy-800/50 p-6">
                 <ReportSummaryView
-                  reports={reports?.[summaries[0]?.patient?.id || 'p1'] ?? demoMedicalReports['p1'] ?? []}
+                  reports={reports?.[currentGlobalPatient.id] ?? demoMedicalReports[currentGlobalPatient.id] ?? []}
                 />
               </div>
             </div>
@@ -818,7 +874,7 @@ function PatientDetail({
                 <CareGapCard
                   key={gap.id}
                   gap={gap}
-                  onReview={() => {}}
+                  onReview={() => onCareGapAction(gap.id, 'reviewed')}
                   onPlanFollowUp={(id) => onCareGapAction(id, 'followup_planned')}
                   onMarkReviewed={(id) => onCareGapAction(id, 'reviewed')}
                 />

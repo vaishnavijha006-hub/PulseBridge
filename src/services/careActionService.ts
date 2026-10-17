@@ -190,6 +190,13 @@ class CareActionStore {
   }
 
   /**
+   * Resets the store strictly to demo actions.
+   */
+  public resetToDemo(): void {
+    this.reset(demoCareActions);
+  }
+
+  /**
    * Seeds actions idempotently (does not duplicate records with existing IDs).
    */
   public seed(seedActions: CareAction[] = demoCareActions): void {

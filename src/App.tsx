@@ -172,14 +172,38 @@ function AppContent() {
         const uploadRes = await dataService.uploadPrescriptionImage(newPatientId, file);
         if ('url' in uploadRes) {
           setPrescriptionPreview(uploadRes.url);
-          await dataService.savePrescriptionDraft(newPatientId, uploadRes.url, [
+          const draftRes = await dataService.savePrescriptionDraft(newPatientId, uploadRes.url, [
             { key: 'medicine', labelKey: 'rx_field_medicine', value: newPatient.currentMeds || 'Prescribed Medicine', status: 'uncertain' },
             { key: 'dosage', labelKey: 'rx_field_dosage', value: 'As directed', status: 'uncertain' },
             { key: 'frequency', labelKey: 'rx_field_frequency', value: 'Once daily', status: 'uncertain' },
             { key: 'duration', labelKey: 'rx_field_duration', value: '5 days', status: 'uncertain' },
             { key: 'instructions', labelKey: 'rx_field_instructions', value: 'Take after meals', status: 'uncertain' },
           ]);
+          if ('data' in draftRes) {
+            setPrescriptionDrafts((prev) => ({ ...prev, [newPatientId]: draftRes.data }));
+          }
         }
+      } else if (newPatient.currentMeds && newPatient.currentMeds.trim()) {
+        const draftRes = await dataService.savePrescriptionDraft(
+          newPatientId,
+          'https://images.pexels.com/photos/139398/brainstorming-meeting-patients-diagnosis-139398.jpeg',
+          [
+            { key: 'medicine', labelKey: 'rx_field_medicine', value: newPatient.currentMeds, status: 'uncertain' },
+            { key: 'dosage', labelKey: 'rx_field_dosage', value: 'As directed', status: 'uncertain' },
+            { key: 'frequency', labelKey: 'rx_field_frequency', value: 'Once daily', status: 'uncertain' },
+            { key: 'duration', labelKey: 'rx_field_duration', value: '30 days', status: 'uncertain' },
+            { key: 'instructions', labelKey: 'rx_field_instructions', value: 'Take in the morning', status: 'uncertain' },
+          ]
+        );
+        if ('data' in draftRes) {
+          setPrescriptionDrafts((prev) => ({ ...prev, [newPatientId]: draftRes.data }));
+        }
+      }
+
+      // Sync patient summaries so the Doctor Clinical Command Center displays the new patient
+      const updatedSummaries = await dataService.fetchPatientSummaries();
+      if (updatedSummaries && updatedSummaries.length > 0) {
+        setSummaries(updatedSummaries);
       }
 
       setView('patient_processing');
@@ -317,7 +341,20 @@ function AppContent() {
       ...prev,
       [patientId]: prev[patientId] ? { ...prev[patientId], confirmed: true, fields } : prev[patientId],
     }));
-  }, []);
+
+    // If the confirmed care plan is for the currently active patient, immediately update their schedules
+    const currentTargetId = activePatientIdRef.current || activePatientId;
+    if (patientId === currentTargetId) {
+      const updatedSchedules = await dataService.fetchMedicationSchedules(patientId);
+      setSchedules(updatedSchedules);
+    }
+
+    // Refresh summaries so DoctorDashboard reflects 0 pending prescriptions and updated triage
+    const updatedSummaries = await dataService.fetchPatientSummaries();
+    if (updatedSummaries && updatedSummaries.length > 0) {
+      setSummaries(updatedSummaries);
+    }
+  }, [activePatientId]);
 
   const handleCareGapAction = useCallback(async (gapId: string, action: 'reviewed' | 'followup_planned') => {
     setCareGaps((prev) => {
@@ -330,6 +367,10 @@ function AppContent() {
       return updated;
     });
     await dataService.updateCareGapStatus(gapId, action);
+    const updatedSummaries = await dataService.fetchPatientSummaries();
+    if (updatedSummaries && updatedSummaries.length > 0) {
+      setSummaries(updatedSummaries);
+    }
   }, []);
 
   const handleFamilyToggleAccess = useCallback(async (authorized: boolean) => {
