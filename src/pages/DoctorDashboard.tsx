@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   Search,
   AlertTriangle,
@@ -22,22 +22,29 @@ import {
   Menu,
   Stethoscope,
   X,
-  Sparkles
+  Sparkles,
+  Lock,
+  LogOut,
+  Key,
+  Loader2,
 } from 'lucide-react';
 import { PulseBridgeLogo } from '@/components/PulseBridgeLogo';
 import { CursorGlow } from '@/components/CursorGlow';
 import { PatientStatusCard } from '@/components/PatientStatusCard';
 import { PrescriptionReview } from '@/components/PrescriptionReview';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import type { User } from '@supabase/supabase-js';
 import { CareGapCard } from '@/components/CareGapCard';
 import { StatusBadge } from '@/components/StatusBadge';
 import { DemoBanner, DemoBadge } from '@/components/DemoBanner';
 import { LanguageToggle } from '@/components/LanguageToggle';
+import { cn } from '@/utils/cn';
 import { ClosedLoopCareView } from '@/components/ClosedLoopCareView';
 import { ReportSummaryView } from '@/components/ReportSummaryView';
 import { useLanguage } from '@/i18n/LanguageContext';
-import { cn } from '@/utils/cn';
-import type { PatientSummary, CareGap, PrescriptionDraft, FollowUp, MedicalReport } from '@/types';
-import { demoMedicalReports } from '@/data/demoData';
+import type { PatientSummary, CareGap, PrescriptionDraft, FollowUp, MedicalReport, DoctorNotification } from '@/types';
+import { demoMedicalReports, demoSchedules } from '@/data/demoData';
+import { evaluatePrescriptionSafety } from '@/services/prescriptionSafetyWorkflow';
 import { careActionService } from '@/services/careActionService';
 
 interface DoctorDashboardProps {
@@ -49,7 +56,7 @@ interface DoctorDashboardProps {
   isLoading?: boolean;
   error?: string | null;
   onRetry?: () => void;
-  onConfirmCarePlan: (patientId: string, fields: any[]) => void;
+  onConfirmCarePlan: (patientId: string, fields: any[]) => Promise<any> | void;
   onCareGapAction: (gapId: string, action: 'reviewed' | 'followup_planned') => void;
   onBack: () => void;
   onNavigateRole?: (role: 'patient' | 'admin' | 'family') => void;
@@ -82,6 +89,71 @@ export function DoctorDashboard({
   const [selectedPatient, setSelectedPatient] = useState<string | null>(null);
   const [activeNav, setActiveNav] = useState<DoctorNavTab>('overview');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  // Doctor Supabase Auth State
+  const [authUser, setAuthUser] = useState<User | null>(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [authSuccess, setAuthSuccess] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!supabase) return;
+    supabase.auth.getUser().then(({ data }) => {
+      setAuthUser(data?.user ?? null);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAuthUser(session?.user ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const isVerifiedDoctor = useMemo(() => {
+    if (!authUser) return false;
+    const role = authUser.app_metadata?.role || authUser.user_metadata?.role;
+    return role === 'doctor' || role === 'physician';
+  }, [authUser]);
+
+  const handleDoctorLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!supabase) {
+      setAuthError('Supabase client is not configured.');
+      return;
+    }
+    setAuthLoading(true);
+    setAuthError(null);
+    setAuthSuccess(null);
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: authEmail.trim(),
+        password: authPassword,
+      });
+      if (error) {
+        setAuthError(error.message);
+        return;
+      }
+      const role = data.user?.app_metadata?.role || data.user?.user_metadata?.role;
+      if (role !== 'doctor' && role !== 'physician') {
+        setAuthError('User authenticated, but account is missing the required verified doctor role in app_metadata.');
+      } else {
+        setAuthSuccess('Physician session authenticated. Doctor Lock authorization enabled.');
+        setTimeout(() => setShowAuthModal(false), 1500);
+      }
+    } catch (err: any) {
+      setAuthError(err?.message || 'Authentication failed');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleDoctorSignOut = async () => {
+    if (!supabase) return;
+    await supabase.auth.signOut();
+    setAuthUser(null);
+    setAuthSuccess(null);
+  };
 
   const allGaps = useMemo(
     () =>
@@ -147,22 +219,60 @@ export function DoctorDashboard({
       });
   }, [summaries, filter, search, sortBy]);
 
+  // Aggregate doctor safety and validation alert notifications (Requirement 5)
+  const doctorNotifications = useMemo<DoctorNotification[]>(() => {
+    const list: DoctorNotification[] = [];
+    for (const [pid, draft] of Object.entries(prescriptionDrafts)) {
+      if (!draft || draft.confirmed) continue;
+      const summary = summaries.find((s) => s.patient.id === pid);
+      const assessment = evaluatePrescriptionSafety(
+        draft,
+        summary?.patient,
+        demoSchedules[pid] || []
+      );
+      list.push(...assessment.notifications);
+    }
+    return list;
+  }, [prescriptionDrafts, summaries]);
+
   // When patient is selected, display EHR Clinical Chart
   if (selectedPatient) {
     const summary = summaries.find((s) => s.patient.id === selectedPatient);
     if (!summary) return null;
 
     return (
-      <PatientDetail
-        summary={summary}
-        gaps={careGaps[selectedPatient] ?? []}
-        draft={prescriptionDrafts[selectedPatient]}
-        followUps={followUps[selectedPatient] ?? []}
-        reports={reports?.[selectedPatient] ?? demoMedicalReports[selectedPatient] ?? []}
-        onConfirmCarePlan={(fields) => onConfirmCarePlan(selectedPatient, fields)}
-        onCareGapAction={onCareGapAction}
-        onBack={() => setSelectedPatient(null)}
-      />
+      <>
+        <PatientDetail
+          summary={summary}
+          gaps={careGaps[selectedPatient] ?? []}
+          draft={prescriptionDrafts[selectedPatient]}
+          followUps={followUps[selectedPatient] ?? []}
+          reports={reports?.[selectedPatient] ?? demoMedicalReports[selectedPatient] ?? []}
+          authUser={authUser}
+          isVerifiedDoctor={isVerifiedDoctor}
+          onOpenAuthModal={() => setShowAuthModal(true)}
+          onSignOut={handleDoctorSignOut}
+          onConfirmCarePlan={(fields) => onConfirmCarePlan(selectedPatient, fields)}
+          onCareGapAction={onCareGapAction}
+          onBack={() => setSelectedPatient(null)}
+        />
+        <DoctorAuthModal
+          isOpen={showAuthModal}
+          onClose={() => {
+            setShowAuthModal(false);
+            setAuthError(null);
+            setAuthSuccess(null);
+          }}
+          authEmail={authEmail}
+          setAuthEmail={setAuthEmail}
+          authPassword={authPassword}
+          setAuthPassword={setAuthPassword}
+          authLoading={authLoading}
+          authError={authError}
+          authSuccess={authSuccess}
+          onSubmit={handleDoctorLogin}
+        />
+      </>
     );
   }
 
@@ -198,16 +308,46 @@ export function DoctorDashboard({
               </div>
             </div>
             <div className="flex items-center gap-3">
-              {/* Doctor identity pill */}
-              <div className="hidden md:flex items-center gap-2.5 rounded-xl border border-navy-600 bg-navy-700/60 px-3 py-1.5">
-                <div className="w-6 h-6 rounded-full bg-teal-500/20 text-teal-300 flex items-center justify-center text-[10px] font-bold">
-                  DS
+              {/* Doctor Supabase Authentication Status */}
+              {authUser ? (
+                <div className="flex items-center gap-2">
+                  <div
+                    className={cn(
+                      'hidden md:flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs',
+                      isVerifiedDoctor
+                        ? 'border-teal-500/50 bg-teal-500/10 text-teal-300'
+                        : 'border-amber-500/50 bg-amber-500/10 text-amber-300'
+                    )}
+                  >
+                    <Stethoscope className="w-3.5 h-3.5" />
+                    <div className="flex flex-col text-left">
+                      <span className="font-semibold text-white leading-tight truncate max-w-[150px]">
+                        {isVerifiedDoctor ? `Dr. ${authUser.email?.split('@')[0]}` : authUser.email}
+                      </span>
+                      <span className="text-[10px] opacity-80 leading-tight">
+                        {isVerifiedDoctor ? 'Verified Physician' : 'Non-Doctor Role'}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleDoctorSignOut}
+                    className="flex items-center gap-1.5 rounded-xl border border-navy-600 bg-navy-700/60 px-2.5 py-1.5 text-xs font-medium text-slate-300 hover:text-rose-300 hover:border-rose-500/40 transition-colors"
+                    title="Sign Out Doctor Session"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Sign Out</span>
+                  </button>
                 </div>
-                <div className="flex flex-col text-left">
-                  <span className="text-xs font-semibold text-white leading-tight">Dr. S. Sharma, MD</span>
-                  <span className="text-[10px] text-teal-300 leading-tight">Cardiology Service</span>
-                </div>
-              </div>
+              ) : (
+                <button
+                  onClick={() => setShowAuthModal(true)}
+                  className="flex items-center gap-1.5 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-300 hover:bg-amber-500/20 hover:border-amber-500/60 transition-all shadow-[0_0_12px_rgba(245,158,11,0.15)]"
+                  title="Authenticate Physician with Supabase Auth"
+                >
+                  <Lock className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Physician Sign In</span>
+                </button>
+              )}
 
               {/* Quick role navigation */}
               {onNavigateRole && (
@@ -375,6 +515,49 @@ export function DoctorDashboard({
               </div>
             </div>
           </div>
+
+          {/* Doctor Safety Alert Notifications (Requirement 5) */}
+          {doctorNotifications.length > 0 && (
+            <div className="rounded-2xl border border-danger-500/40 bg-navy-800/95 p-4 flex flex-col gap-3 shadow-lg">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-navy-700/80 pb-2.5">
+                <div className="flex items-center gap-2">
+                  <ShieldAlert className="w-5 h-5 text-danger-400 flex-shrink-0 animate-pulse" />
+                  <span className="text-sm font-bold text-white">
+                    Doctor Safety & Validation Alerts ({doctorNotifications.length})
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-navy-700 text-slate-300 border border-navy-600">
+                    Channel: In-App Simulated
+                  </span>
+                  <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/30">
+                    External delivery: Not configured (In-app only)
+                  </span>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                {doctorNotifications.map((notif) => (
+                  <div
+                    key={notif.id}
+                    onClick={() => setSelectedPatient(notif.patientId)}
+                    className="cursor-pointer rounded-xl border border-navy-700 bg-navy-900/60 p-3 hover:border-teal-500/50 hover:bg-navy-900 transition-all flex flex-col gap-1.5"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-danger-300 flex items-center gap-1.5">
+                        <AlertTriangle className="w-3.5 h-3.5" />
+                        {notif.title}
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-mono">Patient: {notif.patientId}</span>
+                    </div>
+                    <p className="text-xs text-slate-200 leading-snug">{notif.message}</p>
+                    <span className="text-[11px] text-teal-400 font-semibold hover:underline mt-0.5">
+                      Review & Resolve in EHR →
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Search & Filter Bar */}
           {(activeNav === 'overview' || activeNav === 'patients') && (
@@ -596,6 +779,155 @@ export function DoctorDashboard({
           )}
         </main>
       </div>
+
+      <DoctorAuthModal
+        isOpen={showAuthModal}
+        onClose={() => {
+          setShowAuthModal(false);
+          setAuthError(null);
+          setAuthSuccess(null);
+        }}
+        authEmail={authEmail}
+        setAuthEmail={setAuthEmail}
+        authPassword={authPassword}
+        setAuthPassword={setAuthPassword}
+        authLoading={authLoading}
+        authError={authError}
+        authSuccess={authSuccess}
+        onSubmit={handleDoctorLogin}
+      />
+    </div>
+  );
+}
+
+function DoctorAuthModal({
+  isOpen,
+  onClose,
+  authEmail,
+  setAuthEmail,
+  authPassword,
+  setAuthPassword,
+  authLoading,
+  authError,
+  authSuccess,
+  onSubmit,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  authEmail: string;
+  setAuthEmail: (v: string) => void;
+  authPassword: string;
+  setAuthPassword: (v: string) => void;
+  authLoading: boolean;
+  authError: string | null;
+  authSuccess: string | null;
+  onSubmit: (e: React.FormEvent) => void;
+}) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
+      <div className="w-full max-w-md rounded-2xl border border-navy-600 bg-[#0F172A] p-6 shadow-2xl flex flex-col gap-5 text-slate-100">
+        <div className="flex items-center justify-between pb-3 border-b border-navy-700">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-teal-500/20 text-teal-300 flex items-center justify-center">
+              <Stethoscope className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-white leading-tight">Physician Authentication</h3>
+              <span className="text-[11px] text-slate-400">Supabase Auth Session for Doctor Lock</span>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-navy-800 transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {authSuccess ? (
+          <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/15 p-4 flex items-center gap-3 text-emerald-300 text-sm">
+            <Check className="w-5 h-5 flex-shrink-0" />
+            <span>{authSuccess}</span>
+          </div>
+        ) : (
+          <form onSubmit={onSubmit} className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-slate-300">Physician Email</label>
+              <input
+                type="email"
+                required
+                value={authEmail}
+                onChange={(e) => setAuthEmail(e.target.value)}
+                placeholder="doctor@pulsebridge.ai"
+                className="w-full rounded-xl border border-navy-600 bg-navy-900/80 px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-slate-300">Password</label>
+              <input
+                type="password"
+                required
+                value={authPassword}
+                onChange={(e) => setAuthPassword(e.target.value)}
+                placeholder="••••••••••••"
+                className="w-full rounded-xl border border-navy-600 bg-navy-900/80 px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              />
+            </div>
+
+            {authError && (
+              <div className="rounded-xl border border-danger-500/40 bg-danger-500/15 p-3.5 text-xs text-danger-300 flex flex-col gap-1">
+                <div className="flex items-center gap-2 font-semibold">
+                  <AlertTriangle className="w-4 h-4 flex-shrink-0 text-danger-400" />
+                  <span>{authError}</span>
+                </div>
+                <p className="text-[11px] text-danger-400/90 pl-6">
+                  To configure a doctor account: In the Supabase Dashboard, create a user and assign role: 'doctor' in app_metadata.
+                </p>
+              </div>
+            )}
+
+            <div className="rounded-xl border border-navy-700/80 bg-navy-900/60 p-3 text-[11px] text-slate-400 flex flex-col gap-1">
+              <div className="flex items-center gap-1.5 font-semibold text-slate-300">
+                <Key className="w-3.5 h-3.5 text-teal-400" />
+                <span>Security Gate</span>
+              </div>
+              <p>
+                Production Doctor Lock rejects unauthenticated confirmation to safeguard patient medication regimens. For offline testing without cloud credentials, switch to Demo Mode on the landing page.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 text-xs font-semibold text-slate-300 hover:text-white rounded-xl border border-navy-600 hover:bg-navy-800 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={authLoading}
+                className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-slate-900 bg-gradient-to-r from-teal-400 to-emerald-400 rounded-xl hover:from-teal-300 hover:to-emerald-300 transition-all shadow-md disabled:opacity-50"
+              >
+                {authLoading ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Verifying...</span>
+                  </>
+                ) : (
+                  <>
+                    <Lock className="w-3.5 h-3.5" />
+                    <span>Sign In as Physician</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
     </div>
   );
 }
@@ -697,6 +1029,10 @@ function PatientDetail({
   draft,
   followUps,
   reports,
+  authUser,
+  isVerifiedDoctor,
+  onOpenAuthModal,
+  onSignOut,
   onConfirmCarePlan,
   onCareGapAction,
   onBack,
@@ -706,7 +1042,11 @@ function PatientDetail({
   draft?: PrescriptionDraft;
   followUps: FollowUp[];
   reports: MedicalReport[];
-  onConfirmCarePlan: (fields: any[]) => void;
+  authUser?: User | null;
+  isVerifiedDoctor?: boolean;
+  onOpenAuthModal?: () => void;
+  onSignOut?: () => void;
+  onConfirmCarePlan: (fields: any[]) => Promise<any> | void;
   onCareGapAction: (gapId: string, action: 'reviewed' | 'followup_planned') => void;
   onBack: () => void;
 }) {
@@ -750,7 +1090,46 @@ function PatientDetail({
                 />
               </div>
             </div>
-            <PulseBridgeLogo variant="dark" size="sm" showTagline={false} />
+            <div className="flex items-center gap-3">
+              {authUser ? (
+                <div className="flex items-center gap-2">
+                  <div
+                    className={cn(
+                      'hidden sm:flex items-center gap-2 rounded-xl border px-2.5 py-1 text-xs',
+                      isVerifiedDoctor
+                        ? 'border-teal-500/50 bg-teal-500/10 text-teal-300'
+                        : 'border-amber-500/50 bg-amber-500/10 text-amber-300'
+                    )}
+                  >
+                    <Stethoscope className="w-3 h-3" />
+                    <span className="font-semibold truncate max-w-[120px]">
+                      {isVerifiedDoctor ? `Dr. ${authUser.email?.split('@')[0]}` : authUser.email}
+                    </span>
+                  </div>
+                  {onSignOut && (
+                    <button
+                      onClick={onSignOut}
+                      className="p-1.5 rounded-lg border border-navy-600 bg-navy-700/60 text-slate-300 hover:text-rose-300 hover:border-rose-500/40 transition-colors"
+                      title="Sign Out"
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              ) : (
+                onOpenAuthModal && (
+                  <button
+                    onClick={onOpenAuthModal}
+                    className="flex items-center gap-1.5 rounded-xl border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-300 hover:bg-amber-500/20 transition-all shadow-sm"
+                    title="Authenticate Physician with Supabase Auth"
+                  >
+                    <Lock className="w-3 h-3 text-amber-400" />
+                    <span className="hidden sm:inline">Doctor Sign In</span>
+                  </button>
+                )
+              )}
+              <PulseBridgeLogo variant="dark" size="sm" showTagline={false} />
+            </div>
           </div>
         </div>
       </header>
@@ -792,12 +1171,29 @@ function PatientDetail({
 
         {activeTab === 'overview' && <OverviewTab summary={summary} followUps={followUps} />}
         {activeTab === 'rx' && draft && (
-          <PrescriptionReview
-            draft={draft}
-            patientAllergies={summary.patient.allergies}
-            patientCurrentMeds={summary.patient.currentMeds}
-            onConfirm={onConfirmCarePlan}
-          />
+          <div className="flex flex-col gap-3">
+            {!isVerifiedDoctor && (
+              <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3.5 flex items-start gap-3 text-amber-300 text-xs">
+                <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                <div className="flex flex-col gap-0.5">
+                  <span className="font-semibold text-amber-200">
+                    Production Security Gate: Physician Authentication Required
+                  </span>
+                  <p className="text-amber-300/90 text-[11px]">
+                    To confirm this prescription and activate persistent EHR medication schedules, sign in as a verified physician with Supabase Auth. Unauthenticated confirmations fail closed to preserve clinical safety.
+                  </p>
+                </div>
+              </div>
+            )}
+            <PrescriptionReview
+              draft={draft}
+              patientAllergies={summary.patient.allergies}
+              patientCurrentMeds={summary.patient.currentMeds}
+              activeSchedules={demoSchedules[summary.patient.id] || []}
+              doctorName={authUser && isVerifiedDoctor ? `Dr. ${authUser.email?.split('@')[0]}` : undefined}
+              onConfirm={onConfirmCarePlan}
+            />
+          </div>
         )}
         {activeTab === 'reports' && <ReportSummaryView reports={reports} />}
         {activeTab === 'actions' && (

@@ -152,8 +152,16 @@ function notifyDemoListeners() {
 /**
  * Validates critical prescription fields.
  * Any missing or unverified critical field blocks confirmation.
+ * Superseded or rejected prescriptions are strictly blocked from reactivation.
  */
-function validatePrescriptionConfirmation(fields: PrescriptionField[]): string | null {
+function validatePrescriptionConfirmation(
+  fields: PrescriptionField[],
+  draft?: PrescriptionDraft | null
+): string | null {
+  if (draft?.status === 'rejected_or_superseded') {
+    return 'Cannot confirm care plan: Prescription has been rejected or superseded and cannot be reactivated.';
+  }
+
   const CRITICAL_KEYS = ['medicine', 'dosage', 'frequency', 'duration'];
 
   // 1. Ensure all critical keys exist in the fields array
@@ -635,17 +643,18 @@ const demoService: DataService = {
   },
 
   async confirmCarePlan(patientId, fields) {
-    const validationError = validatePrescriptionConfirmation(fields);
+    const existingDraft = mutableDemoPrescriptionDrafts[patientId];
+    const validationError = validatePrescriptionConfirmation(fields, existingDraft);
     if (validationError) {
       return { error: validationError };
     }
 
-    const existingDraft = mutableDemoPrescriptionDrafts[patientId];
     if (existingDraft) {
       existingDraft.confirmed = true;
       existingDraft.confirmedAt = new Date().toISOString();
       existingDraft.confirmedBy = 'Dr. Anita Desai, MD';
       existingDraft.fields = fields.map((f) => ({ ...f, status: 'confirmed' }));
+      existingDraft.status = 'doctor_approved';
     }
 
     // Activate medication schedule from confirmed fields
@@ -653,18 +662,25 @@ const demoService: DataService = {
     const dosage = fields.find((f) => f.key === 'dosage')?.value ?? 'Standard Dose';
     const instructions = fields.find((f) => f.key === 'instructions')?.value ?? 'As directed';
 
-    if (!mutableDemoSchedules[patientId] || mutableDemoSchedules[patientId].length === 0) {
-      mutableDemoSchedules[patientId] = [
-        {
-          id: `s-${Date.now()}`,
-          medicineId: `m-${Date.now()}`,
-          medicineName: medName,
-          dosage,
-          scheduledTime: '08:00',
-          status: 'pending',
-          instructions,
-        },
-      ];
+    const currentSchedules = mutableDemoSchedules[patientId] || [];
+    const isDuplicate = currentSchedules.some(
+      (s) =>
+        s.medicineName.toLowerCase() === medName.toLowerCase() &&
+        s.dosage.toLowerCase() === dosage.toLowerCase()
+    );
+
+    if (!isDuplicate) {
+      const newSchedule: MedicationSchedule = {
+        id: `s-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        medicineId: `m-${Date.now()}`,
+        medicineName: medName,
+        dosage,
+        scheduledTime: '08:00',
+        status: 'pending',
+        instructions,
+        patientId,
+      };
+      mutableDemoSchedules[patientId] = [...currentSchedules, newSchedule];
     }
 
     notifyDemoListeners();
@@ -1016,6 +1032,9 @@ const productionService: DataService = {
       uploadedAt: data.created_at,
       fields: parsedFields,
       confirmed: data.confirmed,
+      confirmedAt: data.confirmed_at ?? null,
+      confirmedBy: data.confirmed_by ?? null,
+      rawText: data.raw_text ?? null,
     };
   },
 
@@ -1282,33 +1301,58 @@ const productionService: DataService = {
   },
 
   async confirmCarePlan(patientId, fields, doctorNotes) {
-    if (!supabase) return { error: 'Supabase client is not configured' };
-
-    // Safety check: unresolved critical fields block confirmation
+    // 1. Safety check: unresolved critical fields block confirmation (Doctor Lock invariant)
     const validationError = validatePrescriptionConfirmation(fields);
     if (validationError) {
       return { error: validationError };
     }
 
-    // 1. Confirm prescription draft
+    if (!supabase) return { error: 'Supabase client is not configured' };
+
+    // 2. Retrieve authenticated doctor identity
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    if (authError || !authData?.user) {
+      return {
+        error: 'Authentication required: You must be logged in to confirm care plans and enforce doctor lock.',
+      };
+    }
+
+    const doctorUser = authData.user;
+    const doctorId = doctorUser.id;
+
+    // 3. Verify doctor role authorization
+    const role = doctorUser.app_metadata?.role || doctorUser.user_metadata?.role;
+    const isDoctor = role === 'doctor' || role === 'physician';
+    if (!isDoctor) {
+      return {
+        error: 'Authorization denied: Only verified doctors can confirm prescriptions and lock care plans.',
+      };
+    }
+
+    const nowIso = new Date().toISOString();
+
+    // 4. Confirm prescription draft with doctor identity stamped
     const { error: rxError } = await supabase
       .from('prescriptions')
       .update({
         confirmed: true,
-        confirmed_at: new Date().toISOString(),
+        confirmed_at: nowIso,
+        confirmed_by: doctorId,
         fields: JSON.stringify(fields),
         doctor_notes: doctorNotes ?? null,
+        status: 'doctor_approved',
       })
       .eq('patient_id', patientId)
       .eq('confirmed', false);
 
-    if (rxError) return { error: rxError.message };
+    if (rxError) return { error: `Failed to confirm prescription: ${rxError.message}` };
 
-    // 2. Create or activate care plan
+    // 5. Create or activate care plan linked to doctor
     const { data: carePlan, error: cpError } = await supabase
       .from('care_plans')
       .insert({
         patient_id: patientId,
+        doctor_id: doctorId,
         status: 'active',
         notes: doctorNotes ?? 'Doctor verified care plan',
       })
@@ -1316,16 +1360,29 @@ const productionService: DataService = {
       .single();
 
     if (cpError) {
-      console.warn('Care plan record creation notice:', cpError.message);
+      // Compensating rollback: Revert prescription confirmation so it is not left confirmed without a care plan
+      await supabase
+        .from('prescriptions')
+        .update({
+          confirmed: false,
+          confirmed_at: null,
+          confirmed_by: null,
+        })
+        .eq('patient_id', patientId)
+        .eq('confirmed_by', doctorId);
+
+      return {
+        error: `Failed to establish active care plan: ${cpError.message}. Prescription confirmation reverted.`,
+      };
     }
 
-    // 3. Create medication schedule from confirmed medicine fields
+    // 6. Create medication schedule from confirmed medicine fields
     const medName = fields.find((f) => f.key === 'medicine')?.value;
     const dosage = fields.find((f) => f.key === 'dosage')?.value;
     const instructions = fields.find((f) => f.key === 'instructions')?.value;
 
     if (medName && dosage) {
-      await supabase.from('medication_schedules').insert({
+      const { error: schedError } = await supabase.from('medication_schedules').insert({
         patient_id: patientId,
         care_plan_id: carePlan?.id ?? null,
         medicine_name: medName,
@@ -1334,6 +1391,26 @@ const productionService: DataService = {
         status: 'pending',
         instructions: instructions ?? 'As directed',
       });
+
+      if (schedError) {
+        // Compensating rollback: Delete care plan and revert prescription confirmation
+        if (carePlan?.id) {
+          await supabase.from('care_plans').delete().eq('id', carePlan.id);
+        }
+        await supabase
+          .from('prescriptions')
+          .update({
+            confirmed: false,
+            confirmed_at: null,
+            confirmed_by: null,
+          })
+          .eq('patient_id', patientId)
+          .eq('confirmed_by', doctorId);
+
+        return {
+          error: `Failed to create medication schedule: ${schedError.message}. Care plan and prescription reverted.`,
+        };
+      }
     }
 
     return { ok: true };
@@ -1491,3 +1568,4 @@ const productionService: DataService = {
 };
 
 export const dataService: DataService = isDemoMode ? demoService : productionService;
+export { demoService, productionService };

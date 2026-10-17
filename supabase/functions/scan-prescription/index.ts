@@ -18,6 +18,7 @@ import {
   GeminiConfigError,
   GeminiTimeoutError,
   GeminiRateLimitError,
+  GeminiAPIError,
   type PrescriptionVisionAdapter,
 } from './geminiVisionAdapter.ts';
 import {
@@ -403,7 +404,7 @@ export async function handleScanPrescriptionRequest(
       ? process.env?.PULSEBRIDGE_ENV
       : undefined) === 'test';
 
-  if (isServerTestEnv && (useMock || !process.env.GEMINI_API_KEY)) {
+  if (isServerTestEnv && useMock) {
     adapter = new MockGeminiVisionAdapter(mockOutput);
   } else if (useMock && !isServerTestEnv) {
     return new Response(
@@ -514,6 +515,19 @@ export async function handleScanPrescriptionRequest(
         JSON.stringify({
           error: 'AI vision authentication failed. Server credentials rejected.',
           code: 'PROVIDER_AUTH_ERROR',
+        }),
+        {
+          status: 502,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    if (err instanceof GeminiAPIError) {
+      return new Response(
+        JSON.stringify({
+          error: 'AI vision provider service error. Verification failed.',
+          code: 'PROVIDER_API_ERROR',
         }),
         {
           status: 502,

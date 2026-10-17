@@ -27,6 +27,75 @@ export type CareGapStatus = 'open' | 'reviewed' | 'followup_planned';
 
 export type PrescriptionFieldStatus = 'uncertain' | 'confirmed' | 'editable';
 
+export type PrescriptionWorkflowState =
+  | 'needs_review'
+  | 'uncertain_fields'
+  | 'allergy_alert'
+  | 'prescription_conflict'
+  | 'ready_for_doctor_review'
+  | 'doctor_approved'
+  | 'rejected_or_superseded';
+
+export interface DoctorNotification {
+  id: string;
+  patientId: string;
+  prescriptionId?: string;
+  type:
+    | 'unreadable_fields'
+    | 'allergy_match'
+    | 'prescription_conflict'
+    | 'duplicate_medication'
+    | 'validation_failure';
+  severity: 'high' | 'medium' | 'low';
+  title: string;
+  message: string;
+  evidence: string;
+  createdAt: string;
+  channel: 'in_app_simulated';
+  externalDeliveryAttempted: boolean;
+  externalDeliveryStatus: 'not_configured';
+  externalDeliveryReason: string;
+  read: boolean;
+}
+
+export interface PrescriptionSafetyAssessment {
+  workflowState: PrescriptionWorkflowState;
+  patientStatusLabel: string;
+  doctorAlertMessage?: string;
+  canDoctorApprove: boolean;
+  blockingReasons: string[];
+  checks: {
+    criticalFields: {
+      status: 'passed' | 'alert' | 'unknown';
+      missing: string[];
+      uncertain: string[];
+      evidence: string;
+    };
+    allergies: {
+      status: 'passed' | 'alert' | 'unknown';
+      matchedAllergy?: string;
+      evidence: string;
+    };
+    duplicateMeds: {
+      status: 'passed' | 'alert' | 'unknown';
+      duplicateName?: string;
+      evidence: string;
+    };
+    conflictingPrescriptions: {
+      status: 'passed' | 'alert' | 'unknown';
+      conflictingRxId?: string;
+      evidence: string;
+    };
+    prescriptionRecency: {
+      status: 'passed' | 'alert' | 'unknown';
+      prescriptionDate?: string;
+      isExpired?: boolean;
+      evidence: string;
+    };
+  };
+  notifications: DoctorNotification[];
+}
+
 export interface PrescriptionField {
   key: string;
   labelKey: string;
@@ -44,6 +113,11 @@ export interface PrescriptionDraft {
   confirmedAt?: string | null;
   confirmedBy?: string | null;
   rawText?: string | null;
+  status?: PrescriptionWorkflowState;
+  route?: string;
+  prescriptionDate?: string;
+  prescriber?: string;
+  safetyAssessment?: PrescriptionSafetyAssessment;
 }
 
 export interface Medicine {

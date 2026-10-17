@@ -94,6 +94,24 @@ OUTPUT JSON SCHEMA:
       "labelKey": "rx_field_instructions",
       "value": "string (e.g. After meals with water, or empty string)",
       "status": "confirmed" | "uncertain"
+    },
+    {
+      "key": "route",
+      "labelKey": "rx_field_route",
+      "value": "string (e.g. Oral, Sublingual, Topical, or empty string if not specified)",
+      "status": "confirmed" | "uncertain"
+    },
+    {
+      "key": "prescription_date",
+      "labelKey": "rx_field_date",
+      "value": "string (date written on prescription e.g. YYYY-MM-DD or as written, or empty string)",
+      "status": "confirmed" | "uncertain"
+    },
+    {
+      "key": "prescriber",
+      "labelKey": "rx_field_prescriber",
+      "value": "string (prescribing physician or clinic name, or empty string if not readable)",
+      "status": "confirmed" | "uncertain"
     }
   ],
   "rawTranscription": "string (literal transcript of visible prescription text)"
@@ -187,6 +205,10 @@ export class GeminiVisionAdapter implements PrescriptionVisionAdapter {
       }
 
       if (!response.ok) {
+        const errorBody = await response.text().catch(() => '');
+        if (errorBody.includes('API_KEY_INVALID') || errorBody.includes('API key not valid')) {
+          throw new GeminiConfigError('Google Gemini API authentication rejected. Verify server-side credentials.');
+        }
         throw new GeminiAPIError(`Gemini API returned HTTP ${response.status}.`, response.status);
       }
 
@@ -197,7 +219,12 @@ export class GeminiVisionAdapter implements PrescriptionVisionAdapter {
         throw new Error('Gemini API returned an empty completion.');
       }
 
-      const parsedJSON = JSON.parse(textContent);
+      const sanitizedText = textContent
+        .replace(/^```json\s*/i, '')
+        .replace(/^```\s*/i, '')
+        .replace(/\s*```$/, '')
+        .trim();
+      const parsedJSON = JSON.parse(sanitizedText);
       return { rawOutput: parsedJSON, latencyMs };
     } catch (err: any) {
       clearTimeout(timeoutId);

@@ -159,9 +159,9 @@ export function PrescriptionProcessing({
               <div className="w-16 h-16 rounded-full bg-success-50 border border-success-200 flex items-center justify-center text-success-600 shadow-sm">
                 <CheckCircle2 className="w-8 h-8" />
               </div>
-              <h2 className="text-lg font-bold text-navy-800">Prescription Extracted</h2>
+              <h2 className="text-lg font-bold text-navy-800">Prescription extracted — awaiting doctor approval</h2>
               <p className="text-xs text-navy-500">
-                Awaiting Doctor Review & Lock before activating medication schedule
+                Auto-readiness safety checks complete. Medication schedule activates upon physician verification.
               </p>
             </div>
           )}

@@ -38,6 +38,9 @@ const DEFAULT_LABEL_KEYS: Record<string, string> = {
   frequency: 'rx_field_frequency',
   duration: 'rx_field_duration',
   instructions: 'rx_field_instructions',
+  route: 'rx_field_route',
+  prescription_date: 'rx_field_date',
+  prescriber: 'rx_field_prescriber',
 };
 
 /**
@@ -147,6 +150,10 @@ export function validatePrescriptionScanOutput(
       ? rawObj.rawText.trim()
       : null;
 
+  const routeVal = validatedFields.find((f) => f.key === 'route')?.value || undefined;
+  const rxDateVal = validatedFields.find((f) => f.key === 'prescription_date')?.value || undefined;
+  const prescriberVal = validatedFields.find((f) => f.key === 'prescriber')?.value || undefined;
+
   // Assemble safe unconfirmed draft
   const draft: PrescriptionDraft = {
     id: `rx-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -158,6 +165,10 @@ export function validatePrescriptionScanOutput(
     confirmedAt: null,
     confirmedBy: null,
     rawText,
+    route: routeVal,
+    prescriptionDate: rxDateVal,
+    prescriber: prescriberVal,
+    status: missingCriticalFields.length > 0 ? 'uncertain_fields' : 'ready_for_doctor_review',
   };
 
   return {

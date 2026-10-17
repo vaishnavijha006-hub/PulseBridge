@@ -24,10 +24,11 @@ import { LanguageToggle } from '@/components/LanguageToggle';
 import { DemoBadge } from '@/components/DemoBanner';
 import { StatusBadge } from '@/components/StatusBadge';
 import { FamilyConsentManager } from '@/components/FamilyConsentManager';
-import { useLanguage } from '@/i18n/LanguageContext';
 import { cn } from '@/utils/cn';
+import { useLanguage } from '@/i18n/LanguageContext';
 import { evaluateDoseTiming, DOSE_REASON_OPTIONS, applyOverdueEvaluations, generateReminders } from '@/utils/reminderEngine';
-import type { MedicationSchedule, DoseStatus, HealthState, FollowUp, PrescriptionDraft, MedicalReport } from '@/types';
+import { evaluatePrescriptionSafety } from '@/services/prescriptionSafetyWorkflow';
+import type { MedicationSchedule, DoseStatus, HealthState, FollowUp, PrescriptionDraft, MedicalReport, PatientProfile } from '@/types';
 import { demoMedicalReports } from '@/data/demoData';
 
 interface PatientDashboardProps {
@@ -35,6 +36,8 @@ interface PatientDashboardProps {
   followUps: FollowUp[];
   prescriptionDraft?: PrescriptionDraft | null;
   reports?: MedicalReport[];
+  patientId?: string;
+  patientProfile?: Partial<PatientProfile> | null;
   onDoseAction: (scheduleId: string, action: DoseStatus, reason?: string) => void;
   onHealthUpdate: (state: HealthState, description: string) => void;
   onFollowUpAnswer: (followUpId: string, answer: string) => void;
@@ -49,6 +52,8 @@ export function PatientDashboard({
   followUps,
   prescriptionDraft,
   reports = demoMedicalReports['p1'] ?? [],
+  patientId,
+  patientProfile,
   onDoseAction,
   onHealthUpdate,
   onFollowUpAnswer,
@@ -56,6 +61,9 @@ export function PatientDashboard({
   onNavigateRole,
 }: PatientDashboardProps) {
   const { t, lang } = useLanguage();
+  const displayName = patientProfile?.name || (patientId === 'p1' ? 'Ravi Sharma' : (patientId || 'Patient'));
+  const displayId = patientId || 'p1';
+  const initialLetter = (displayName[0] || 'P').toUpperCase();
   const [schedules, setSchedules] = useState<MedicationSchedule[]>(initialSchedules);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<string | null>(null);
@@ -102,19 +110,48 @@ export function PatientDashboard({
     [onDoseAction, t, lang]
   );
 
+  // Evaluate prescription safety and auto-readiness workflow status
+  const isApprovalPending = Boolean(prescriptionDraft && !prescriptionDraft.confirmed);
+
+  const patientForSafety = useMemo<PatientProfile>(
+    () => ({
+      id: patientId || 'p1',
+      name: displayName,
+      age: patientProfile?.age || 45,
+      gender: patientProfile?.gender || 'other',
+      phone: patientProfile?.phone || '',
+      symptoms: patientProfile?.symptoms || '',
+      allergies: patientProfile?.allergies ?? 'None',
+      currentMeds: patientProfile?.currentMeds ?? 'None',
+      language: (patientProfile?.language as any) || 'en',
+    }),
+    [patientId, displayName, patientProfile]
+  );
+
+  const safetyAssessment = useMemo(() => {
+    if (!prescriptionDraft) return null;
+    return evaluatePrescriptionSafety(prescriptionDraft, patientForSafety, schedules);
+  }, [prescriptionDraft, patientForSafety, schedules]);
+
   const pendingFollowUps = followUps.filter((f) => f.status === 'pending');
-  const takenCount = schedules.filter((s) => s.status === 'taken').length;
-  const totalCount = schedules.length;
+  const rawTakenCount = schedules.filter((s) => s.status === 'taken').length;
+  const rawTotalCount = schedules.length;
+
+  // When approval is pending, do not display active schedules or reminders (Requirement 6)
+  const takenCount = isApprovalPending ? 0 : rawTakenCount;
+  const totalCount = isApprovalPending ? 0 : rawTotalCount;
   const progressPercent = totalCount > 0 ? Math.round((takenCount / totalCount) * 100) : 0;
 
-  // Next scheduled dose helper
+  // Next scheduled dose helper (suppressed while approval is pending)
   const nextDose = useMemo(() => {
+    if (isApprovalPending) return null;
     return schedules.find((s) => s.status === 'pending' || s.status === 'snoozed');
-  }, [schedules]);
+  }, [isApprovalPending, schedules]);
 
   const activeReminders = useMemo(() => {
+    if (isApprovalPending) return [];
     return generateReminders(schedules, followUps);
-  }, [schedules, followUps]);
+  }, [isApprovalPending, schedules, followUps]);
 
   return (
     <div className="min-h-screen bg-slate-50/70 text-slate-800 flex flex-col font-sans selection:bg-teal-500/20 selection:text-teal-900">
@@ -142,10 +179,10 @@ export function PatientDashboard({
             {/* Patient identity badge */}
             <div className="hidden md:flex items-center gap-2 rounded-xl bg-slate-100 border border-slate-200/80 px-2.5 py-1 text-xs">
               <div className="w-5 h-5 rounded-full bg-teal-600 text-white flex items-center justify-center text-[10px] font-bold">
-                R
+                {initialLetter}
               </div>
-              <span className="font-semibold text-slate-700">Ravi Sharma</span>
-              <span className="text-[10px] text-slate-400 font-mono">ID: p1</span>
+              <span className="font-semibold text-slate-700">{displayName}</span>
+              <span className="text-[10px] text-slate-400 font-mono">ID: {displayId}</span>
             </div>
 
             {onNavigateRole && (
@@ -258,16 +295,47 @@ export function PatientDashboard({
           </div>
         )}
 
-        {/* Prescription Verification Status Banner */}
-        {prescriptionDraft && !prescriptionDraft.confirmed && (
-          <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 flex items-start gap-3">
-            <Clock className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+        {/* Prescription Verification Status Banner (Requirement 6) */}
+        {prescriptionDraft && (
+          <div
+            className={cn(
+              'rounded-2xl border p-4 flex items-start gap-3 transition-all',
+              prescriptionDraft.confirmed
+                ? 'border-emerald-300 bg-emerald-50 text-emerald-900'
+                : safetyAssessment?.workflowState === 'allergy_alert'
+                ? 'border-danger-300 bg-danger-50 text-danger-900'
+                : safetyAssessment?.workflowState === 'prescription_conflict'
+                ? 'border-amber-400 bg-amber-50 text-amber-900'
+                : safetyAssessment?.workflowState === 'uncertain_fields'
+                ? 'border-amber-300 bg-amber-50 text-amber-900'
+                : 'border-teal-300 bg-teal-50 text-teal-900'
+            )}
+          >
+            {prescriptionDraft.confirmed ? (
+              <Check className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+            ) : safetyAssessment?.workflowState === 'allergy_alert' ? (
+              <ShieldAlert className="w-5 h-5 text-danger-600 flex-shrink-0 mt-0.5 animate-pulse" />
+            ) : safetyAssessment?.workflowState === 'prescription_conflict' ? (
+              <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            ) : (
+              <Clock className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            )}
             <div className="flex flex-col gap-1">
-              <span className="text-sm font-bold text-amber-900">
-                Prescription Uploaded — Awaiting Doctor Review & Lock
+              <span className="text-sm font-bold">
+                {prescriptionDraft.confirmed
+                  ? 'Doctor approved — reminders activated'
+                  : safetyAssessment?.patientStatusLabel || 'Prescription extracted — awaiting doctor approval'}
               </span>
-              <p className="text-xs text-amber-800 leading-relaxed">
-                Your prescription details have been extracted. For patient safety, medication dosing plans and active reminders will start once verified and locked by your doctor.
+              <p className="text-xs leading-relaxed opacity-90">
+                {prescriptionDraft.confirmed
+                  ? `Care plan verified and locked by ${prescriptionDraft.confirmedBy || 'your physician'}. Your scheduled reminders and daily medication plan are now live.`
+                  : safetyAssessment?.workflowState === 'allergy_alert'
+                  ? 'A potential conflict with your documented allergies was detected. For your safety, doctor review is required before medication schedules begin.'
+                  : safetyAssessment?.workflowState === 'prescription_conflict'
+                  ? 'A conflict with your active medications was detected. Schedule is paused awaiting doctor reconciliation.'
+                  : safetyAssessment?.workflowState === 'uncertain_fields'
+                  ? 'Your prescription was extracted, but dosage or duration parameters require physician verification. Schedule is paused awaiting doctor review.'
+                  : 'Your prescription details have been extracted and are pending doctor confirmation. Dosing plans and reminders will activate once confirmed.'}
               </p>
             </div>
           </div>
@@ -399,7 +467,21 @@ export function PatientDashboard({
                 </span>
               </div>
 
-              {schedules.length === 0 ? (
+              {isApprovalPending ? (
+                <div className="rounded-2xl border border-amber-300 bg-amber-50/70 p-6 flex flex-col items-center text-center gap-3">
+                  <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center text-amber-700">
+                    <Clock className="w-6 h-6" />
+                  </div>
+                  <div className="flex flex-col gap-1 max-w-md">
+                    <h3 className="text-base font-bold text-amber-900">
+                      Medication Schedule Paused — Awaiting Doctor Approval
+                    </h3>
+                    <p className="text-xs text-amber-800 leading-relaxed">
+                      Your prescription is undergoing clinical safety verification. To preserve patient safety, active medication schedules and reminders remain paused until an authorized physician confirms your care plan.
+                    </p>
+                  </div>
+                </div>
+              ) : schedules.length === 0 ? (
                 <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-slate-400">
                   {t('empty_no_data')}
                 </div>

@@ -81,6 +81,7 @@ function AppContent() {
       window.removeEventListener('hashchange', handlePopState);
     };
   }, []);
+  const [activePatientId, setActivePatientId] = useState<string>(DEMO_PATIENT_ID);
   const [prescriptionPreview, setPrescriptionPreview] = useState<string | null>(null);
   const [prescriptionFile, setPrescriptionFile] = useState<File | null>(null);
   const [schedules, setSchedules] = useState<MedicationSchedule[]>(demoSchedules[DEMO_PATIENT_ID] ?? []);
@@ -98,22 +99,22 @@ function AppContent() {
     async function loadData() {
       try {
         const [sched, drafts, gaps, fUps, summs, fam, rep] = await Promise.all([
-          dataService.fetchMedicationSchedules(DEMO_PATIENT_ID),
-          dataService.fetchPrescriptionDraft(DEMO_PATIENT_ID),
-          dataService.fetchCareGaps(DEMO_PATIENT_ID),
-          dataService.fetchFollowUps(DEMO_PATIENT_ID),
+          dataService.fetchMedicationSchedules(activePatientId),
+          dataService.fetchPrescriptionDraft(activePatientId),
+          dataService.fetchCareGaps(activePatientId),
+          dataService.fetchFollowUps(activePatientId),
           dataService.fetchPatientSummaries(),
-          dataService.fetchFamilyView(DEMO_PATIENT_ID),
-          dataService.fetchMedicalReports(DEMO_PATIENT_ID),
+          dataService.fetchFamilyView(activePatientId),
+          dataService.fetchMedicalReports(activePatientId),
         ]);
         if (!mounted) return;
-        if (sched && sched.length > 0) setSchedules(sched);
-        if (drafts) setPrescriptionDrafts((prev) => ({ ...prev, [DEMO_PATIENT_ID]: drafts }));
-        if (gaps && gaps.length > 0) setCareGaps((prev) => ({ ...prev, [DEMO_PATIENT_ID]: gaps }));
-        if (fUps && fUps.length > 0) setFollowUps((prev) => ({ ...prev, [DEMO_PATIENT_ID]: fUps }));
+        if (sched) setSchedules(sched);
+        if (drafts) setPrescriptionDrafts((prev) => ({ ...prev, [activePatientId]: drafts }));
+        if (gaps && gaps.length > 0) setCareGaps((prev) => ({ ...prev, [activePatientId]: gaps }));
+        if (fUps && fUps.length > 0) setFollowUps((prev) => ({ ...prev, [activePatientId]: fUps }));
         if (summs && summs.length > 0) setSummaries(summs);
         if (fam) setFamilyView(fam);
-        if (rep && rep.length > 0) setReports((prev) => ({ ...prev, [DEMO_PATIENT_ID]: rep }));
+        if (rep && rep.length > 0) setReports((prev) => ({ ...prev, [activePatientId]: rep }));
       } catch (err) {
         console.warn('Could not fetch remote data, keeping initialized state:', err);
       }
@@ -129,7 +130,7 @@ function AppContent() {
       mounted = false;
       unsubscribe();
     };
-  }, []);
+  }, [activePatientId]);
 
   const handleRoleSelect = useCallback((role: 'patient' | 'doctor' | 'family' | 'admin' | 'patient_intake') => {
     if (role === 'patient') setView('patient_dashboard');
@@ -142,27 +143,40 @@ function AppContent() {
   const handleIntakeComplete = useCallback(async (profile: Partial<PatientProfile>, file: File | null) => {
     setPatientProfile(profile);
     setPrescriptionFile(file);
+
+    // 1. Establish patient entity and capture the actual returned patient ID
+    const saveRes = await dataService.savePatientIntake(profile);
+    if ('error' in saveRes || !saveRes.data?.id) {
+      console.error('Failed to save patient intake:', 'error' in saveRes ? saveRes.error : 'No patient ID returned');
+      return; // Stop downstream scan rather than attaching to a different patient
+    }
+
+    const newPatientId = saveRes.data.id;
+    setActivePatientId(newPatientId);
+
+    // 2. Upload prescription image under new patient ID if file present
     if (file) {
-      const uploadRes = await dataService.uploadPrescriptionImage(DEMO_PATIENT_ID, file);
+      const uploadRes = await dataService.uploadPrescriptionImage(newPatientId, file);
       if ('url' in uploadRes) {
         setPrescriptionPreview(uploadRes.url);
       }
     }
-    await dataService.savePatientIntake(profile);
+
     setView('patient_processing');
   }, []);
 
   const handleProcessingComplete = useCallback(async (draft?: PrescriptionDraft) => {
+    const targetPatientId = draft?.patientId || activePatientId;
     if (draft) {
       setPrescriptionDrafts((prev) => ({
         ...prev,
-        [DEMO_PATIENT_ID]: draft,
+        [targetPatientId]: draft,
       }));
     }
-    const sched = await dataService.fetchMedicationSchedules(DEMO_PATIENT_ID);
-    setSchedules(sched.length > 0 ? sched : demoSchedules[DEMO_PATIENT_ID] ?? []);
+    const sched = await dataService.fetchMedicationSchedules(targetPatientId);
+    setSchedules(sched.length > 0 ? sched : (targetPatientId === DEMO_PATIENT_ID ? (demoSchedules[DEMO_PATIENT_ID] ?? []) : []));
     setView('patient_dashboard');
-  }, []);
+  }, [activePatientId]);
 
   const handleDoseAction = useCallback(async (scheduleId: string, action: DoseStatus, reason?: string) => {
     setSchedules((prev) =>
@@ -176,22 +190,25 @@ function AppContent() {
 
 
   const handleHealthUpdate = useCallback(async (state: HealthState, description: string) => {
-    const patient = demoPatients.find((p) => p.id === DEMO_PATIENT_ID);
+    const patient =
+      patientProfile?.id === activePatientId
+        ? (patientProfile as PatientProfile)
+        : demoPatients.find((p) => p.id === activePatientId) || demoPatients.find((p) => p.id === DEMO_PATIENT_ID);
     if (!patient) return;
 
-    const updateRes = await dataService.submitHealthUpdate(DEMO_PATIENT_ID, state, description);
+    const updateRes = await dataService.submitHealthUpdate(activePatientId, state, description);
     const newUpdate = 'data' in updateRes ? updateRes.data : {
       id: `h-new-${Date.now()}`,
-      patientId: DEMO_PATIENT_ID,
+      patientId: activePatientId,
       state,
       symptomDescription: description,
       submittedAt: new Date().toISOString(),
       source: 'patient' as const,
     };
 
-    const allUpdates = [newUpdate, ...(demoHealthUpdates[DEMO_PATIENT_ID] ?? [])];
+    const allUpdates = [newUpdate, ...(demoHealthUpdates[activePatientId] ?? [])];
     const allSchedules = schedules;
-    const allFollowUps = followUps[DEMO_PATIENT_ID] ?? [];
+    const allFollowUps = followUps[activePatientId] ?? [];
 
     const { gaps: newGaps } = detectCareGaps(patient, allUpdates, allSchedules, allFollowUps);
 
@@ -199,9 +216,8 @@ function AppContent() {
       await dataService.createCareGap({ ...gap, status: 'open' });
     }
 
-
     setCareGaps((prev) => {
-      const existing = prev[DEMO_PATIENT_ID] ?? [];
+      const existing = prev[activePatientId] ?? [];
       const withIds = newGaps.map((g) => ({
         ...g,
         id: `g-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -210,10 +226,10 @@ function AppContent() {
       const filtered = withIds.filter((ng) => !existing.some((eg) => eg.type === ng.type && eg.evidence === ng.evidence));
       return {
         ...prev,
-        [DEMO_PATIENT_ID]: [...filtered, ...existing],
+        [activePatientId]: [...filtered, ...existing],
       };
     });
-  }, [schedules, followUps]);
+  }, [activePatientId, patientProfile, schedules, followUps]);
 
   const handleFollowUpAnswer = useCallback(async (followUpId: string, answer: string) => {
     setFollowUps((prev) => {
@@ -234,13 +250,43 @@ function AppContent() {
     const res = await dataService.confirmCarePlan(patientId, fields);
     if ('error' in res) {
       console.error('Cannot confirm care plan:', res.error);
-      return;
+      return res;
     }
+
+    // 1. Update prescription draft in state
     setPrescriptionDrafts((prev) => ({
       ...prev,
-      [patientId]: prev[patientId] ? { ...prev[patientId], confirmed: true, fields } : prev[patientId],
+      [patientId]: prev[patientId]
+        ? {
+            ...prev[patientId],
+            confirmed: true,
+            confirmedAt: new Date().toISOString(),
+            confirmedBy: 'Dr. Anita Desai, MD',
+            fields: fields.map((f) => ({ ...f, status: 'confirmed' })),
+          }
+        : prev[patientId],
     }));
-  }, []);
+
+    // 2. Refresh medication schedules from data service
+    const refreshedSchedules = await dataService.fetchMedicationSchedules(patientId);
+
+    // 3. Update schedules in state if this patient is the active patient (prevent stale async overwrite)
+    if (patientId === activePatientId) {
+      setSchedules(refreshedSchedules);
+    }
+
+    // 4. Refresh patient summaries for doctor dashboard
+    try {
+      const updatedSummaries = await dataService.fetchPatientSummaries();
+      if (updatedSummaries && updatedSummaries.length > 0) {
+        setSummaries(updatedSummaries);
+      }
+    } catch {
+      // Keep existing summaries if fetch fails
+    }
+
+    return res;
+  }, [activePatientId]);
 
   const handleCareGapAction = useCallback(async (gapId: string, action: 'reviewed' | 'followup_planned') => {
     setCareGaps((prev) => {
@@ -256,8 +302,8 @@ function AppContent() {
   }, []);
 
   const handleFamilyToggleAccess = useCallback(async (authorized: boolean) => {
-    await dataService.updateCaregiverAccess(DEMO_PATIENT_ID, authorized);
-    const updated = await dataService.fetchFamilyView(DEMO_PATIENT_ID);
+    await dataService.updateCaregiverAccess(activePatientId, authorized);
+    const updated = await dataService.fetchFamilyView(activePatientId);
     if (updated) {
       setFamilyView(updated);
     } else {
@@ -266,10 +312,7 @@ function AppContent() {
         caregiverAccess: { ...prev.caregiverAccess, authorized },
       }));
     }
-  }, []);
-
-  void patientProfile;
-
+  }, [activePatientId]);
 
   return (
     <>
@@ -287,7 +330,7 @@ function AppContent() {
         <PrescriptionProcessing
           imageUrl={prescriptionPreview}
           file={prescriptionFile}
-          patientId={DEMO_PATIENT_ID}
+          patientId={activePatientId}
           onComplete={handleProcessingComplete}
           onBack={() => setView('patient_intake')}
         />
@@ -295,9 +338,11 @@ function AppContent() {
       {view === 'patient_dashboard' && (
         <PatientDashboard
           schedules={schedules}
-          followUps={followUps[DEMO_PATIENT_ID] ?? []}
-          prescriptionDraft={prescriptionDrafts[DEMO_PATIENT_ID] ?? null}
-          reports={reports[DEMO_PATIENT_ID] ?? []}
+          followUps={followUps[activePatientId] ?? []}
+          prescriptionDraft={prescriptionDrafts[activePatientId] ?? null}
+          reports={reports[activePatientId] ?? []}
+          patientId={activePatientId}
+          patientProfile={patientProfile}
           onDoseAction={handleDoseAction}
           onHealthUpdate={handleHealthUpdate}
           onFollowUpAnswer={handleFollowUpAnswer}

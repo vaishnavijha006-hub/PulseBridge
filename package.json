@@ -21,6 +21,10 @@
     "test:caregap-radar": "npx tsx --tsconfig tsconfig.app.json scripts/test_caregap_radar_priority.ts",
     "test:security-hardening": "npx tsx --tsconfig tsconfig.app.json scripts/test_security_hardening.ts",
     "test:e2e-three-features": "npx tsx --tsconfig tsconfig.app.json scripts/test_three_features_e2e.ts",
+    "test:live-gemini": "npx tsx --tsconfig tsconfig.app.json scripts/test_live_gemini_vision.ts",
+    "test:demo-blockers": "npx tsx --tsconfig tsconfig.app.json scripts/test_demo_blocker_fixes.ts",
+    "test:persistent-doctor-lock": "npx tsx --tsconfig tsconfig.app.json scripts/verify_persistent_doctor_lock.ts",
+    "test:prescription-safety": "npx tsx --tsconfig tsconfig.app.json scripts/test_prescription_safety_workflow.ts",
     "backend": "npx tsx scripts/backend_server.ts"
   },
   "dependencies": {

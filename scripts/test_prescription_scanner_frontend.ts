@@ -274,6 +274,141 @@ async function runTests() {
   }
 
   // ---------------------------------------------------------------------------
+  // SUITE 6: Feature 1 Critical Fixes Regression Suite
+  // ---------------------------------------------------------------------------
+  console.log('\nSUITE 6: Feature 1 Critical Fixes Regression Suite');
+  {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (input: any, init?: RequestInit) => {
+      const urlStr = typeof input === 'string' ? input : input.url;
+      const headers = new Headers(init?.headers);
+      const req = new Request(urlStr, {
+        method: init?.method || 'POST',
+        headers,
+        body: init?.body,
+      });
+      return handleScanPrescriptionRequest(req);
+    }) as any;
+
+    try {
+      // 1. Dynamic Patient Identity: Intake creates real patient ID propagated to scan & draft
+      const intakeRes = await dataService.savePatientIntake({
+        name: 'Meera Patel',
+        age: 38,
+        gender: 'female',
+        symptoms: 'Mild tachycardia and fatigue',
+        allergies: 'Penicillin',
+        currentMeds: 'None',
+        language: 'hi',
+      });
+
+      assert('data' in intakeRes && Boolean(intakeRes.data?.id), 'savePatientIntake returns persisted patient data');
+      const newPatientId = 'data' in intakeRes ? intakeRes.data.id : 'unknown';
+      assert(newPatientId.startsWith('p-'), 'Generated patient ID uses consistent prefix');
+      assert(newPatientId !== 'p1', 'Newly onboarded patient ID is distinct from demo patient p1');
+
+      // Unconfirmed prescription invariant: brand-new patient has NO schedules before doctor confirmation
+      const preConfirmSchedules = await dataService.fetchMedicationSchedules(newPatientId);
+      assert(preConfirmSchedules.length === 0, 'Unconfirmed patient has 0 active medication schedules');
+
+      // Scan prescription for newPatientId
+      const validBlob = new Blob([samplePngBytes], { type: 'image/png' });
+      const scanRes = await dataService.scanPrescription(newPatientId, validBlob, { useMock: true });
+      assert('data' in scanRes, 'Scan succeeds for dynamic patient ID');
+      if ('data' in scanRes) {
+        assert(scanRes.data.patientId === newPatientId, 'Prescription draft preserves dynamic patient ID');
+        assert(scanRes.data.confirmed === false, 'Newly scanned draft is unconfirmed');
+      }
+
+      // Verify draft in store under newPatientId
+      const fetchedDraft = await dataService.fetchPrescriptionDraft(newPatientId);
+      assert(fetchedDraft !== null && fetchedDraft.patientId === newPatientId, 'Draft is retrievable by newPatientId');
+
+      // 2. Doctor Lock: Missing or uncertain critical fields block confirmation for new patient
+      const invalidFields: PrescriptionField[] = [
+        { key: 'medicine', labelKey: 'rx_field_medicine', value: 'Metoprolol', status: 'confirmed' },
+        { key: 'dosage', labelKey: 'rx_field_dosage', value: '', status: 'uncertain' }, // empty & uncertain!
+        { key: 'frequency', labelKey: 'rx_field_frequency', value: 'Twice daily', status: 'confirmed' },
+        { key: 'duration', labelKey: 'rx_field_duration', value: '14 days', status: 'confirmed' },
+      ];
+      const blockedRes = await dataService.confirmCarePlan(newPatientId, invalidFields);
+      assert('error' in blockedRes, 'Missing/uncertain critical field blocks confirmation');
+
+      // Schedules remain 0 after blocked confirmation attempt
+      const postBlockedSchedules = await dataService.fetchMedicationSchedules(newPatientId);
+      assert(postBlockedSchedules.length === 0, 'Blocked confirmation never generates schedules');
+
+      // 3. Authorized Doctor Confirmation for dynamic patient activates schedule
+      const validDoctorFields: PrescriptionField[] = [
+        { key: 'medicine', labelKey: 'rx_field_medicine', value: 'Metoprolol', status: 'confirmed' },
+        { key: 'dosage', labelKey: 'rx_field_dosage', value: '25mg', status: 'confirmed' },
+        { key: 'frequency', labelKey: 'rx_field_frequency', value: 'Twice daily (08:00, 20:00)', status: 'confirmed' },
+        { key: 'duration', labelKey: 'rx_field_duration', value: '14 days', status: 'confirmed' },
+        { key: 'instructions', labelKey: 'rx_field_instructions', value: 'Take with food', status: 'confirmed' },
+      ];
+      const confirmRes = await dataService.confirmCarePlan(newPatientId, validDoctorFields);
+      assert('ok' in confirmRes && confirmRes.ok === true, 'Care plan confirmed successfully for new patient');
+
+      // Verify schedule is created in 'pending' status for newPatientId
+      const postConfirmSchedules = await dataService.fetchMedicationSchedules(newPatientId);
+      assert(postConfirmSchedules.length === 1, 'Schedule activated upon doctor confirmation');
+      assert(postConfirmSchedules[0].medicineName === 'Metoprolol', 'Schedule medicine name matches confirmed field');
+      assert(postConfirmSchedules[0].dosage === '25mg', 'Schedule dosage matches confirmed field');
+      assert(postConfirmSchedules[0].status === 'pending', 'Activated schedule begins in pending status');
+      assert(postConfirmSchedules[0].patientId === newPatientId, 'Activated schedule is assigned to dynamic patient');
+
+      // 4. Append Newly Confirmed Schedule When Existing Schedules Already Exist (Patient p1)
+      const p1InitialSchedules = await dataService.fetchMedicationSchedules('p1');
+      assert(p1InitialSchedules.length > 0, 'Patient p1 starts with existing demo schedules');
+      const initialCount = p1InitialSchedules.length;
+      const initialIds = p1InitialSchedules.map((s) => s.id);
+
+      // Confirm a new prescription for Clopidogrel on patient p1
+      const p1NewFields: PrescriptionField[] = [
+        { key: 'medicine', labelKey: 'rx_field_medicine', value: 'Clopidogrel', status: 'confirmed' },
+        { key: 'dosage', labelKey: 'rx_field_dosage', value: '75mg', status: 'confirmed' },
+        { key: 'frequency', labelKey: 'rx_field_frequency', value: 'Once daily (08:00)', status: 'confirmed' },
+        { key: 'duration', labelKey: 'rx_field_duration', value: '30 days', status: 'confirmed' },
+        { key: 'instructions', labelKey: 'rx_field_instructions', value: 'After breakfast', status: 'confirmed' },
+      ];
+      const p1ConfirmRes = await dataService.confirmCarePlan('p1', p1NewFields);
+      assert('ok' in p1ConfirmRes && p1ConfirmRes.ok === true, 'Confirmation succeeds for patient with existing schedules');
+
+      const p1UpdatedSchedules = await dataService.fetchMedicationSchedules('p1');
+      assert(p1UpdatedSchedules.length === initialCount + 1, 'New schedule is appended rather than replacing existing schedules');
+
+      // Verify existing schedules remain unchanged
+      for (const origId of initialIds) {
+        assert(p1UpdatedSchedules.some((s) => s.id === origId), `Existing schedule ${origId} preserved intact`);
+      }
+
+      // Verify newly appended schedule attributes
+      const clopidogrelSched = p1UpdatedSchedules.find((s) => s.medicineName.toLowerCase() === 'clopidogrel');
+      assert(Boolean(clopidogrelSched), 'Appended Clopidogrel schedule found in schedules list');
+      assert(clopidogrelSched?.status === 'pending', 'Appended schedule starts in pending status');
+      assert(clopidogrelSched?.dosage === '75mg', 'Appended schedule has correct dosage');
+
+      // 5. Duplicate Prevention: Repeated confirmation does not duplicate existing schedule
+      const p1RepeatConfirm = await dataService.confirmCarePlan('p1', p1NewFields);
+      assert('ok' in p1RepeatConfirm && p1RepeatConfirm.ok === true, 'Repeated confirmation returns ok');
+      const p1SchedulesAfterRepeat = await dataService.fetchMedicationSchedules('p1');
+      assert(
+        p1SchedulesAfterRepeat.length === p1UpdatedSchedules.length,
+        'Repeated confirmation does not create duplicate schedule'
+      );
+
+      // 6. State Refresh: Draft marked confirmed with doctor metadata
+      const p1LockedDraft = await dataService.fetchPrescriptionDraft('p1');
+      assert(p1LockedDraft?.confirmed === true, 'Prescription draft marked confirmed');
+      assert(Boolean(p1LockedDraft?.confirmedAt), 'Prescription draft has confirmedAt timestamp');
+      assert(Boolean(p1LockedDraft?.confirmedBy), 'Prescription draft has confirmedBy doctor identity');
+
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
   // Summary
   // ---------------------------------------------------------------------------
   console.log('\n================================================================');

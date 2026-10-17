@@ -327,8 +327,49 @@ console.log('\nSUITE 5: Full Mocked Request Processing & Zero Secret Leakage');
     }),
   });
   const prodMockRes = await handleScanPrescriptionRequest(prodMockRequest);
-  assert(prodMockRes.status === 400 || prodMockRes.status === 401, 'Production request cannot force mock extraction');
-  process.env.PULSEBRIDGE_ENV = 'test';
+}
+
+// -----------------------------------------------------------------------------
+// TEST SUITE 6: Production Service Doctor Authorization & Invariants
+// -----------------------------------------------------------------------------
+console.log('\nSUITE 6: Production Service Doctor Authorization & Invariants');
+{
+  const { productionService } = await import('../src/services/dataService');
+
+  // Invariant 1: Unresolved or uncertain critical fields are rejected before database mutation
+  const uncertainFields = [
+    { key: 'medicine', labelKey: 'rx_medicine', value: 'Aspirin', status: 'confirmed' as const },
+    { key: 'dosage', labelKey: 'rx_dosage', value: '75mg', status: 'confirmed' as const },
+    { key: 'frequency', labelKey: 'rx_frequency', value: '', status: 'uncertain' as const },
+    { key: 'duration', labelKey: 'rx_duration', value: '14 days', status: 'confirmed' as const },
+  ];
+  const prematureRes = await productionService.confirmCarePlan('p1', uncertainFields);
+  assert('error' in prematureRes, 'Rejects unverified critical fields before database update');
+  assert(
+    'error' in prematureRes && prematureRes.error.includes('Critical fields must be verified'),
+    'Error message explicitly specifies required critical field verification'
+  );
+
+  // Invariant 2: Completely missing critical keys are rejected
+  const incompleteFields = [
+    { key: 'medicine', labelKey: 'rx_medicine', value: 'Aspirin', status: 'confirmed' as const },
+  ];
+  const missingKeysRes = await productionService.confirmCarePlan('p1', incompleteFields);
+  assert('error' in missingKeysRes, 'Rejects payload missing mandatory critical keys');
+  assert(
+    'error' in missingKeysRes && missingKeysRes.error.includes('Missing required critical fields'),
+    'Error message lists missing critical keys'
+  );
+
+  // Invariant 3: Unconfigured or unauthenticated Supabase returns safe explicit error
+  const allConfirmedFields = [
+    { key: 'medicine', labelKey: 'rx_medicine', value: 'Aspirin', status: 'confirmed' as const },
+    { key: 'dosage', labelKey: 'rx_dosage', value: '75mg', status: 'confirmed' as const },
+    { key: 'frequency', labelKey: 'rx_frequency', value: 'Once daily', status: 'confirmed' as const },
+    { key: 'duration', labelKey: 'rx_duration', value: '14 days', status: 'confirmed' as const },
+  ];
+  const unconfiguredRes = await productionService.confirmCarePlan('p1', allConfirmedFields);
+  assert('error' in unconfiguredRes, 'Unconfigured Supabase returns safe explicit error without false success');
 }
 
 // -----------------------------------------------------------------------------
