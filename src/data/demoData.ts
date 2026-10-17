@@ -284,6 +284,192 @@ CLINICAL PATHOLOGIST NOTE: Hs-Troponin elevation detected in patient reporting c
         },
       ],
     },
+    {
+      id: 'rep-p1-2',
+      patientId: 'p1',
+      title: 'Lipid & Routine Metabolic Follow-Up',
+      reportType: 'cardiology',
+      date: '2026-07-10',
+      facilityOrLab: 'Apex Heart & Vascular Institute — Diagnostic Pathology',
+      orderingDoctor: 'Dr. S. Sharma, MD',
+      rawText: `APEX HEART & VASCULAR INSTITUTE
+PATIENT: Ravi Sharma | AGE: 62 | GENDER: Male | REF: PB-7019
+DATE OF SERVICE: 10-JUL-2026 | ORDERING: Dr. S. Sharma, MD
+
+TEST NAME                       RESULT      UNITS      REFERENCE INTERVAL
+--------------------------------------------------------------------------
+Total Cholesterol               228         mg/dL      < 200                    [HIGH]
+HDL Cholesterol                  40          mg/dL      > 40                     [BORDERLINE]
+LDL Cholesterol                 152         mg/dL      < 100                    [HIGH]
+Random Blood Glucose            138         mg/dL      70 - 140                 [NORMAL]
+Serum Creatinine                1.1         mg/dL      0.7 - 1.3                [NORMAL]
+--------------------------------------------------------------------------`,
+      structuredFindings: [
+        {
+          testOrParameter: 'Total Cholesterol',
+          value: '228',
+          unit: 'mg/dL',
+          referenceRange: '< 200 mg/dL',
+          isAbnormal: true,
+          clinicalNotes: 'Elevated total cholesterol',
+          sourceEvidence: 'Total Cholesterol: 228 mg/dL (Ref: < 200)',
+        },
+        {
+          testOrParameter: 'HDL Cholesterol',
+          value: '40',
+          unit: 'mg/dL',
+          referenceRange: '> 40 mg/dL',
+          isAbnormal: false,
+          clinicalNotes: 'Lower threshold of normal',
+          sourceEvidence: 'HDL Cholesterol: 40 mg/dL (Ref: > 40)',
+        },
+        {
+          testOrParameter: 'LDL Cholesterol',
+          value: '152',
+          unit: 'mg/dL',
+          referenceRange: '< 100 mg/dL',
+          isAbnormal: true,
+          clinicalNotes: 'Elevated atherogenic lipoprotein',
+          sourceEvidence: 'LDL Cholesterol: 152 mg/dL (Ref: < 100)',
+        },
+        {
+          testOrParameter: 'Random Blood Glucose',
+          value: '138',
+          unit: 'mg/dL',
+          referenceRange: '70 - 140 mg/dL',
+          isAbnormal: false,
+          clinicalNotes: 'Within non-fasting interval',
+          sourceEvidence: 'Random Blood Glucose: 138 mg/dL (Ref: 70 - 140)',
+        },
+        {
+          testOrParameter: 'Serum Creatinine',
+          value: '1.1',
+          unit: 'mg/dL',
+          referenceRange: '0.7 - 1.3 mg/dL',
+          isAbnormal: false,
+          clinicalNotes: 'Normal renal clearance',
+          sourceEvidence: 'Serum Creatinine: 1.1 mg/dL (Ref: 0.7 - 1.3)',
+        },
+      ],
+    },
+    {
+      id: 'rep-p1-3',
+      patientId: 'p1',
+      title: 'Baseline Cardiovascular & Lipid Assessment',
+      reportType: 'cardiology',
+      date: '2026-03-05',
+      facilityOrLab: 'Apex Heart & Vascular Institute — Diagnostic Pathology',
+      orderingDoctor: 'Dr. S. Sharma, MD',
+      rawText: `APEX HEART & VASCULAR INSTITUTE
+PATIENT: Ravi Sharma | AGE: 62 | GENDER: Male | REF: PB-7019
+DATE OF SERVICE: 05-MAR-2026 | ORDERING: Dr. S. Sharma, MD
+
+TEST NAME                       RESULT      UNITS      REFERENCE INTERVAL
+--------------------------------------------------------------------------
+Total Cholesterol               240         mg/dL      < 200                    [HIGH]
+HDL Cholesterol                  38          mg/dL      > 40                     [LOW]
+LDL Cholesterol                 165         mg/dL      < 100                    [HIGH]
+Random Blood Glucose            130         mg/dL      70 - 140                 [NORMAL]
+Serum Creatinine                1.0         mg/dL      0.7 - 1.3                [NORMAL]
+--------------------------------------------------------------------------`,
+      structuredFindings: [
+        {
+          testOrParameter: 'Total Cholesterol',
+          value: '240',
+          unit: 'mg/dL',
+          referenceRange: '< 200 mg/dL',
+          isAbnormal: true,
+          clinicalNotes: 'Marked hypercholesterolemia',
+          sourceEvidence: 'Total Cholesterol: 240 mg/dL (Ref: < 200)',
+        },
+        {
+          testOrParameter: 'HDL Cholesterol',
+          value: '38',
+          unit: 'mg/dL',
+          referenceRange: '> 40 mg/dL',
+          isAbnormal: true,
+          clinicalNotes: 'Suboptimal protective HDL',
+          sourceEvidence: 'HDL Cholesterol: 38 mg/dL (Ref: > 40)',
+        },
+        {
+          testOrParameter: 'LDL Cholesterol',
+          value: '165',
+          unit: 'mg/dL',
+          referenceRange: '< 100 mg/dL',
+          isAbnormal: true,
+          clinicalNotes: 'Significantly elevated LDL-C',
+          sourceEvidence: 'LDL Cholesterol: 165 mg/dL (Ref: < 100)',
+        },
+        {
+          testOrParameter: 'Random Blood Glucose',
+          value: '130',
+          unit: 'mg/dL',
+          referenceRange: '70 - 140 mg/dL',
+          isAbnormal: false,
+          clinicalNotes: 'Normal glycemic index',
+          sourceEvidence: 'Random Blood Glucose: 130 mg/dL (Ref: 70 - 140)',
+        },
+        {
+          testOrParameter: 'Serum Creatinine',
+          value: '1.0',
+          unit: 'mg/dL',
+          referenceRange: '0.7 - 1.3 mg/dL',
+          isAbnormal: false,
+          clinicalNotes: 'Preserved baseline renal function',
+          sourceEvidence: 'Serum Creatinine: 1.0 mg/dL (Ref: 0.7 - 1.3)',
+        },
+      ],
+    },
+  ],
+  p3: [
+    {
+      id: 'rep-p3-1',
+      patientId: 'p3',
+      title: 'Hypertension & Renal Function Panel',
+      reportType: 'lab',
+      date: '2026-09-28',
+      facilityOrLab: 'Apex Laboratories',
+      orderingDoctor: 'Dr. Anita Desai, MD',
+      rawText: `APEX LABORATORIES
+PATIENT: Ahmed Khan | AGE: 48 | GENDER: Male
+DATE: 28-SEP-2026
+
+TEST                    VALUE       UNITS       REFERENCE INTERVAL
+--------------------------------------------------------------------------
+Serum Creatinine        0.9         mg/dL       0.7 - 1.3                         [NORMAL]
+Serum Potassium         4.2         mEq/L       3.5 - 5.1                         [NORMAL]
+Blood Urea Nitrogen     15          mg/dL       7 - 20                            [NORMAL]
+--------------------------------------------------------------------------`,
+      structuredFindings: [
+        {
+          testOrParameter: 'Serum Creatinine',
+          value: '0.9',
+          unit: 'mg/dL',
+          referenceRange: '0.7 - 1.3 mg/dL',
+          isAbnormal: false,
+          clinicalNotes: 'Normal baseline',
+          sourceEvidence: 'Serum Creatinine: 0.9 mg/dL (Ref: 0.7 - 1.3)',
+        },
+        {
+          testOrParameter: 'Serum Potassium',
+          value: '4.2',
+          unit: 'mEq/L',
+          referenceRange: '3.5 - 5.1 mEq/L',
+          isAbnormal: false,
+          clinicalNotes: 'Normokalemic',
+          sourceEvidence: 'Serum Potassium: 4.2 mEq/L (Ref: 3.5 - 5.1)',
+        },
+        {
+          testOrParameter: 'Blood Urea Nitrogen',
+          value: '15',
+          unit: 'mg/dL',
+          referenceRange: '7 - 20 mg/dL',
+          isAbnormal: false,
+          clinicalNotes: 'Normal clearance',
+          sourceEvidence: 'Blood Urea Nitrogen: 15 mg/dL (Ref: 7 - 20)',
+        },
+      ],
+    },
   ],
   p4: [
     {
@@ -341,6 +527,122 @@ Serum Potassium         4.8         mEq/L       3.5 - 5.1                       
           isAbnormal: false,
           clinicalNotes: 'Normokalemic',
           sourceEvidence: 'Serum Potassium: 4.8 mEq/L (Ref: 3.5 - 5.1)',
+        },
+      ],
+    },
+    {
+      id: 'rep-p4-2',
+      patientId: 'p4',
+      title: 'Diabetic Quarterly Follow-Up Panel',
+      reportType: 'lab',
+      date: '2026-06-20',
+      facilityOrLab: 'City Care Clinical Laboratories',
+      orderingDoctor: 'Dr. V. Gupta, MD',
+      rawText: `CITY CARE CLINICAL LABORATORIES
+PATIENT: Lakshmi Rao | AGE: 70 | GENDER: Female | REF: PB-9481
+DATE: 20-JUN-2026
+
+TEST                    VALUE       UNITS       REFERENCE INTERVAL
+--------------------------------------------------------------------------
+Glycated Hemoglobin (HbA1c) 8.9     %           < 5.7 (Normal)                    [ELEVATED]
+Estimated GFR (eGFR)    70          mL/min/1.73m2 > 60                             [NORMAL]
+Urine Microalbumin      40          mg/L        < 30                              [ELEVATED]
+Serum Potassium         4.6         mEq/L       3.5 - 5.1                         [NORMAL]
+--------------------------------------------------------------------------`,
+      structuredFindings: [
+        {
+          testOrParameter: 'Glycated Hemoglobin (HbA1c)',
+          value: '8.9',
+          unit: '%',
+          referenceRange: '< 5.7 %',
+          isAbnormal: true,
+          clinicalNotes: 'Suboptimal glycemic control',
+          sourceEvidence: 'Glycated Hemoglobin (HbA1c): 8.9 % (Ref: < 5.7)',
+        },
+        {
+          testOrParameter: 'Estimated GFR (eGFR)',
+          value: '70',
+          unit: 'mL/min/1.73m2',
+          referenceRange: '> 60 mL/min/1.73m2',
+          isAbnormal: false,
+          clinicalNotes: 'Stable renal filtration',
+          sourceEvidence: 'Estimated GFR (eGFR): 70 mL/min/1.73m2 (Ref: > 60)',
+        },
+        {
+          testOrParameter: 'Urine Microalbumin',
+          value: '40',
+          unit: 'mg/L',
+          referenceRange: '< 30 mg/L',
+          isAbnormal: true,
+          clinicalNotes: 'Persistent microalbuminuria',
+          sourceEvidence: 'Urine Microalbumin: 40 mg/L (Ref: < 30)',
+        },
+        {
+          testOrParameter: 'Serum Potassium',
+          value: '4.6',
+          unit: 'mEq/L',
+          referenceRange: '3.5 - 5.1 mEq/L',
+          isAbnormal: false,
+          clinicalNotes: 'Normokalemic',
+          sourceEvidence: 'Serum Potassium: 4.6 mEq/L (Ref: 3.5 - 5.1)',
+        },
+      ],
+    },
+    {
+      id: 'rep-p4-3',
+      patientId: 'p4',
+      title: 'Annual Diabetic & Renal Function Review',
+      reportType: 'lab',
+      date: '2026-01-15',
+      facilityOrLab: 'City Care Clinical Laboratories',
+      orderingDoctor: 'Dr. V. Gupta, MD',
+      rawText: `CITY CARE CLINICAL LABORATORIES
+PATIENT: Lakshmi Rao | AGE: 70 | GENDER: Female | REF: PB-9481
+DATE: 15-JAN-2026
+
+TEST                    VALUE       UNITS       REFERENCE INTERVAL
+--------------------------------------------------------------------------
+Glycated Hemoglobin (HbA1c) 9.3     %           < 5.7 (Normal)                    [ELEVATED]
+Estimated GFR (eGFR)    72          mL/min/1.73m2 > 60                             [NORMAL]
+Urine Microalbumin      38          mg/L        < 30                              [ELEVATED]
+Serum Potassium         4.5         mEq/L       3.5 - 5.1                         [NORMAL]
+--------------------------------------------------------------------------`,
+      structuredFindings: [
+        {
+          testOrParameter: 'Glycated Hemoglobin (HbA1c)',
+          value: '9.3',
+          unit: '%',
+          referenceRange: '< 5.7 %',
+          isAbnormal: true,
+          clinicalNotes: 'Poor glycemic control at baseline',
+          sourceEvidence: 'Glycated Hemoglobin (HbA1c): 9.3 % (Ref: < 5.7)',
+        },
+        {
+          testOrParameter: 'Estimated GFR (eGFR)',
+          value: '72',
+          unit: 'mL/min/1.73m2',
+          referenceRange: '> 60 mL/min/1.73m2',
+          isAbnormal: false,
+          clinicalNotes: 'Normal glomerular filtration',
+          sourceEvidence: 'Estimated GFR (eGFR): 72 mL/min/1.73m2 (Ref: > 60)',
+        },
+        {
+          testOrParameter: 'Urine Microalbumin',
+          value: '38',
+          unit: 'mg/L',
+          referenceRange: '< 30 mg/L',
+          isAbnormal: true,
+          clinicalNotes: 'Early microalbuminuria',
+          sourceEvidence: 'Urine Microalbumin: 38 mg/L (Ref: < 30)',
+        },
+        {
+          testOrParameter: 'Serum Potassium',
+          value: '4.5',
+          unit: 'mEq/L',
+          referenceRange: '3.5 - 5.1 mEq/L',
+          isAbnormal: false,
+          clinicalNotes: 'Normokalemic',
+          sourceEvidence: 'Serum Potassium: 4.5 mEq/L (Ref: 3.5 - 5.1)',
         },
       ],
     },

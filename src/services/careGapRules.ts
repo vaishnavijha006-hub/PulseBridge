@@ -13,6 +13,7 @@ export interface CareGapRuleResult {
 }
 
 export interface QueueScoreFactor {
+  rule?: string;
   reason: string;
   points: number;
   evidence: string;
@@ -61,6 +62,7 @@ export function detectCareGaps(
     gaps.push({
       patientId: patient.id,
       type: 'new_symptom',
+      severity: 'high',
       evidence: `New or worsening symptom reported: "${latestUpdate.symptomDescription || 'Feeling unwell'}"`,
       timestamp: latestUpdate.submittedAt,
       missingInfo: latestUpdate.symptomDescription
@@ -79,6 +81,7 @@ export function detectCareGaps(
       gaps.push({
         patientId: patient.id,
         type: 'missing_severity',
+        severity: 'medium',
         evidence: `Symptom "${latestUpdate.symptomDescription}" reported without pain/severity rating`,
         timestamp: latestUpdate.submittedAt,
         missingInfo: 'Pain / discomfort scale (1-10)',
@@ -98,6 +101,7 @@ export function detectCareGaps(
     gaps.push({
       patientId: patient.id,
       type: 'repeated_missed_dose',
+      severity: 'high',
       evidence: `${missedDoses.length} missed doses recorded (${medNames.join(', ')})${reasons ? ` — Reasons: ${reasons}` : ''}`,
       timestamp: new Date().toISOString(),
       missingInfo: reasons ? null : 'Reason for non-adherence',
@@ -113,6 +117,7 @@ export function detectCareGaps(
       gaps.push({
         patientId: patient.id,
         type: 'unanswered_followup',
+        severity: 'medium',
         evidence: `Follow-up question unanswered for ${Math.floor(hoursSinceAsked)}h: "${f.question}"`,
         timestamp: new Date().toISOString(),
         missingInfo: 'Patient response',
@@ -126,6 +131,7 @@ export function detectCareGaps(
     gaps.push({
       patientId: patient.id,
       type: 'overdue_update',
+      severity: 'low',
       evidence: 'No health update has been submitted since onboarding',
       timestamp: new Date().toISOString(),
       missingInfo: 'Current recovery status check-in',
@@ -137,6 +143,7 @@ export function detectCareGaps(
       gaps.push({
         patientId: patient.id,
         type: 'overdue_update',
+        severity: 'low',
         evidence: `No health update recorded in ${Math.floor(hoursSinceUpdate)} hours`,
         timestamp: new Date().toISOString(),
         missingInfo: 'Current recovery status check-in',
@@ -145,15 +152,34 @@ export function detectCareGaps(
     }
   }
 
-  // 6. Allergy Conflict
+  // 6. Allergy Conflict (with drug class cross-reactivity)
   if (patient.allergies && patient.allergies.toLowerCase() !== 'none') {
     const allergyMeds = patient.allergies.toLowerCase();
-    const currentMedNames = schedules.map((s) => s.medicineName.toLowerCase());
+    const currentMedNames = schedules
+      .map((s) => (s?.medicineName || '').toLowerCase().trim())
+      .filter(Boolean);
+    const drugClassAliases: Record<string, string[]> = {
+      penicillin: ['amoxicillin', 'ampicillin', 'augmentin', 'penicillin', 'piperacillin'],
+      sulfa: ['sulfamethoxazole', 'bactrim', 'septra', 'cotrimoxazole', 'sulfa'],
+      aspirin: ['aspirin', 'ibuprofen', 'naproxen', 'diclofenac', 'nsaid'],
+    };
+
     for (const med of currentMedNames) {
-      if (allergyMeds.includes(med) || med.includes(allergyMeds.split(',')[0].trim())) {
+      let isConflict = allergyMeds.includes(med) || med.includes(allergyMeds.split(',')[0].trim());
+      if (!isConflict) {
+        for (const [cls, members] of Object.entries(drugClassAliases)) {
+          if (allergyMeds.includes(cls) && members.some((m) => med.includes(m))) {
+            isConflict = true;
+            break;
+          }
+        }
+      }
+
+      if (isConflict) {
         gaps.push({
           patientId: patient.id,
           type: 'allergy_conflict',
+          severity: 'high',
           evidence: `Patient recorded allergy to "${patient.allergies}", current medicine "${med}" may conflict`,
           timestamp: new Date().toISOString(),
           missingInfo: 'Doctor clinical confirmation of medicine safety',
@@ -164,19 +190,20 @@ export function detectCareGaps(
     }
   }
 
-  // 7. Duplicate Medication Check
+  // 7. Duplicate Medication Check (count >= 2 for same normalized medication)
   const medCounts = schedules.reduce<Record<string, number>>((acc, s) => {
+    if (!s?.medicineName) return acc;
     const norm = s.medicineName.trim().toLowerCase();
     acc[norm] = (acc[norm] || 0) + 1;
     return acc;
   }, {});
 
   for (const [med, count] of Object.entries(medCounts)) {
-    if (count > 3) {
-      // Unusual multiple occurrences for single medication
+    if (count >= 2) {
       gaps.push({
         patientId: patient.id,
         type: 'duplicate_medicine',
+        severity: 'high',
         evidence: `Multiple active schedules (${count}) detected for "${med}"`,
         timestamp: new Date().toISOString(),
         missingInfo: 'Doctor schedule verification',
@@ -249,6 +276,7 @@ export function calculatePatientTriageScore(
   if (latestUpdate && latestUpdate.state === 'bad') {
     score += 40;
     factors.push({
+      rule: 'new_symptom',
       reason: 'New or worsening symptom reported',
       points: 40,
       evidence: latestUpdate.symptomDescription || 'Patient reported feeling bad',
@@ -263,6 +291,7 @@ export function calculatePatientTriageScore(
   if (hasAllergyOrDuplicate) {
     score += 40;
     factors.push({
+      rule: 'safety_flag',
       reason: 'Safety concern: Allergy conflict or duplicate medication',
       points: 40,
       evidence: careGaps.find((g) => g.type === 'allergy_conflict' || g.type === 'duplicate_medicine')?.evidence ?? 'Allergy conflict detected',
@@ -275,6 +304,7 @@ export function calculatePatientTriageScore(
     score += 30;
     const meds = [...new Set(missedDoses.map((d) => d.medicineName))].join(', ');
     factors.push({
+      rule: 'repeated_missed_dose',
       reason: 'Two or more missed doses in recovery window',
       points: 30,
       evidence: `${missedDoses.length} doses missed (${meds})`,
@@ -283,10 +313,16 @@ export function calculatePatientTriageScore(
   }
 
   // Rule D: Missing symptom severity/duration (+20)
-  const hasMissingSeverity = careGaps.some((g) => g.status === 'open' && g.type === 'missing_severity');
-  if (hasMissingSeverity) {
+  const hasMissingSeverityGap = careGaps.some((g) => g.status === 'open' && g.type === 'missing_severity');
+  const hasUnratedSymptom = Boolean(
+    latestUpdate?.symptomDescription &&
+    latestUpdate.state !== 'good' &&
+    !/\b(severity|pain scale|\d+\s*\/\s*10|\b(mild|moderate|severe)\b)\b/i.test(latestUpdate.symptomDescription)
+  );
+  if (hasMissingSeverityGap || hasUnratedSymptom) {
     score += 20;
     factors.push({
+      rule: 'missing_severity',
       reason: 'Symptom reported without clinical severity/duration scale',
       points: 20,
       evidence: 'Missing 1-10 pain/discomfort rating',
@@ -303,6 +339,7 @@ export function calculatePatientTriageScore(
   if (hasUnanswered) {
     score += 15;
     factors.push({
+      rule: 'unanswered_followup',
       reason: 'Follow-up question unanswered for more than 24 hours',
       points: 15,
       evidence: 'Pending clinical question',
@@ -314,6 +351,7 @@ export function calculatePatientTriageScore(
   if (!latestUpdate) {
     score += 10;
     factors.push({
+      rule: 'overdue_update',
       reason: 'No health check-in submitted since enrollment',
       points: 10,
       evidence: 'Check-in overdue',
@@ -324,6 +362,7 @@ export function calculatePatientTriageScore(
     if (hoursSinceUpdate > 24) {
       score += 10;
       factors.push({
+        rule: 'overdue_update',
         reason: 'No health update recorded for > 24 hours',
         points: 10,
         evidence: `Last update ${Math.floor(hoursSinceUpdate)} hours ago`,

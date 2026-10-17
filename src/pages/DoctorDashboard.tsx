@@ -11,6 +11,7 @@ import { useLanguage } from '@/i18n/LanguageContext';
 import { cn } from '@/utils/cn';
 import type { PatientSummary, CareGap, PrescriptionDraft, FollowUp, MedicalReport } from '@/types';
 import { ReportSummaryView } from '@/components/ReportSummaryView';
+import { ClosedLoopCareView } from '@/components/ClosedLoopCareView';
 import { demoMedicalReports } from '@/data/demoData';
 
 interface DoctorDashboardProps {
@@ -288,25 +289,46 @@ function PatientDetail({
         </div>
 
         {activeTab === 'overview' && <OverviewTab summary={summary} followUps={followUps} />}
-        {activeTab === 'rx' && draft && <PrescriptionReview draft={draft} patientAllergies={summary.patient.allergies} onConfirm={onConfirmCarePlan} />}
+        {activeTab === 'rx' && draft && (
+          <PrescriptionReview
+            draft={draft}
+            patientAllergies={summary.patient.allergies}
+            patientCurrentMeds={summary.patient.currentMeds}
+            onConfirm={onConfirmCarePlan}
+          />
+        )}
         {activeTab === 'reports' && <ReportSummaryView reports={reports} />}
         {activeTab === 'gaps' && (
-          <div className="flex flex-col gap-3">
-            {gaps.length === 0 ? (
-              <div className="rounded-xl border border-navy-600 bg-navy-700/30 p-6 text-center text-navy-400">
-                No care gaps for this patient.
-              </div>
-            ) : (
-              gaps.map(gap => (
-                <CareGapCard
-                  key={gap.id}
-                  gap={gap}
-                  onReview={() => {}}
-                  onPlanFollowUp={(id) => onCareGapAction(id, 'followup_planned')}
-                  onMarkReviewed={(id) => onCareGapAction(id, 'reviewed')}
-                />
-              ))
-            )}
+          <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-3">
+              <h3 className="text-sm font-semibold text-teal-400 uppercase tracking-wide">
+                Detected Care Gaps & Clinical Evidence
+              </h3>
+              {gaps.length === 0 ? (
+                <div className="rounded-xl border border-navy-600 bg-navy-700/30 p-6 text-center text-navy-400">
+                  No care gaps for this patient.
+                </div>
+              ) : (
+                gaps.map((gap) => (
+                  <CareGapCard
+                    key={gap.id}
+                    gap={gap}
+                    onReview={() => {}}
+                    onPlanFollowUp={(id) => onCareGapAction(id, 'followup_planned')}
+                    onMarkReviewed={(id) => onCareGapAction(id, 'reviewed')}
+                  />
+                ))
+              )}
+            </div>
+
+            {/* Closed-Loop Care Action Tracker integration */}
+            <div className="border-t border-navy-600/60 pt-6">
+              <ClosedLoopCareView
+                patientId={summary.patient.id}
+                patientName={summary.patient.name}
+                careGaps={gaps}
+              />
+            </div>
           </div>
         )}
       </div>

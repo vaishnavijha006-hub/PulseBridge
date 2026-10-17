@@ -1,27 +1,41 @@
 import { useState } from 'react';
-import { Check, AlertTriangle, Edit3, Save, Lock, ShieldAlert } from 'lucide-react';
+import { Check, AlertTriangle, Edit3, Save, Lock, ShieldAlert, FileText, Sparkles, Image as ImageIcon } from 'lucide-react';
 import { StatusBadge } from '@/components/StatusBadge';
 import { useLanguage } from '@/i18n/LanguageContext';
 import { cn } from '@/utils/cn';
+import { extractPrescriptionFromText } from '@/services/prescriptionExtractor';
 import type { PrescriptionDraft, PrescriptionField } from '@/types';
 
 interface PrescriptionReviewProps {
   draft: PrescriptionDraft;
   patientAllergies?: string;
+  patientCurrentMeds?: string;
+  doctorName?: string;
   onConfirm: (updatedFields: PrescriptionField[]) => void;
 }
 
-export function PrescriptionReview({ draft, patientAllergies, onConfirm }: PrescriptionReviewProps) {
+export function PrescriptionReview({
+  draft,
+  patientAllergies,
+  patientCurrentMeds,
+  doctorName = 'Dr. Anita Desai, MD',
+  onConfirm,
+}: PrescriptionReviewProps) {
   const { t } = useLanguage();
-  const [fields, setFields] = useState<PrescriptionField[]>(draft.fields.map(f => ({ ...f })));
+  const [fields, setFields] = useState<PrescriptionField[]>(draft.fields.map((f) => ({ ...f })));
   const [confirmed, setConfirmed] = useState(draft.confirmed);
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [activeMediaTab, setActiveMediaTab] = useState<'image' | 'text'>('image');
+  const [rawText, setRawText] = useState<string>(
+    draft.rawText ||
+      'Rx:\nTab Aspirin 75mg once daily after breakfast for 14 days\nTake with water'
+  );
 
   const CRITICAL_KEYS = ['medicine', 'dosage', 'frequency', 'duration'];
 
-  const uncertainFields = fields.filter(f => f.status === 'uncertain');
-  const confirmedFields = fields.filter(f => f.status !== 'uncertain');
+  const uncertainFields = fields.filter((f) => f.status === 'uncertain');
+  const confirmedFields = fields.filter((f) => f.status !== 'uncertain');
   const sortedFields = [...uncertainFields, ...confirmedFields];
 
   // Critical prescription fields must be non-empty AND doctor-confirmed
@@ -34,24 +48,30 @@ export function PrescriptionReview({ draft, patientAllergies, onConfirm }: Presc
   const hasUnresolved = emptyCriticalFields.length > 0 || uncertainCriticalFields.length > 0;
 
   // Active allergy conflict check
+  const prescribedMedName = fields.find((f) => f.key === 'medicine')?.value?.toLowerCase() ?? '';
   const allergyConflict = Boolean(
     patientAllergies &&
-    patientAllergies.toLowerCase() !== 'none' &&
-    fields.some(
-      (f) =>
-        f.key === 'medicine' &&
-        f.value &&
-        (patientAllergies.toLowerCase().includes(f.value.toLowerCase()) ||
-          f.value.toLowerCase().includes(patientAllergies.toLowerCase().split(',')[0].trim()))
-    )
+      patientAllergies.toLowerCase() !== 'none' &&
+      prescribedMedName &&
+      (patientAllergies.toLowerCase().includes(prescribedMedName) ||
+        prescribedMedName.includes(patientAllergies.toLowerCase().split(',')[0].trim()))
+  );
+
+  // Duplicate medication check against patient.currentMeds
+  const duplicateMedication = Boolean(
+    patientCurrentMeds &&
+      patientCurrentMeds.toLowerCase() !== 'none' &&
+      prescribedMedName &&
+      (patientCurrentMeds.toLowerCase().includes(prescribedMedName) ||
+        prescribedMedName.includes(patientCurrentMeds.toLowerCase().split(',')[0].trim()))
   );
 
   const handleEdit = (key: string, value: string) => {
-    setFields(prev => prev.map(f => f.key === key ? { ...f, value } : f));
+    setFields((prev) => prev.map((f) => (f.key === key ? { ...f, value } : f)));
   };
 
   const handleMarkResolved = (key: string) => {
-    setFields(prev => prev.map(f => f.key === key ? { ...f, status: 'confirmed' } : f));
+    setFields((prev) => prev.map((f) => (f.key === key ? { ...f, status: 'confirmed' } : f)));
     setEditingKey(null);
   };
 
@@ -61,10 +81,17 @@ export function PrescriptionReview({ draft, patientAllergies, onConfirm }: Presc
       setTimeout(() => setError(null), 4000);
       return;
     }
-    const updated = fields.map(f => ({ ...f, status: 'confirmed' as const }));
+    const updated = fields.map((f) => ({ ...f, status: 'confirmed' as const }));
     setFields(updated);
     setConfirmed(true);
     onConfirm(updated);
+  };
+
+  // Run AI / Grounded Prescription Extraction from text
+  const handleExtractFromText = () => {
+    if (!rawText.trim()) return;
+    const extracted = extractPrescriptionFromText(rawText);
+    setFields(extracted.fields);
   };
 
 
@@ -82,18 +109,67 @@ export function PrescriptionReview({ draft, patientAllergies, onConfirm }: Presc
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 divide-y lg:divide-y-0 lg:divide-x divide-navy-600">
-        {/* Image side */}
-        <div className="p-5">
-          <span className="text-sm font-semibold text-navy-200 mb-3 block">{t('doctor_rx_image')}</span>
-          <div className="rounded-xl border border-navy-600 bg-navy-800/50 overflow-hidden">
-            <img src={draft.imageUrl} alt="Prescription" className="w-full max-h-72 object-contain bg-navy-900" />
+        {/* Left: Image or Raw Text with Extraction */}
+        <div className="p-5 flex flex-col gap-3">
+          <div className="flex items-center justify-between border-b border-navy-600/70 pb-2.5">
+            <span className="text-xs font-bold text-navy-200 uppercase tracking-wider">Source Document</span>
+            <div className="flex items-center gap-1 bg-navy-800 p-0.5 rounded-lg border border-navy-600">
+              <button
+                onClick={() => setActiveMediaTab('image')}
+                className={cn(
+                  'flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium transition-colors',
+                  activeMediaTab === 'image'
+                    ? 'bg-teal-500/20 text-teal-300 font-bold'
+                    : 'text-navy-400 hover:text-white'
+                )}
+              >
+                <ImageIcon className="w-3.5 h-3.5" />
+                <span>Image</span>
+              </button>
+              <button
+                onClick={() => setActiveMediaTab('text')}
+                className={cn(
+                  'flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium transition-colors',
+                  activeMediaTab === 'text'
+                    ? 'bg-teal-500/20 text-teal-300 font-bold'
+                    : 'text-navy-400 hover:text-white'
+                )}
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span>Raw Text</span>
+              </button>
+            </div>
           </div>
+
+          {activeMediaTab === 'image' ? (
+            <div className="rounded-xl border border-navy-600 bg-navy-800/50 overflow-hidden">
+              <img src={draft.imageUrl} alt="Prescription" className="w-full max-h-72 object-contain bg-navy-900" />
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2.5">
+              <textarea
+                value={rawText}
+                onChange={(e) => setRawText(e.target.value)}
+                rows={5}
+                className="w-full rounded-xl bg-navy-900 border border-navy-600 p-3 text-xs text-white font-mono leading-relaxed focus:border-teal-400 focus:outline-none"
+                placeholder="Paste or type prescription narrative text here..."
+              />
+              <button
+                onClick={handleExtractFromText}
+                className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-purple-600/30 border border-purple-500/40 text-purple-200 text-xs font-bold hover:bg-purple-600/50 transition-colors"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-purple-300" />
+                <span>Extract Structured Parameters</span>
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* Fields side */}
+        {/* Right: Fields & Safety Alerts */}
         <div className="p-5 flex flex-col gap-3">
           <span className="text-sm font-semibold text-navy-200">{t('doctor_rx_fields')}</span>
 
+          {/* Allergy Conflict Banner */}
           {allergyConflict && (
             <div className="rounded-xl border border-danger-500/50 bg-danger-500/15 p-3 flex items-start gap-2.5 text-danger-300">
               <ShieldAlert className="w-4 h-4 text-danger-400 flex-shrink-0 mt-0.5" />
@@ -102,7 +178,22 @@ export function PrescriptionReview({ draft, patientAllergies, onConfirm }: Presc
                   ⚠️ Allergy Alert: Patient Sensitive to "{patientAllergies}"
                 </span>
                 <span className="text-danger-300 mt-0.5">
-                  Verify medication and drug class compatibility before confirming this care plan.
+                  Verify medication compatibility before approving this care plan.
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Duplicate Medication Warning Banner */}
+          {duplicateMedication && (
+            <div className="rounded-xl border border-amber-500/50 bg-amber-500/15 p-3 flex items-start gap-2.5 text-amber-300">
+              <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+              <div className="flex flex-col text-xs">
+                <span className="font-bold text-amber-200 uppercase tracking-wide">
+                  ⚠️ Duplicate Medication Flag: Patient Currently Taking "{patientCurrentMeds}"
+                </span>
+                <span className="text-amber-300 mt-0.5">
+                  Review for drug duplication or dose modification before activating new schedule.
                 </span>
               </div>
             </div>
@@ -230,10 +321,19 @@ export function PrescriptionReview({ draft, patientAllergies, onConfirm }: Presc
 
 
           {confirmed && (
-            <div className="mt-2 flex items-center gap-2 rounded-xl bg-success-500/10 border border-success-500/30 px-4 py-3">
-              <Check className="w-5 h-5 text-success-400" />
-              <span className="text-sm font-medium text-success-300">
-                Care plan activated. Schedules are now live for the patient.
+            <div className="mt-2 flex flex-col gap-1.5 rounded-xl bg-success-500/10 border border-success-500/30 px-4 py-3">
+              <div className="flex items-center gap-2">
+                <Lock className="w-4 h-4 text-success-400" />
+                <span className="text-xs font-bold text-success-300 uppercase tracking-wider">
+                  Doctor Lock Enforced
+                </span>
+              </div>
+              <span className="text-xs text-navy-200">
+                Approved & locked by <strong className="text-white">{draft.confirmedBy || doctorName}</strong> on{' '}
+                <span className="text-navy-300">{draft.confirmedAt ? new Date(draft.confirmedAt).toLocaleString() : 'Just now'}</span>.
+              </span>
+              <span className="text-xs text-success-400">
+                Care plan activated. Patient reminders and dosing schedule are now live.
               </span>
             </div>
           )}

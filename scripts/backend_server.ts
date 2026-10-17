@@ -9,6 +9,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { handleSummarizeRequest } from '../supabase/functions/summarize-medical-report/index';
+import { handleScanPrescriptionRequest } from '../supabase/functions/scan-prescription/index';
 
 // Safely load local environment variables from .env.local or .env if present
 for (const envFile of ['.env.local', '.env']) {
@@ -65,6 +66,7 @@ const server = http.createServer(async (nodeReq, nodeRes) => {
         endpoints: [
           '/health',
           '/functions/v1/summarize-medical-report',
+          '/functions/v1/scan-prescription',
         ],
         timestamp: new Date().toISOString(),
       })
@@ -111,11 +113,50 @@ const server = http.createServer(async (nodeReq, nodeRes) => {
     return;
   }
 
+  if (url.pathname.endsWith('/scan-prescription')) {
+    const bodyBuffer = await new Promise<Buffer>((resolve, reject) => {
+      const chunks: Buffer[] = [];
+      nodeReq.on('data', (chunk) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
+      nodeReq.on('end', () => resolve(Buffer.concat(chunks)));
+      nodeReq.on('error', reject);
+    });
+
+    const headers = new Headers();
+    for (const [key, val] of Object.entries(nodeReq.headers)) {
+      if (val) {
+        if (Array.isArray(val)) {
+          val.forEach((v) => headers.append(key, v));
+        } else {
+          headers.set(key, val);
+        }
+      }
+    }
+
+    const webReq = new Request(url.toString(), {
+      method: nodeReq.method,
+      headers,
+      body: ['GET', 'HEAD'].includes(nodeReq.method || '') ? undefined : bodyBuffer,
+    });
+
+    try {
+      const webRes = await handleScanPrescriptionRequest(webReq);
+      const resBody = await webRes.text();
+      const resHeaders = Object.fromEntries(webRes.headers.entries());
+      resHeaders['content-length'] = Buffer.byteLength(resBody).toString();
+      nodeRes.writeHead(webRes.status, resHeaders);
+      nodeRes.end(resBody);
+    } catch (err: any) {
+      nodeRes.writeHead(500, { 'Content-Type': 'application/json' });
+      nodeRes.end(JSON.stringify({ error: err.message || 'Internal Server Error' }));
+    }
+    return;
+  }
+
   nodeRes.writeHead(404, { 'Content-Type': 'application/json' });
   nodeRes.end(
     JSON.stringify({
       error: 'Endpoint not found',
-      available: ['/health', '/functions/v1/summarize-medical-report'],
+      available: ['/health', '/functions/v1/summarize-medical-report', '/functions/v1/scan-prescription'],
     })
   );
 });
@@ -124,4 +165,5 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`[PulseBridge Backend] Server running at http://localhost:${PORT}/`);
   console.log(`[PulseBridge Backend] Health check: http://localhost:${PORT}/health`);
   console.log(`[PulseBridge Backend] AI Summarizer endpoint: http://localhost:${PORT}/functions/v1/summarize-medical-report`);
+  console.log(`[PulseBridge Backend] Prescription Scanner endpoint: http://localhost:${PORT}/functions/v1/scan-prescription`);
 });

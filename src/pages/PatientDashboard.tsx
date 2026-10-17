@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { Check, Clock, X, Bell, Pill, ChevronDown, ChevronUp, AlertTriangle, HelpCircle, ShieldAlert } from 'lucide-react';
 import { PulseBridgeLogo } from '@/components/PulseBridgeLogo';
 import { LanguageToggle } from '@/components/LanguageToggle';
@@ -6,12 +6,13 @@ import { DemoBadge } from '@/components/DemoBanner';
 import { StatusBadge } from '@/components/StatusBadge';
 import { useLanguage } from '@/i18n/LanguageContext';
 import { cn } from '@/utils/cn';
-import { evaluateDoseTiming, DOSE_REASON_OPTIONS, applyOverdueEvaluations } from '@/utils/reminderEngine';
-import type { MedicationSchedule, DoseStatus, HealthState, FollowUp } from '@/types';
+import { evaluateDoseTiming, DOSE_REASON_OPTIONS, applyOverdueEvaluations, generateReminders } from '@/utils/reminderEngine';
+import type { MedicationSchedule, DoseStatus, HealthState, FollowUp, PrescriptionDraft } from '@/types';
 
 interface PatientDashboardProps {
   schedules: MedicationSchedule[];
   followUps: FollowUp[];
+  prescriptionDraft?: PrescriptionDraft | null;
   onDoseAction: (scheduleId: string, action: DoseStatus, reason?: string) => void;
   onHealthUpdate: (state: HealthState, description: string) => void;
   onFollowUpAnswer: (followUpId: string, answer: string) => void;
@@ -21,6 +22,7 @@ interface PatientDashboardProps {
 export function PatientDashboard({
   schedules: initialSchedules,
   followUps,
+  prescriptionDraft,
   onDoseAction,
   onHealthUpdate,
   onFollowUpAnswer,
@@ -74,6 +76,10 @@ export function PatientDashboard({
 
   const pendingFollowUps = followUps.filter((f) => f.status === 'pending');
 
+  const activeReminders = useMemo(() => {
+    return generateReminders(schedules, followUps);
+  }, [schedules, followUps]);
+
   return (
     <div className="min-h-screen bg-surface-light flex flex-col">
       {/* Header */}
@@ -116,6 +122,72 @@ export function PatientDashboard({
             <div className="flex items-center gap-3 rounded-2xl bg-danger-500 text-white px-5 py-3.5 shadow-xl">
               <AlertTriangle className="w-5 h-5 flex-shrink-0" />
               <span className="font-medium text-sm">{error}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Prescription Verification Status Banner */}
+        {prescriptionDraft && !prescriptionDraft.confirmed && (
+          <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 flex items-start gap-3">
+            <Clock className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div className="flex flex-col gap-1">
+              <span className="text-sm font-bold text-amber-900">
+                Prescription Uploaded — Awaiting Doctor Review & Lock
+              </span>
+              <p className="text-xs text-amber-800 leading-relaxed">
+                Your prescription details have been extracted. For patient safety, medication dosing plans and active reminders will start once verified and locked by your doctor.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Active Smart Reminders (In-App Simulation) */}
+        {activeReminders.length > 0 && (
+          <div className="rounded-2xl border border-teal-200 bg-teal-50/60 p-4 flex flex-col gap-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Bell className="w-4 h-4 text-teal-600" />
+                <span className="text-xs font-bold uppercase tracking-wider text-teal-900">
+                  Active Smart Reminders
+                </span>
+              </div>
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-teal-100 text-teal-700">
+                In-App Simulated Channel
+              </span>
+            </div>
+            <div className="flex flex-col gap-2">
+              {activeReminders.map((rem) => (
+                <div
+                  key={rem.id}
+                  className={cn(
+                    'rounded-xl border p-2.5 flex items-start justify-between gap-3 text-xs',
+                    rem.escalated
+                      ? 'border-danger-300 bg-danger-50 text-danger-900'
+                      : rem.type === 'missed_dose'
+                      ? 'border-amber-300 bg-amber-50 text-amber-900'
+                      : 'border-teal-200 bg-white text-navy-800',
+                  )}
+                >
+                  <div className="flex items-start gap-2">
+                    {rem.escalated ? (
+                      <AlertTriangle className="w-4 h-4 text-danger-600 flex-shrink-0 mt-0.5 animate-pulse" />
+                    ) : (
+                      <Clock className="w-4 h-4 text-teal-600 flex-shrink-0 mt-0.5" />
+                    )}
+                    <div className="flex flex-col">
+                      <span className="font-semibold">{rem.message}</span>
+                      {rem.escalated && (
+                        <span className="text-[10px] font-bold text-danger-700 uppercase tracking-wide">
+                          ⚠️ 20-min escalation triggered — unacknowledged dose
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-mono text-navy-500 whitespace-nowrap">
+                    {rem.scheduledFor}
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
         )}

@@ -40,6 +40,7 @@ const DEMO_PATIENT_ID = 'p1';
 function AppContent() {
   const [view, setView] = useState<View>('landing');
   const [prescriptionPreview, setPrescriptionPreview] = useState<string | null>(null);
+  const [prescriptionFile, setPrescriptionFile] = useState<File | null>(null);
   const [schedules, setSchedules] = useState<MedicationSchedule[]>(demoSchedules[DEMO_PATIENT_ID] ?? []);
   const [careGaps, setCareGaps] = useState<Record<string, CareGap[]>>(demoCareGaps);
   const [prescriptionDrafts, setPrescriptionDrafts] = useState<Record<string, PrescriptionDraft>>(demoPrescriptionDrafts);
@@ -96,6 +97,7 @@ function AppContent() {
 
   const handleIntakeComplete = useCallback(async (profile: Partial<PatientProfile>, file: File | null) => {
     setPatientProfile(profile);
+    setPrescriptionFile(file);
     if (file) {
       const uploadRes = await dataService.uploadPrescriptionImage(DEMO_PATIENT_ID, file);
       if ('url' in uploadRes) {
@@ -106,7 +108,13 @@ function AppContent() {
     setView('patient_processing');
   }, []);
 
-  const handleProcessingComplete = useCallback(async () => {
+  const handleProcessingComplete = useCallback(async (draft?: PrescriptionDraft) => {
+    if (draft) {
+      setPrescriptionDrafts((prev) => ({
+        ...prev,
+        [DEMO_PATIENT_ID]: draft,
+      }));
+    }
     const sched = await dataService.fetchMedicationSchedules(DEMO_PATIENT_ID);
     setSchedules(sched.length > 0 ? sched : demoSchedules[DEMO_PATIENT_ID] ?? []);
     setView('patient_dashboard');
@@ -234,6 +242,8 @@ function AppContent() {
       {view === 'patient_processing' && (
         <PrescriptionProcessing
           imageUrl={prescriptionPreview}
+          file={prescriptionFile}
+          patientId={DEMO_PATIENT_ID}
           onComplete={handleProcessingComplete}
           onBack={() => setView('patient_intake')}
         />
@@ -242,6 +252,7 @@ function AppContent() {
         <PatientDashboard
           schedules={schedules}
           followUps={followUps[DEMO_PATIENT_ID] ?? []}
+          prescriptionDraft={prescriptionDrafts[DEMO_PATIENT_ID] ?? null}
           onDoseAction={handleDoseAction}
           onHealthUpdate={handleHealthUpdate}
           onFollowUpAnswer={handleFollowUpAnswer}
