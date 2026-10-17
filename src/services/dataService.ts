@@ -193,7 +193,7 @@ async function invokeAIReportSummary(report: MedicalReport): Promise<ReportSumma
   let authToken = 'test-valid-jwt-token';
   if (supabase) {
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
+      const { data: sessionData } = await (supabase.auth as any).getSession();
       if (sessionData?.session?.access_token) {
         authToken = sessionData.session.access_token;
       }
@@ -354,7 +354,7 @@ async function invokeScanPrescriptionEndpoint(
   let authToken = 'test-valid-jwt-token';
   if (supabase) {
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
+      const { data: sessionData } = await (supabase.auth as any).getSession();
       if (sessionData?.session?.access_token) {
         authToken = sessionData.session.access_token;
       }
