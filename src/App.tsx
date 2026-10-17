@@ -263,8 +263,19 @@ function AppContent() {
             confirmedAt: new Date().toISOString(),
             confirmedBy: 'Dr. Anita Desai, MD',
             fields: fields.map((f) => ({ ...f, status: 'confirmed' })),
+            status: 'doctor_approved',
           }
-        : prev[patientId],
+        : {
+            id: `rx-${patientId}`,
+            patientId,
+            imageUrl: '',
+            uploadedAt: new Date().toISOString(),
+            confirmed: true,
+            confirmedAt: new Date().toISOString(),
+            confirmedBy: 'Dr. Anita Desai, MD',
+            fields: fields.map((f) => ({ ...f, status: 'confirmed' })),
+            status: 'doctor_approved',
+          },
     }));
 
     // 2. Refresh medication schedules from data service

@@ -25,6 +25,7 @@
     "test:demo-blockers": "npx tsx --tsconfig tsconfig.app.json scripts/test_demo_blocker_fixes.ts",
     "test:persistent-doctor-lock": "npx tsx --tsconfig tsconfig.app.json scripts/verify_persistent_doctor_lock.ts",
     "test:prescription-safety": "npx tsx --tsconfig tsconfig.app.json scripts/test_prescription_safety_workflow.ts",
+    "test:patient-intake": "npx tsx --tsconfig tsconfig.app.json scripts/test_patient_intake_validation.ts",
     "backend": "npx tsx scripts/backend_server.ts"
   },
   "dependencies": {

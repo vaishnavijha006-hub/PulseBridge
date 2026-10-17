@@ -222,6 +222,7 @@ export interface PatientProfile {
   allergies: string;
   currentMeds: string;
   language: Language;
+  allergyStatus?: 'no_known_allergies' | 'unknown' | 'documented';
 }
 
 export interface PatientSummary {

@@ -16,7 +16,6 @@ import {
   CheckCircle2,
   Users,
   Bell,
-  LogOut,
   Calendar,
   Lock,
   Sparkles,
@@ -268,11 +267,11 @@ export function FamilyRecoveryCircle({ onBack, onNavigateRole }: FamilyRecoveryC
 
             <button
               onClick={onBack}
-              aria-label="Log out"
+              aria-label="Back to Portal"
               title="Return to main portal"
-              className="p-2 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-slate-100 transition-colors"
+              className="p-2 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors"
             >
-              <LogOut className="w-4 h-4" />
+              <ChevronLeft className="w-4 h-4" />
             </button>
           </div>
         </div>

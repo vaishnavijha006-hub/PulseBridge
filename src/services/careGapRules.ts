@@ -237,8 +237,17 @@ export function detectCareGaps(
   }
 
   // 6. Allergy Conflict (with drug class cross-reactivity)
-  if (patient.allergies && patient.allergies.toLowerCase() !== 'none') {
-    const allergyMeds = patient.allergies.toLowerCase();
+  const normPatientAllergy = (patient.allergies || '').trim().toLowerCase();
+  const hasKnownDocumentedAllergies =
+    Boolean(normPatientAllergy) &&
+    normPatientAllergy !== 'none' &&
+    normPatientAllergy !== 'no_known_allergies' &&
+    normPatientAllergy !== 'no known allergies' &&
+    normPatientAllergy !== 'unknown' &&
+    normPatientAllergy !== 'not_sure';
+
+  if (hasKnownDocumentedAllergies) {
+    const allergyMeds = normPatientAllergy;
     const currentMedNames = schedules
       .map((s) => (s?.medicineName || '').toLowerCase().trim())
       .filter(Boolean);

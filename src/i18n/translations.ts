@@ -96,6 +96,24 @@ export type TranslationKey =
   | 'intake_voice'
   | 'intake_optional'
   | 'intake_none'
+  | 'intake_allergy_yes'
+  | 'intake_allergy_yes_hint'
+  | 'intake_allergy_no'
+  | 'intake_allergy_no_hint'
+  | 'intake_allergy_unsure'
+  | 'intake_allergy_unsure_hint'
+  | 'intake_allergy_details_q'
+  | 'intake_allergy_details_placeholder'
+  | 'intake_allergy_quick_add'
+  | 'err_name_required'
+  | 'err_age_invalid'
+  | 'err_gender_required'
+  | 'err_phone_invalid'
+  | 'err_symptoms_required'
+  | 'err_allergy_selection_required'
+  | 'err_allergy_details_required'
+  | 'err_upload_required'
+  | 'err_fix_errors'
   | 'gender_male'
   | 'gender_female'
   | 'gender_other'
@@ -408,6 +426,24 @@ const dict: Dictionary = {
   intake_voice: { en: 'Speak', hi: 'बोलें' },
   intake_optional: { en: 'Optional', hi: 'वैकल्पिक' },
   intake_none: { en: 'None', hi: 'कोई नहीं' },
+  intake_allergy_yes: { en: 'Yes, I have known allergies', hi: 'हाँ, मुझे ज्ञात एलर्जी है' },
+  intake_allergy_yes_hint: { en: 'e.g., Penicillin, sulfa, foods, or specific medicines', hi: 'उदा., पेनिसिलिन, सल्फा, भोजन या विशेष दवाइयां' },
+  intake_allergy_no: { en: 'No known allergies', hi: 'कोई ज्ञात एलर्जी नहीं' },
+  intake_allergy_no_hint: { en: 'No known drug or food allergy reactions on record', hi: 'दवाई या भोजन से एलर्जी का कोई ज्ञात इतिहास नहीं है' },
+  intake_allergy_unsure: { en: 'I’m not sure', hi: 'मुझे पक्का पता नहीं' },
+  intake_allergy_unsure_hint: { en: 'Status will be flagged for doctor review & safety verification', hi: 'डॉक्टर की समीक्षा और सुरक्षा जांच के लिए अनिश्चित दर्ज रहेगा' },
+  intake_allergy_details_q: { en: 'Please specify your allergies:', hi: 'कृपया अपनी एलर्जी का विवरण दें:' },
+  intake_allergy_details_placeholder: { en: 'e.g., Penicillin, Peanuts, Sulfa...', hi: 'उदा., पेनिसिलिन, मूंगफली, सल्फा...' },
+  intake_allergy_quick_add: { en: 'Quick select:', hi: 'त्वरित चयन:' },
+  err_name_required: { en: 'Please enter your full name (at least 2 characters).', hi: 'कृपया अपना पूरा नाम दर्ज करें (कम से कम 2 अक्षर)।' },
+  err_age_invalid: { en: 'Please enter a valid age between 1 and 120.', hi: 'कृपया 1 से 120 के बीच एक मान्य उम्र दर्ज करें।' },
+  err_gender_required: { en: 'Please select your gender.', hi: 'कृपया लिंग का चयन करें।' },
+  err_phone_invalid: { en: 'Please enter a valid 10-digit phone number.', hi: 'कृपया 10 अंकों का मान्य फ़ोन नंबर दर्ज करें।' },
+  err_symptoms_required: { en: 'Please describe your symptoms or reason for visit.', hi: 'कृपया अपने लक्षणों या परामर्श के कारण का विवरण दें।' },
+  err_allergy_selection_required: { en: 'Please select an option about your allergy history to continue.', hi: 'आगे बढ़ने के लिए कृपया एलर्जी के बारे में एक विकल्प चुनें।' },
+  err_allergy_details_required: { en: 'Please specify which medicines or substances you are allergic to.', hi: 'कृपया बताएं कि आपको किन दवाइयों या पदार्थों से एलर्जी है।' },
+  err_upload_required: { en: 'Please upload a clear prescription photo to complete intake.', hi: 'इनटेक पूरा करने के लिए कृपया पर्ची की साफ फोटो अपलोड करें।' },
+  err_fix_errors: { en: 'Please correct the highlighted fields before continuing.', hi: 'कृपया आगे बढ़ने से पहले हाइलाइट किए गए फ़ील्ड को ठीक करें।' },
   gender_male: { en: 'Male', hi: 'पुरुष' },
   gender_female: { en: 'Female', hi: 'महिला' },
   gender_other: { en: 'Other', hi: 'अन्य' },

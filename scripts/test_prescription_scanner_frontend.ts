@@ -296,6 +296,7 @@ async function runTests() {
         name: 'Meera Patel',
         age: 38,
         gender: 'female',
+        phone: '9876543210',
         symptoms: 'Mild tachycardia and fatigue',
         allergies: 'Penicillin',
         currentMeds: 'None',

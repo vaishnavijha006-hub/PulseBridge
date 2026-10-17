@@ -113,12 +113,26 @@ export function evaluatePrescriptionSafety(
   let matchedAllergy: string | undefined;
   let allergyEvidence = 'No documented allergy conflicts detected with prescribed medication.';
 
-  if (patient === undefined || patient === null || patient.allergies === undefined || patient.allergies === null) {
+  const rawAllergyStr = (patient?.allergies || '').trim().toLowerCase();
+  if (
+    patient === undefined ||
+    patient === null ||
+    patient.allergies === undefined ||
+    patient.allergies === null ||
+    !rawAllergyStr ||
+    rawAllergyStr === 'unknown' ||
+    rawAllergyStr === 'not_sure'
+  ) {
     allergyStatus = 'unknown';
-    allergyEvidence = 'Patient allergy history is unavailable in clinical records. Status unknown.';
-  } else if (!patient.allergies.trim() || patient.allergies.trim().toLowerCase() === 'none') {
+    allergyEvidence = 'Patient allergy history is unverified or unknown ("unknown"). Clinical verification required before schedule activation.';
+  } else if (
+    rawAllergyStr === 'no_known_allergies' ||
+    rawAllergyStr === 'none' ||
+    rawAllergyStr === 'no known allergies' ||
+    rawAllergyStr === 'no allergies'
+  ) {
     allergyStatus = 'passed';
-    allergyEvidence = 'Patient has no documented drug allergies on file ("None").';
+    allergyEvidence = 'Patient has no documented drug allergies on file ("No known allergies").';
   } else if (normMed) {
     const rawAllergies = patient.allergies.toLowerCase().split(/[,;]/).map((s) => s.trim());
     let isConflict = false;

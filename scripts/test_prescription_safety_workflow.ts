@@ -393,6 +393,10 @@ async function runTests() {
     const testPatientId = `p-sched-test-${Date.now()}`;
     const newPatientRes = await demoService.savePatientIntake({
       name: 'Schedule Test Patient',
+      age: 45,
+      gender: 'male',
+      phone: '9876543210',
+      symptoms: 'Hypertension routine evaluation',
       allergies: 'None',
       currentMeds: 'None',
     });
