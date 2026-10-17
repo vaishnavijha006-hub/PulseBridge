@@ -6,9 +6,11 @@ import { PatientStatusCard } from '@/components/PatientStatusCard';
 import { PrescriptionReview } from '@/components/PrescriptionReview';
 import { CareGapCard } from '@/components/CareGapCard';
 import { StatusBadge } from '@/components/StatusBadge';
+import { DemoBanner, DemoBadge } from '@/components/DemoBanner';
 import { useLanguage } from '@/i18n/LanguageContext';
 import { cn } from '@/utils/cn';
 import type { PatientSummary, CareGap, PrescriptionDraft, FollowUp } from '@/types';
+
 
 interface DoctorDashboardProps {
   summaries: PatientSummary[];
@@ -83,9 +85,16 @@ export function DoctorDashboard({
                 <ChevronLeft className="w-5 h-5" />
               </button>
               <PulseBridgeLogo variant="dark" size="md" />
+              <div className="hidden lg:block">
+                <DemoBanner variant="dark" />
+              </div>
             </div>
             <div className="flex items-center gap-3">
+              <div className="lg:hidden">
+                <DemoBadge variant="dark" />
+              </div>
               <div className="hidden sm:flex items-center gap-2 rounded-lg bg-navy-700 border border-navy-600 px-3 py-1.5">
+
                 <span className="text-xs font-medium text-navy-200">{new Date().toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
               </div>
               <div className="flex items-center gap-2">

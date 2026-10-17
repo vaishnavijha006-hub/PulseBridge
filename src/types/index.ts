@@ -45,6 +45,21 @@ export interface Medicine {
   confirmed: boolean;
 }
 
+export interface CarePlan {
+  id: string;
+  patientId: string;
+  prescriptionId?: string;
+  doctorId?: string;
+  status: 'draft' | 'active' | 'completed' | 'discontinued';
+  diagnosis?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type PatientIntakeData = Omit<PatientProfile, 'id'>;
+
+
 export interface MedicationSchedule {
   id: string;
   medicineId: string;

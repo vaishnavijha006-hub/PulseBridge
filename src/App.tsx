@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { LanguageProvider } from '@/i18n/LanguageContext';
 import { LandingPage } from '@/pages/LandingPage';
 import { PatientIntakeWizard } from '@/pages/PatientIntakeWizard';
@@ -18,7 +18,17 @@ import {
   demoPatients,
   demoHealthUpdates,
 } from '@/data/demoData';
-import type { PatientProfile, MedicationSchedule, DoseStatus, HealthState, CareGap, PrescriptionDraft, FollowUp, PrescriptionField } from '@/types';
+import type {
+  PatientProfile,
+  MedicationSchedule,
+  DoseStatus,
+  HealthState,
+  CareGap,
+  PrescriptionDraft,
+  FollowUp,
+  PrescriptionField,
+  PatientSummary,
+} from '@/types';
 
 type View = 'landing' | 'patient_intake' | 'patient_processing' | 'patient_dashboard' | 'doctor' | 'family';
 
@@ -33,34 +43,75 @@ function AppContent() {
   const [followUps, setFollowUps] = useState<Record<string, FollowUp[]>>(demoFollowUps);
   const [patientProfile, setPatientProfile] = useState<Partial<PatientProfile> | null>(null);
 
+  const [summaries, setSummaries] = useState<PatientSummary[]>(getPatientSummaries());
+
+  useEffect(() => {
+    let mounted = true;
+    async function loadData() {
+      try {
+        const [sched, drafts, gaps, fUps, summs] = await Promise.all([
+          dataService.fetchMedicationSchedules(DEMO_PATIENT_ID),
+          dataService.fetchPrescriptionDraft(DEMO_PATIENT_ID),
+          dataService.fetchCareGaps(DEMO_PATIENT_ID),
+          dataService.fetchFollowUps(DEMO_PATIENT_ID),
+          dataService.fetchPatientSummaries(),
+        ]);
+        if (!mounted) return;
+        if (sched && sched.length > 0) setSchedules(sched);
+        if (drafts) setPrescriptionDrafts((prev) => ({ ...prev, [DEMO_PATIENT_ID]: drafts }));
+        if (gaps && gaps.length > 0) setCareGaps((prev) => ({ ...prev, [DEMO_PATIENT_ID]: gaps }));
+        if (fUps && fUps.length > 0) setFollowUps((prev) => ({ ...prev, [DEMO_PATIENT_ID]: fUps }));
+        if (summs && summs.length > 0) setSummaries(summs);
+      } catch (err) {
+        console.warn('Could not fetch remote data, keeping initialized state:', err);
+      }
+    }
+    void loadData();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   const handleRoleSelect = useCallback((role: 'patient' | 'doctor' | 'family') => {
     if (role === 'patient') setView('patient_intake');
     else if (role === 'doctor') setView('doctor');
     else setView('family');
   }, []);
 
-  const handleIntakeComplete = useCallback((profile: Partial<PatientProfile>, _file: File | null) => {
+  const handleIntakeComplete = useCallback(async (profile: Partial<PatientProfile>, file: File | null) => {
     setPatientProfile(profile);
+    if (file) {
+      const uploadRes = await dataService.uploadPrescriptionImage(DEMO_PATIENT_ID, file);
+      if ('url' in uploadRes) {
+        setPrescriptionPreview(uploadRes.url);
+      }
+    }
+    await dataService.savePatientIntake(profile);
     setView('patient_processing');
   }, []);
 
-  const handleProcessingComplete = useCallback(() => {
-    setSchedules(demoSchedules[DEMO_PATIENT_ID] ?? []);
+  const handleProcessingComplete = useCallback(async () => {
+    const sched = await dataService.fetchMedicationSchedules(DEMO_PATIENT_ID);
+    setSchedules(sched.length > 0 ? sched : demoSchedules[DEMO_PATIENT_ID] ?? []);
     setView('patient_dashboard');
   }, []);
 
-  const handleDoseAction = useCallback((scheduleId: string, action: DoseStatus) => {
+  const handleDoseAction = useCallback(async (scheduleId: string, action: DoseStatus) => {
     setSchedules((prev) =>
       prev.map((s) => (s.id === scheduleId ? { ...s, status: action } : s)),
     );
-    void dataService.recordAdherence(scheduleId, action);
+    const res = await dataService.recordAdherence(scheduleId, action);
+    if ('error' in res) {
+      console.error('Failed to record adherence:', res.error);
+    }
   }, []);
 
-  const handleHealthUpdate = useCallback((state: HealthState, description: string) => {
+  const handleHealthUpdate = useCallback(async (state: HealthState, description: string) => {
     const patient = demoPatients.find((p) => p.id === DEMO_PATIENT_ID);
     if (!patient) return;
 
-    const newUpdate = {
+    const updateRes = await dataService.submitHealthUpdate(DEMO_PATIENT_ID, state, description);
+    const newUpdate = 'data' in updateRes ? updateRes.data : {
       id: `h-new-${Date.now()}`,
       patientId: DEMO_PATIENT_ID,
       state,
@@ -74,6 +125,11 @@ function AppContent() {
     const allFollowUps = followUps[DEMO_PATIENT_ID] ?? [];
 
     const { gaps: newGaps } = detectCareGaps(patient, allUpdates, allSchedules, allFollowUps);
+
+    for (const gap of newGaps) {
+      await dataService.createCareGap({ ...gap, status: 'open' });
+    }
+
 
     setCareGaps((prev) => {
       const existing = prev[DEMO_PATIENT_ID] ?? [];
@@ -90,7 +146,7 @@ function AppContent() {
     });
   }, [schedules, followUps]);
 
-  const handleFollowUpAnswer = useCallback((followUpId: string, answer: string) => {
+  const handleFollowUpAnswer = useCallback(async (followUpId: string, answer: string) => {
     setFollowUps((prev) => {
       const updated = { ...prev };
       for (const pid of Object.keys(updated)) {
@@ -102,18 +158,22 @@ function AppContent() {
       }
       return updated;
     });
-    void dataService.updateFollowUp(followUpId, answer);
+    await dataService.updateFollowUp(followUpId, answer);
   }, []);
 
-  const handleConfirmCarePlan = useCallback((patientId: string, fields: PrescriptionField[]) => {
+  const handleConfirmCarePlan = useCallback(async (patientId: string, fields: PrescriptionField[]) => {
+    const res = await dataService.confirmCarePlan(patientId, fields);
+    if ('error' in res) {
+      console.error('Cannot confirm care plan:', res.error);
+      return;
+    }
     setPrescriptionDrafts((prev) => ({
       ...prev,
       [patientId]: prev[patientId] ? { ...prev[patientId], confirmed: true, fields } : prev[patientId],
     }));
-    void dataService.confirmCarePlan(patientId, fields);
   }, []);
 
-  const handleCareGapAction = useCallback((gapId: string, action: 'reviewed' | 'followup_planned') => {
+  const handleCareGapAction = useCallback(async (gapId: string, action: 'reviewed' | 'followup_planned') => {
     setCareGaps((prev) => {
       const updated = { ...prev };
       for (const pid of Object.keys(updated)) {
@@ -123,15 +183,15 @@ function AppContent() {
       }
       return updated;
     });
-    void dataService.updateCareGapStatus(gapId, action);
+    await dataService.updateCareGapStatus(gapId, action);
   }, []);
 
-  const handleFamilyToggleAccess = useCallback((authorized: boolean) => {
-    void dataService.updateCaregiverAccess(DEMO_PATIENT_ID, authorized);
+  const handleFamilyToggleAccess = useCallback(async (authorized: boolean) => {
+    await dataService.updateCaregiverAccess(DEMO_PATIENT_ID, authorized);
   }, []);
 
   void patientProfile;
-  const summaries = getPatientSummaries();
+
 
   return (
     <>

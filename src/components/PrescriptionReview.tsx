@@ -17,11 +17,20 @@ export function PrescriptionReview({ draft, onConfirm }: PrescriptionReviewProps
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const CRITICAL_KEYS = ['medicine', 'dosage', 'frequency', 'duration'];
+
   const uncertainFields = fields.filter(f => f.status === 'uncertain');
   const confirmedFields = fields.filter(f => f.status !== 'uncertain');
   const sortedFields = [...uncertainFields, ...confirmedFields];
 
-  const hasUnresolved = uncertainFields.some(f => !f.value.trim());
+  // Critical prescription fields must be non-empty AND doctor-confirmed
+  const emptyCriticalFields = fields.filter(
+    (f) => CRITICAL_KEYS.includes(f.key) && (!f.value || !f.value.trim())
+  );
+  const uncertainCriticalFields = fields.filter(
+    (f) => CRITICAL_KEYS.includes(f.key) && f.status === 'uncertain'
+  );
+  const hasUnresolved = emptyCriticalFields.length > 0 || uncertainCriticalFields.length > 0;
 
   const handleEdit = (key: string, value: string) => {
     setFields(prev => prev.map(f => f.key === key ? { ...f, value } : f));
@@ -34,8 +43,8 @@ export function PrescriptionReview({ draft, onConfirm }: PrescriptionReviewProps
 
   const handleConfirm = () => {
     if (hasUnresolved) {
-      setError('Please resolve all uncertain fields before confirming.');
-      setTimeout(() => setError(null), 3000);
+      setError('Critical fields (medicine, dosage, frequency, duration) must be verified and non-empty.');
+      setTimeout(() => setError(null), 4000);
       return;
     }
     const updated = fields.map(f => ({ ...f, status: 'confirmed' as const }));
@@ -43,6 +52,7 @@ export function PrescriptionReview({ draft, onConfirm }: PrescriptionReviewProps
     setConfirmed(true);
     onConfirm(updated);
   };
+
 
   return (
     <div className="rounded-2xl border border-navy-600 bg-navy-700/50 overflow-hidden">
@@ -124,12 +134,24 @@ export function PrescriptionReview({ draft, onConfirm }: PrescriptionReviewProps
                       {field.value || '(missing — needs review)'}
                     </span>
                     {!confirmed && (
-                      <button
-                        onClick={() => setEditingKey(field.key)}
-                        className="flex w-7 h-7 items-center justify-center rounded text-navy-300 hover:text-teal-400 hover:bg-navy-600 transition-colors"
-                      >
-                        <Edit3 className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        {isUncertain && field.value.trim() && (
+                          <button
+                            onClick={() => handleMarkResolved(field.key)}
+                            title="Verify and confirm field"
+                            className="flex w-7 h-7 items-center justify-center rounded text-teal-400 hover:text-white hover:bg-teal-500/20 transition-colors"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setEditingKey(field.key)}
+                          title="Edit field"
+                          className="flex w-7 h-7 items-center justify-center rounded text-navy-300 hover:text-teal-400 hover:bg-navy-600 transition-colors"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     )}
                   </div>
                 )}
@@ -170,11 +192,14 @@ export function PrescriptionReview({ draft, onConfirm }: PrescriptionReviewProps
               </button>
               {hasUnresolved && (
                 <p className="text-xs text-amber-400/80 text-center">
-                  {uncertainFields.filter(f => !f.value.trim()).length} field(s) need values before confirmation.
+                  {emptyCriticalFields.length > 0
+                    ? `${emptyCriticalFields.length} critical field(s) missing: ${emptyCriticalFields.map((f) => f.key).join(', ')}`
+                    : `${uncertainCriticalFields.length} critical field(s) must be verified before confirmation.`}
                 </p>
               )}
             </div>
           )}
+
 
           {confirmed && (
             <div className="mt-2 flex items-center gap-2 rounded-xl bg-success-500/10 border border-success-500/30 px-4 py-3">

@@ -2,7 +2,9 @@ import { useState, useCallback } from 'react';
 import { Check, Clock, X, Bell, Pill, ChevronDown, ChevronUp, AlertTriangle, HelpCircle } from 'lucide-react';
 import { PulseBridgeLogo } from '@/components/PulseBridgeLogo';
 import { LanguageToggle } from '@/components/LanguageToggle';
+import { DemoBadge } from '@/components/DemoBanner';
 import { StatusBadge } from '@/components/StatusBadge';
+
 import { useLanguage } from '@/i18n/LanguageContext';
 import { cn } from '@/utils/cn';
 import type { MedicationSchedule, DoseStatus, HealthState, FollowUp } from '@/types';
@@ -54,9 +56,13 @@ export function PatientDashboard({
             <ChevronUp className="w-4 h-4 rotate-90" />
           </button>
           <PulseBridgeLogo variant="light" size="sm" showTagline={false} />
-          <LanguageToggle variant="light" />
+          <div className="flex items-center gap-2">
+            <DemoBadge variant="light" />
+            <LanguageToggle variant="light" />
+          </div>
         </div>
       </header>
+
 
       <main className="flex-1 mx-auto max-w-2xl w-full px-4 sm:px-6 py-6 flex flex-col gap-6">
         {/* Greeting */}

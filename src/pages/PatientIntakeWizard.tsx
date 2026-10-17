@@ -3,7 +3,9 @@ import { ArrowLeft, ArrowRight, Mic, MicOff, User } from 'lucide-react';
 import { PulseBridgeLogo } from '@/components/PulseBridgeLogo';
 import { PulseProgress } from '@/components/PulseProgress';
 import { LanguageToggle } from '@/components/LanguageToggle';
+import { DemoBadge } from '@/components/DemoBanner';
 import { PrescriptionUpload } from '@/components/PrescriptionUpload';
+
 import { useLanguage } from '@/i18n/LanguageContext';
 import type { Language, PatientProfile } from '@/types';
 import { cn } from '@/utils/cn';
@@ -54,9 +56,13 @@ export function PatientIntakeWizard({ onComplete, onBack }: PatientIntakeWizardP
             <span className="hidden sm:inline">{t('back')}</span>
           </button>
           <PulseBridgeLogo variant="light" size="sm" showTagline={false} />
-          <LanguageToggle variant="light" />
+          <div className="flex items-center gap-2">
+            <DemoBadge variant="light" />
+            <LanguageToggle variant="light" />
+          </div>
         </div>
       </header>
+
 
       {/* Progress */}
       <div className="mx-auto max-w-2xl w-full px-4 sm:px-6 pt-6">

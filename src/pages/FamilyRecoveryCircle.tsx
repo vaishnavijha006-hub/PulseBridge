@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Phone, PhoneOff, ShieldCheck, ShieldX, Heart, Clock, Activity, ChevronLeft, AlertTriangle, Info } from 'lucide-react';
 import { PulseBridgeLogo } from '@/components/PulseBridgeLogo';
 import { LanguageToggle } from '@/components/LanguageToggle';
+import { DemoBadge } from '@/components/DemoBanner';
 import { StatusBadge } from '@/components/StatusBadge';
 import { useLanguage } from '@/i18n/LanguageContext';
 import { cn } from '@/utils/cn';
@@ -35,9 +36,13 @@ export function FamilyRecoveryCircle({ view, onBack, onToggleAccess }: FamilyRec
             <ChevronLeft className="w-5 h-5" />
           </button>
           <PulseBridgeLogo variant="light" size="sm" showTagline={false} />
-          <LanguageToggle variant="light" />
+          <div className="flex items-center gap-2">
+            <DemoBadge variant="light" />
+            <LanguageToggle variant="light" />
+          </div>
         </div>
       </header>
+
 
       <main className="flex-1 mx-auto max-w-md w-full px-4 py-6 flex flex-col gap-5">
         {/* Headline */}
