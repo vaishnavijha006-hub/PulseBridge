@@ -282,10 +282,11 @@ export function FamilyRecoveryCircle({ onBack, onNavigateRole }: FamilyRecoveryC
       <div className="bg-slate-100/90 border-b border-slate-200/80 px-4 sm:px-6 lg:px-8 py-2">
         <div className="mx-auto max-w-7xl flex flex-wrap items-center justify-between gap-3 text-xs">
           <div className="flex items-center gap-2">
-            <Users className="w-3.5 h-3.5 text-teal-600" />
+            <Users className="w-3.5 h-3.5 text-teal-600" aria-hidden="true" />
             <span className="font-semibold text-slate-700">{t('family_view_as_label')}:</span>
             <select
               value={selectedMemberId}
+              aria-label={t('family_view_as_label')}
               onChange={(e) => {
                 setSelectedMemberId(e.target.value);
                 setDemoStateMode('standard');
@@ -294,50 +295,50 @@ export function FamilyRecoveryCircle({ onBack, onNavigateRole }: FamilyRecoveryC
             >
               {members.map((m) => (
                 <option key={m.id} value={m.id}>
-                  {m.caregiverName} ({m.relationship}) &bull; {m.authorized ? 'Active Consent' : 'Revoked / Inactive'}
+                  {m.caregiverName} ({m.relationship}) &bull; {m.authorized ? t('family_consent_active') : t('family_status_revoked')}
                 </option>
               ))}
             </select>
           </div>
 
           {/* Test Harness Mode Switcher */}
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-[11px] text-slate-500 font-medium">State Simulator:</span>
+          <div className="flex items-center gap-1.5 flex-wrap" role="toolbar" aria-label={t('family_state_simulator_label')}>
+            <span className="text-[11px] text-slate-500 font-medium">{t('family_state_simulator_label')}:</span>
             <button
               onClick={() => setDemoStateMode('standard')}
               className={cn(
-                'px-2 py-0.5 rounded text-[11px] font-semibold transition-colors',
+                'px-2 py-0.5 rounded text-[11px] font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-teal-500',
                 demoStateMode === 'standard' ? 'bg-teal-700 text-white' : 'bg-white text-slate-600 hover:bg-slate-200'
               )}
             >
-              Normal View
+              {t('family_state_normal')}
             </button>
             <button
               onClick={() => setDemoStateMode('pending')}
               className={cn(
-                'px-2 py-0.5 rounded text-[11px] font-semibold transition-colors',
+                'px-2 py-0.5 rounded text-[11px] font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500',
                 demoStateMode === 'pending' ? 'bg-amber-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-200'
               )}
             >
-              Pending Invite
+              {t('family_state_pending')}
             </button>
             <button
               onClick={() => setDemoStateMode('expired')}
               className={cn(
-                'px-2 py-0.5 rounded text-[11px] font-semibold transition-colors',
+                'px-2 py-0.5 rounded text-[11px] font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-slate-500',
                 demoStateMode === 'expired' ? 'bg-slate-700 text-white' : 'bg-white text-slate-600 hover:bg-slate-200'
               )}
             >
-              Expired Invite
+              {t('family_state_expired')}
             </button>
             <button
               onClick={() => setDemoStateMode('error')}
               className={cn(
-                'px-2 py-0.5 rounded text-[11px] font-semibold transition-colors',
+                'px-2 py-0.5 rounded text-[11px] font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-rose-500',
                 demoStateMode === 'error' ? 'bg-rose-700 text-white' : 'bg-white text-slate-600 hover:bg-slate-200'
               )}
             >
-              Network Error
+              {t('family_state_error')}
             </button>
           </div>
         </div>
@@ -349,7 +350,7 @@ export function FamilyRecoveryCircle({ onBack, onNavigateRole }: FamilyRecoveryC
         <div className="rounded-2xl border border-sky-100 bg-gradient-to-r from-slate-900 via-navy-900 to-sky-950 text-white p-6 md:p-8 shadow-sm relative overflow-hidden">
           <div className="relative z-10 max-w-3xl flex flex-col gap-2">
             <div className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-teal-300 bg-teal-950/80 border border-teal-700/60 px-3 py-1 rounded-full w-fit">
-              <ShieldCheck className="w-3.5 h-3.5 text-teal-400" />
+              <ShieldCheck className="w-3.5 h-3.5 text-teal-400" aria-hidden="true" />
               <span>{t('family_active_verified')}</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white mt-1">
@@ -361,7 +362,7 @@ export function FamilyRecoveryCircle({ onBack, onNavigateRole }: FamilyRecoveryC
 
             {/* Non-alarming, honest monitoring disclaimer */}
             <div className="mt-3 flex items-start gap-2.5 bg-white/10 backdrop-blur-sm border border-white/15 rounded-xl p-3 text-xs text-slate-200 max-w-2xl">
-              <Info className="w-4 h-4 text-teal-300 flex-shrink-0 mt-0.5" />
+              <Info className="w-4 h-4 text-teal-300 flex-shrink-0 mt-0.5" aria-hidden="true" />
               <p className="leading-relaxed">
                 {t('family_non_monitoring_note')}
               </p>
@@ -371,40 +372,44 @@ export function FamilyRecoveryCircle({ onBack, onNavigateRole }: FamilyRecoveryC
 
         {/* SIMULATED NON-STANDARD STATES */}
         {demoStateMode === 'error' && (
-          <div className="rounded-2xl border border-rose-200 bg-rose-50/90 p-8 text-center flex flex-col items-center gap-3 shadow-xs">
-            <AlertCircle className="w-12 h-12 text-rose-600" />
-            <h2 className="text-lg font-bold text-rose-950">Connection Error</h2>
+          <div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50/90 p-8 text-center flex flex-col items-center gap-3 shadow-xs">
+            <AlertCircle className="w-12 h-12 text-rose-600" aria-hidden="true" />
+            <h2 className="text-lg font-bold text-rose-950">{t('family_error_connection_title')}</h2>
             <p className="text-sm text-rose-800 max-w-md">
-              Unable to securely synchronize authorized recovery updates from the clinical server.
+              {t('family_error_connection_desc')}
             </p>
             <button
               onClick={() => setDemoStateMode('standard')}
-              className="mt-2 px-4 py-2 bg-rose-600 text-white font-semibold text-xs rounded-xl hover:bg-rose-700 transition-colors shadow-sm"
+              className="mt-2 px-4 py-2 bg-rose-600 text-white font-semibold text-xs rounded-xl hover:bg-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2 transition-colors shadow-sm"
             >
-              Retry Connection
+              {t('family_error_retry_btn')}
             </button>
           </div>
         )}
 
         {demoStateMode === 'pending' && (
-          <div className="rounded-2xl border border-amber-200 bg-amber-50/90 p-8 text-center flex flex-col items-center gap-3 shadow-xs">
-            <Hourglass className="w-12 h-12 text-amber-600 animate-pulse" />
+          <div role="status" className="rounded-2xl border border-amber-200 bg-amber-50/90 p-8 text-center flex flex-col items-center gap-3 shadow-xs">
+            <Hourglass className="w-12 h-12 text-amber-600 animate-pulse motion-reduce:animate-none" aria-hidden="true" />
             <h2 className="text-lg font-bold text-amber-950">{t('family_status_pending')}</h2>
             <p className="text-sm text-amber-800 max-w-md">
-              Your invitation to join {liveView.patientName}’s recovery circle is pending patient confirmation.
+              {lang === 'hi'
+                ? `${liveView.patientName} के रिकवरी सर्कल में शामिल होने का आपका निमंत्रण मरीज की पुष्टि की प्रतीक्षा कर रहा है।`
+                : `Your invitation to join ${liveView.patientName}’s recovery circle is pending patient confirmation.`}
             </p>
             <div className="bg-white/80 border border-amber-200 rounded-xl px-4 py-2 font-mono text-xs text-amber-900 mt-1">
-              Invite Code: {liveView.caregiverMemberId ? 'PB-REC-9942' : 'PB-REC-PENDING'}
+              {t('family_invite_code_label')}: {liveView.caregiverMemberId ? 'PB-REC-9942' : 'PB-REC-PENDING'}
             </div>
           </div>
         )}
 
         {demoStateMode === 'expired' && (
-          <div className="rounded-2xl border border-slate-300 bg-slate-100 p-8 text-center flex flex-col items-center gap-3 shadow-xs">
-            <Clock className="w-12 h-12 text-slate-400" />
+          <div role="status" className="rounded-2xl border border-slate-300 bg-slate-100 p-8 text-center flex flex-col items-center gap-3 shadow-xs">
+            <Clock className="w-12 h-12 text-slate-400" aria-hidden="true" />
             <h2 className="text-lg font-bold text-slate-900">{t('family_status_expired')}</h2>
             <p className="text-sm text-slate-600 max-w-md">
-              This family circle invitation link has expired for security reasons. Please ask {liveView.patientName} to send a new invite code from their dashboard.
+              {lang === 'hi'
+                ? `सुरक्षा कारणों से यह निमंत्रण समाप्त हो गया है। कृपया ${liveView.patientName} से नया कोड भेजने का अनुरोध करें।`
+                : `This family circle invitation link has expired for security reasons. Please ask ${liveView.patientName} to send a new invite code from their dashboard.`}
             </p>
           </div>
         )}

@@ -206,6 +206,12 @@ describe('PatientDashboard — Family Consent Management', () => {
     const revokeBtn = screen.getAllByText('Revoke Access')[0];
     fireEvent.click(revokeBtn);
 
+    // If accessible confirmation modal opened, confirm revocation
+    const confirmModalBtn = screen.queryByRole('button', { name: /Confirm Immediate Revocation/i });
+    if (confirmModalBtn) {
+      fireEvent.click(confirmModalBtn);
+    }
+
     // Verify revoked badge
     expect(screen.getAllByText('Access Revoked')[0]).toBeInTheDocument();
 
@@ -282,5 +288,108 @@ describe('PatientDashboard — Family Consent Management', () => {
     // Verify invitation sent and member listed
     expect(screen.getByText('Rohan Sharma')).toBeInTheDocument();
   });
+
+  it('switches language between English and Hindi without resetting dashboard state', () => {
+    render(
+      <LanguageProvider initialLang="en">
+        <FamilyRecoveryCircle onBack={vi.fn()} />
+      </LanguageProvider>
+    );
+
+    // Initial English content
+    expect(screen.getByText('Support their recovery, together.')).toBeInTheDocument();
+    expect(screen.getByText('Care Milestones')).toBeInTheDocument();
+
+    // Click the Language Toggle button in navigation
+    const toggleBtn = screen.getByRole('button', { name: /Toggle language/i });
+    fireEvent.click(toggleBtn);
+
+    // Hindi translated content rendered
+    expect(screen.getByText('साथ मिलकर बनाएं उनकी रिकवरी आसान।')).toBeInTheDocument();
+    expect(screen.getByText('केयर माइलस्टोन्स')).toBeInTheDocument();
+    expect(screen.getAllByText('सक्रिय एवं सत्यापित')[0]).toBeInTheDocument();
+
+    // Toggle back to English
+    fireEvent.click(toggleBtn);
+    expect(screen.getByText('Support their recovery, together.')).toBeInTheDocument();
+  });
+
+  it('renders non-color-only indicators (icons + text badges) for all permission categories', () => {
+    // Configure fcm_1 with mixed permissions so both Granted and Restricted badges appear
+    familyConsentService.updatePermissions({
+      memberId: 'fcm_1',
+      patientId: 'p1',
+      permissions: {
+        shareProfile: true,
+        shareMedicationStatus: true,
+        shareDailyVitals: false,
+        shareAppointments: true,
+        shareCareInstructions: true,
+        shareCareActions: false,
+        allowDirectCalling: true,
+      },
+    });
+
+    render(
+      <LanguageProvider initialLang="en">
+        <PatientDashboard
+          schedules={demoSchedules['p1']}
+          followUps={demoFollowUps['p1']}
+          reports={demoMedicalReports['p1']}
+          onDoseAction={vi.fn()}
+          onHealthUpdate={vi.fn()}
+          onFollowUpAnswer={vi.fn()}
+          onBack={vi.fn()}
+        />
+      </LanguageProvider>
+    );
+
+    const familyTab = screen.getByText('Family Circle');
+    fireEvent.click(familyTab);
+
+    // Check for explicit "Granted" and "Restricted" text badges alongside icons
+    expect(screen.getAllByText('Granted').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Restricted').length).toBeGreaterThan(0);
+  });
+
+  it('requires confirmation modal when modifying permission categories and respects cancellation', () => {
+    render(
+      <LanguageProvider initialLang="en">
+        <PatientDashboard
+          schedules={demoSchedules['p1']}
+          followUps={demoFollowUps['p1']}
+          reports={demoMedicalReports['p1']}
+          onDoseAction={vi.fn()}
+          onHealthUpdate={vi.fn()}
+          onFollowUpAnswer={vi.fn()}
+          onBack={vi.fn()}
+        />
+      </LanguageProvider>
+    );
+
+    const familyTab = screen.getByText('Family Circle');
+    fireEvent.click(familyTab);
+
+    // Find checkbox for Medication Progress
+    const medsCheckbox = screen.getByLabelText(/Daily Medication Progress - Granted/i);
+    expect(medsCheckbox).toBeChecked();
+
+    // Click to toggle off -> opens confirmation modal
+    fireEvent.click(medsCheckbox);
+
+    // Modal is displayed with title and explanation
+    expect(screen.getByText('Update Sharing Permission?')).toBeInTheDocument();
+    expect(screen.getByText(/Are you sure you want to/i)).toBeInTheDocument();
+
+    // Cancel the modal
+    const cancelBtn = screen.getByRole('button', { name: /Cancel/i });
+    fireEvent.click(cancelBtn);
+
+    // Modal is closed and permission was not changed
+    expect(screen.queryByText('Update Sharing Permission?')).not.toBeInTheDocument();
+    expect(medsCheckbox).toBeChecked();
+  });
 });
+
+
 

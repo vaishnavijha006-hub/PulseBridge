@@ -294,6 +294,29 @@ export type TranslationKey =
   | 'family_care_action_due_label'
   | 'family_care_action_role_label'
   | 'family_care_action_decoupled_disclaimer'
+  | 'family_granted'
+  | 'family_restricted'
+  | 'family_revoke_modal_title'
+  | 'family_revoke_modal_desc'
+  | 'family_revoke_modal_reauth_note'
+  | 'family_revoke_modal_confirm_btn'
+  | 'family_remove_modal_title'
+  | 'family_remove_modal_desc'
+  | 'family_cancel_invite_modal_title'
+  | 'family_cancel_invite_modal_desc'
+  | 'family_category_change_title'
+  | 'family_btn_cancel'
+  | 'family_btn_confirm'
+  | 'family_btn_remove'
+  | 'family_error_connection_title'
+  | 'family_error_connection_desc'
+  | 'family_error_retry_btn'
+  | 'family_invite_code_label'
+  | 'family_state_simulator_label'
+  | 'family_state_normal'
+  | 'family_state_pending'
+  | 'family_state_expired'
+  | 'family_state_error'
   | 'reminder_dose'
   | 'reminder_missed'
   | 'reminder_followup'
@@ -646,6 +669,44 @@ const dict: Dictionary = {
     en: 'Family acknowledgment confirms support awareness only. Clinical completion is governed strictly by the treating physician.',
     hi: 'परिवार की स्वीकृति केवल जागरूकता की पुष्टि करती है। क्लीनिकल पूर्णता का निर्णय केवल चिकित्सक द्वारा लिया जाता है।',
   },
+  family_granted: { en: 'Granted', hi: 'स्वीकृत' },
+  family_restricted: { en: 'Restricted', hi: 'प्रतिबंधित' },
+  family_revoke_modal_title: { en: 'Revoke Family Access Immediately?', hi: 'पारिवारिक पहुंच तुरंत रद्द करें?' },
+  family_revoke_modal_desc: {
+    en: 'This will immediately deny all future recovery updates, medication logs, and care plans for this family member.',
+    hi: 'यह इस परिवार के सदस्य के लिए भविष्य के सभी रिकवरी अपडेट, दवाई लॉग और केयर प्लान तुरंत रोक देगा।',
+  },
+  family_revoke_modal_reauth_note: {
+    en: 'You can restore access at any time from this dashboard.',
+    hi: 'आप इस डैशबोर्ड से किसी भी समय पहुंच बहाल कर सकते हैं।',
+  },
+  family_revoke_modal_confirm_btn: { en: 'Confirm Immediate Revocation', hi: 'तत्काल निरस्तीकरण की पुष्टि करें' },
+  family_remove_modal_title: { en: 'Remove from Recovery Circle?', hi: 'रिकवरी सर्कल से हटाएं?' },
+  family_remove_modal_desc: {
+    en: 'This member will be permanently removed from your recovery circle. You would need to issue a new invitation to reconnect.',
+    hi: 'यह सदस्य आपके रिकवरी सर्कल से स्थायी रूप से हटा दिया जाएगा। पुनः जोड़ने के लिए आपको नया निमंत्रण भेजना होगा।',
+  },
+  family_cancel_invite_modal_title: { en: 'Cancel Pending Invitation?', hi: 'लंबित निमंत्रण रद्द करें?' },
+  family_cancel_invite_modal_desc: {
+    en: 'The invitation token will be immediately invalidated and cannot be accepted.',
+    hi: 'निमंत्रण टोकन तुरंत अमान्य हो जाएगा और इसे स्वीकार नहीं किया जा सकेगा।',
+  },
+  family_category_change_title: { en: 'Update Sharing Permission?', hi: 'साझाकरण अनुमति अपडेट करें?' },
+  family_btn_cancel: { en: 'Cancel', hi: 'रद्द करें' },
+  family_btn_confirm: { en: 'Confirm Change', hi: 'परिवर्तन की पुष्टि करें' },
+  family_btn_remove: { en: 'Remove Member', hi: 'सदस्य हटाएं' },
+  family_error_connection_title: { en: 'Connection Error', hi: 'कनेक्शन त्रुटि' },
+  family_error_connection_desc: {
+    en: 'Unable to securely synchronize authorized recovery updates from the clinical server.',
+    hi: 'क्लीनिकल सर्वर से अधिकृत रिकवरी अपडेट सुरक्षित रूप से सिंक करने में असमर्थ।',
+  },
+  family_error_retry_btn: { en: 'Retry Connection', hi: 'पुनः प्रयास करें' },
+  family_invite_code_label: { en: 'Invite Code', hi: 'निमंत्रण कोड' },
+  family_state_simulator_label: { en: 'State Simulator', hi: 'स्थिति सिमुलेटर' },
+  family_state_normal: { en: 'Normal View', hi: 'सामान्य दृश्य' },
+  family_state_pending: { en: 'Pending Invite', hi: 'लंबित निमंत्रण' },
+  family_state_expired: { en: 'Expired Invite', hi: 'समाप्त निमंत्रण' },
+  family_state_error: { en: 'Network Error', hi: 'नेटवर्क त्रुटि' },
   reminder_dose: { en: 'Dose reminder', hi: 'दवाई रिमाइंडर' },
   reminder_missed: { en: 'Missed-dose reminder', hi: 'छूटी खुराक रिमाइंडर' },
   reminder_followup: { en: 'Follow-up reminder', hi: 'फॉलो-अप रिमाइंडर' },

@@ -79,6 +79,11 @@ export function FamilyConsentManager({ patientId }: FamilyConsentManagerProps) {
     currentValue: boolean;
   } | null>(null);
 
+  // Dedicated Accessible Confirmation Modals
+  const [revokeTarget, setRevokeTarget] = useState<{ id: string; name: string; relationship: string } | null>(null);
+  const [removeTarget, setRemoveTarget] = useState<{ id: string; name: string } | null>(null);
+  const [cancelInviteTarget, setCancelInviteTarget] = useState<{ id: string; email: string } | null>(null);
+
   const loadData = () => {
     setMembers(familyConsentService.listMembers(patientId));
     setInvitations(familyConsentService.listInvitations(patientId));
@@ -98,11 +103,15 @@ export function FamilyConsentManager({ patientId }: FamilyConsentManagerProps) {
   };
 
   // Immediate Revocation
-  const handleRevoke = (memberId: string, memberName: string) => {
-    if (window.confirm(`${t('family_revoke_confirm')} (${memberName})\n\n${t('family_past_data_disclosure')}`)) {
-      familyConsentService.revokeConsent(memberId, patientId);
-      showToast(lang === 'hi' ? `${memberName} की पहुंच तुरंत वापस ली गई` : `Access immediately revoked for ${memberName}`);
-    }
+  const handleRevokeClick = (memberId: string, memberName: string, relationship: string) => {
+    setRevokeTarget({ id: memberId, name: memberName, relationship });
+  };
+
+  const handleRevokeConfirm = () => {
+    if (!revokeTarget) return;
+    familyConsentService.revokeConsent(revokeTarget.id, patientId);
+    showToast(lang === 'hi' ? `${revokeTarget.name} की पहुंच तुरंत वापस ली गई` : `Access immediately revoked for ${revokeTarget.name}`);
+    setRevokeTarget(null);
   };
 
   // Restore Access
@@ -112,19 +121,27 @@ export function FamilyConsentManager({ patientId }: FamilyConsentManagerProps) {
   };
 
   // Remove Member
-  const handleRemove = (memberId: string, memberName: string) => {
-    if (window.confirm(lang === 'hi' ? `क्या आप ${memberName} को हटाना चाहते हैं?` : `Remove ${memberName} from circle?`)) {
-      familyConsentService.removeMember(memberId, patientId);
-      showToast(lang === 'hi' ? `${memberName} को हटाया गया` : `${memberName} removed from circle`);
-    }
+  const handleRemoveClick = (memberId: string, memberName: string) => {
+    setRemoveTarget({ id: memberId, name: memberName });
+  };
+
+  const handleRemoveConfirm = () => {
+    if (!removeTarget) return;
+    familyConsentService.removeMember(removeTarget.id, patientId);
+    showToast(lang === 'hi' ? `${removeTarget.name} को हटाया गया` : `${removeTarget.name} removed from circle`);
+    setRemoveTarget(null);
   };
 
   // Cancel Pending Invitation
-  const handleCancelInvite = (invitationId: string, email: string) => {
-    if (window.confirm(lang === 'hi' ? `${email} का निमंत्रण रद्द करें?` : `Cancel invitation for ${email}?`)) {
-      familyConsentService.cancelInvitation(invitationId, patientId);
-      showToast(lang === 'hi' ? 'निमंत्रण रद्द किया गया' : 'Invitation cancelled');
-    }
+  const handleCancelInviteClick = (invitationId: string, email: string) => {
+    setCancelInviteTarget({ id: invitationId, email });
+  };
+
+  const handleCancelInviteConfirm = () => {
+    if (!cancelInviteTarget) return;
+    familyConsentService.cancelInvitation(cancelInviteTarget.id, patientId);
+    showToast(lang === 'hi' ? 'निमंत्रण रद्द किया गया' : 'Invitation cancelled');
+    setCancelInviteTarget(null);
   };
 
   // Prompt Confirmation before changing category permissions
@@ -373,31 +390,32 @@ export function FamilyConsentManager({ patientId }: FamilyConsentManagerProps) {
                         </div>
                       </div>
 
-                      {/* Immediate Revocation / Restore Buttons */}
-                      <div className="flex items-center gap-2 self-end sm:self-center">
-                        {isRevoked ? (
+                        {/* Immediate Revocation / Restore Buttons */}
+                        <div className="flex items-center gap-2 self-end sm:self-center">
+                          {isRevoked ? (
+                            <button
+                              onClick={() => handleRestore(member.id, member.caregiverName)}
+                              className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-teal-50 border border-teal-200 text-teal-700 hover:bg-teal-100 focus:outline-none focus:ring-2 focus:ring-teal-500 transition-colors"
+                            >
+                              {t('family_restore_btn')}
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleRevokeClick(member.id, member.caregiverName, member.relationship)}
+                              className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 focus:outline-none focus:ring-2 focus:ring-rose-500 transition-colors"
+                            >
+                              {t('family_revoke_btn')}
+                            </button>
+                          )}
                           <button
-                            onClick={() => handleRestore(member.id, member.caregiverName)}
-                            className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-teal-50 border border-teal-200 text-teal-700 hover:bg-teal-100 transition-colors"
+                            onClick={() => handleRemoveClick(member.id, member.caregiverName)}
+                            className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-rose-500 transition-colors"
+                            title="Remove member"
+                            aria-label={`Remove ${member.caregiverName} from recovery circle`}
                           >
-                            {t('family_restore_btn')}
+                            <Trash2 className="w-4 h-4" />
                           </button>
-                        ) : (
-                          <button
-                            onClick={() => handleRevoke(member.id, member.caregiverName)}
-                            className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 transition-colors"
-                          >
-                            {t('family_revoke_btn')}
-                          </button>
-                        )}
-                        <button
-                          onClick={() => handleRemove(member.id, member.caregiverName)}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-slate-100 transition-colors"
-                          title="Remove member"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
+                        </div>
                     </div>
 
                     {/* Granular Permission Categories */}
@@ -411,30 +429,51 @@ export function FamilyConsentManager({ patientId }: FamilyConsentManagerProps) {
                         <div
                           className={cn(
                             'p-3 rounded-xl border transition-all flex flex-col justify-between gap-2',
-                            member.permissions.shareProfile
-                              ? 'bg-teal-50/40 border-teal-200/80 text-teal-900'
-                              : 'bg-slate-50 border-slate-200 text-slate-500 opacity-75'
+                            isRevoked
+                              ? 'bg-rose-50/20 border-rose-200/60 text-slate-500 opacity-60'
+                              : member.permissions.shareProfile
+                              ? 'bg-teal-50/40 border-teal-200/80 text-teal-950'
+                              : 'bg-slate-50 border-slate-200 text-slate-500 opacity-80'
                           )}
                         >
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold flex items-center gap-1.5">
-                              <Users className="w-3.5 h-3.5 text-teal-600" />
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-bold flex items-center gap-1.5 text-slate-800">
+                              <Users className="w-3.5 h-3.5 text-teal-600 flex-shrink-0" aria-hidden="true" />
                               {t('family_perm_profile')}
                             </span>
-                            <input
-                              type="checkbox"
-                              checked={member.permissions.shareProfile}
-                              disabled={isRevoked}
-                              onChange={() =>
-                                handleRequestCategoryChange(
-                                  member.id,
-                                  member.caregiverName,
-                                  'shareProfile',
-                                  member.permissions.shareProfile
-                                )
-                              }
-                              className="rounded text-teal-600 focus:ring-teal-500 cursor-pointer"
-                            />
+                            <div className="flex items-center gap-2">
+                              {isRevoked ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 border border-rose-200">
+                                  <ShieldX className="w-3 h-3 text-rose-700" aria-hidden="true" />
+                                  <span>{t('family_status_revoked')}</span>
+                                </span>
+                              ) : member.permissions.shareProfile ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-700" aria-hidden="true" />
+                                  <span>{t('family_granted')}</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 border border-slate-300">
+                                  <Lock className="w-3 h-3 text-slate-500" aria-hidden="true" />
+                                  <span>{t('family_restricted')}</span>
+                                </span>
+                              )}
+                              <input
+                                type="checkbox"
+                                aria-label={`${t('family_perm_profile')} - ${isRevoked ? t('family_status_revoked') : member.permissions.shareProfile ? t('family_granted') : t('family_restricted')}`}
+                                checked={member.permissions.shareProfile}
+                                disabled={isRevoked}
+                                onChange={() =>
+                                  handleRequestCategoryChange(
+                                    member.id,
+                                    member.caregiverName,
+                                    'shareProfile',
+                                    member.permissions.shareProfile
+                                  )
+                                }
+                                className="rounded text-teal-600 focus:ring-2 focus:ring-teal-500 cursor-pointer disabled:cursor-not-allowed"
+                              />
+                            </div>
                           </div>
                           <span className="text-[11px] text-slate-500 leading-snug">
                             {t('family_perm_profile_desc')}
@@ -445,30 +484,51 @@ export function FamilyConsentManager({ patientId }: FamilyConsentManagerProps) {
                         <div
                           className={cn(
                             'p-3 rounded-xl border transition-all flex flex-col justify-between gap-2',
-                            member.permissions.shareMedicationStatus
-                              ? 'bg-teal-50/40 border-teal-200/80 text-teal-900'
-                              : 'bg-slate-50 border-slate-200 text-slate-500 opacity-75'
+                            isRevoked
+                              ? 'bg-rose-50/20 border-rose-200/60 text-slate-500 opacity-60'
+                              : member.permissions.shareMedicationStatus
+                              ? 'bg-teal-50/40 border-teal-200/80 text-teal-950'
+                              : 'bg-slate-50 border-slate-200 text-slate-500 opacity-80'
                           )}
                         >
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold flex items-center gap-1.5">
-                              <Pill className="w-3.5 h-3.5 text-teal-600" />
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-bold flex items-center gap-1.5 text-slate-800">
+                              <Pill className="w-3.5 h-3.5 text-teal-600 flex-shrink-0" aria-hidden="true" />
                               {t('family_perm_meds')}
                             </span>
-                            <input
-                              type="checkbox"
-                              checked={member.permissions.shareMedicationStatus}
-                              disabled={isRevoked}
-                              onChange={() =>
-                                handleRequestCategoryChange(
-                                  member.id,
-                                  member.caregiverName,
-                                  'shareMedicationStatus',
-                                  member.permissions.shareMedicationStatus
-                                )
-                              }
-                              className="rounded text-teal-600 focus:ring-teal-500 cursor-pointer"
-                            />
+                            <div className="flex items-center gap-2">
+                              {isRevoked ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 border border-rose-200">
+                                  <ShieldX className="w-3 h-3 text-rose-700" aria-hidden="true" />
+                                  <span>{t('family_status_revoked')}</span>
+                                </span>
+                              ) : member.permissions.shareMedicationStatus ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-700" aria-hidden="true" />
+                                  <span>{t('family_granted')}</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 border border-slate-300">
+                                  <Lock className="w-3 h-3 text-slate-500" aria-hidden="true" />
+                                  <span>{t('family_restricted')}</span>
+                                </span>
+                              )}
+                              <input
+                                type="checkbox"
+                                aria-label={`${t('family_perm_meds')} - ${isRevoked ? t('family_status_revoked') : member.permissions.shareMedicationStatus ? t('family_granted') : t('family_restricted')}`}
+                                checked={member.permissions.shareMedicationStatus}
+                                disabled={isRevoked}
+                                onChange={() =>
+                                  handleRequestCategoryChange(
+                                    member.id,
+                                    member.caregiverName,
+                                    'shareMedicationStatus',
+                                    member.permissions.shareMedicationStatus
+                                  )
+                                }
+                                className="rounded text-teal-600 focus:ring-2 focus:ring-teal-500 cursor-pointer disabled:cursor-not-allowed"
+                              />
+                            </div>
                           </div>
                           <span className="text-[11px] text-slate-500 leading-snug">
                             {t('family_perm_meds_desc')}
@@ -479,30 +539,51 @@ export function FamilyConsentManager({ patientId }: FamilyConsentManagerProps) {
                         <div
                           className={cn(
                             'p-3 rounded-xl border transition-all flex flex-col justify-between gap-2',
-                            member.permissions.shareDailyVitals
-                              ? 'bg-teal-50/40 border-teal-200/80 text-teal-900'
-                              : 'bg-slate-50 border-slate-200 text-slate-500 opacity-75'
+                            isRevoked
+                              ? 'bg-rose-50/20 border-rose-200/60 text-slate-500 opacity-60'
+                              : member.permissions.shareDailyVitals
+                              ? 'bg-teal-50/40 border-teal-200/80 text-teal-950'
+                              : 'bg-slate-50 border-slate-200 text-slate-500 opacity-80'
                           )}
                         >
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold flex items-center gap-1.5">
-                              <Heart className="w-3.5 h-3.5 text-teal-600" />
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-bold flex items-center gap-1.5 text-slate-800">
+                              <Heart className="w-3.5 h-3.5 text-teal-600 flex-shrink-0" aria-hidden="true" />
                               {t('family_perm_vitals')}
                             </span>
-                            <input
-                              type="checkbox"
-                              checked={member.permissions.shareDailyVitals}
-                              disabled={isRevoked}
-                              onChange={() =>
-                                handleRequestCategoryChange(
-                                  member.id,
-                                  member.caregiverName,
-                                  'shareDailyVitals',
-                                  member.permissions.shareDailyVitals
-                                )
-                              }
-                              className="rounded text-teal-600 focus:ring-teal-500 cursor-pointer"
-                            />
+                            <div className="flex items-center gap-2">
+                              {isRevoked ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 border border-rose-200">
+                                  <ShieldX className="w-3 h-3 text-rose-700" aria-hidden="true" />
+                                  <span>{t('family_status_revoked')}</span>
+                                </span>
+                              ) : member.permissions.shareDailyVitals ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-700" aria-hidden="true" />
+                                  <span>{t('family_granted')}</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 border border-slate-300">
+                                  <Lock className="w-3 h-3 text-slate-500" aria-hidden="true" />
+                                  <span>{t('family_restricted')}</span>
+                                </span>
+                              )}
+                              <input
+                                type="checkbox"
+                                aria-label={`${t('family_perm_vitals')} - ${isRevoked ? t('family_status_revoked') : member.permissions.shareDailyVitals ? t('family_granted') : t('family_restricted')}`}
+                                checked={member.permissions.shareDailyVitals}
+                                disabled={isRevoked}
+                                onChange={() =>
+                                  handleRequestCategoryChange(
+                                    member.id,
+                                    member.caregiverName,
+                                    'shareDailyVitals',
+                                    member.permissions.shareDailyVitals
+                                  )
+                                }
+                                className="rounded text-teal-600 focus:ring-2 focus:ring-teal-500 cursor-pointer disabled:cursor-not-allowed"
+                              />
+                            </div>
                           </div>
                           <span className="text-[11px] text-slate-500 leading-snug">
                             {t('family_perm_vitals_desc')}
@@ -513,30 +594,51 @@ export function FamilyConsentManager({ patientId }: FamilyConsentManagerProps) {
                         <div
                           className={cn(
                             'p-3 rounded-xl border transition-all flex flex-col justify-between gap-2',
-                            member.permissions.shareAppointments
-                              ? 'bg-teal-50/40 border-teal-200/80 text-teal-900'
-                              : 'bg-slate-50 border-slate-200 text-slate-500 opacity-75'
+                            isRevoked
+                              ? 'bg-rose-50/20 border-rose-200/60 text-slate-500 opacity-60'
+                              : member.permissions.shareAppointments
+                              ? 'bg-teal-50/40 border-teal-200/80 text-teal-950'
+                              : 'bg-slate-50 border-slate-200 text-slate-500 opacity-80'
                           )}
                         >
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold flex items-center gap-1.5">
-                              <Calendar className="w-3.5 h-3.5 text-teal-600" />
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-bold flex items-center gap-1.5 text-slate-800">
+                              <Calendar className="w-3.5 h-3.5 text-teal-600 flex-shrink-0" aria-hidden="true" />
                               {t('family_perm_appointments')}
                             </span>
-                            <input
-                              type="checkbox"
-                              checked={member.permissions.shareAppointments}
-                              disabled={isRevoked}
-                              onChange={() =>
-                                handleRequestCategoryChange(
-                                  member.id,
-                                  member.caregiverName,
-                                  'shareAppointments',
-                                  member.permissions.shareAppointments
-                                )
-                              }
-                              className="rounded text-teal-600 focus:ring-teal-500 cursor-pointer"
-                            />
+                            <div className="flex items-center gap-2">
+                              {isRevoked ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 border border-rose-200">
+                                  <ShieldX className="w-3 h-3 text-rose-700" aria-hidden="true" />
+                                  <span>{t('family_status_revoked')}</span>
+                                </span>
+                              ) : member.permissions.shareAppointments ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-700" aria-hidden="true" />
+                                  <span>{t('family_granted')}</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 border border-slate-300">
+                                  <Lock className="w-3 h-3 text-slate-500" aria-hidden="true" />
+                                  <span>{t('family_restricted')}</span>
+                                </span>
+                              )}
+                              <input
+                                type="checkbox"
+                                aria-label={`${t('family_perm_appointments')} - ${isRevoked ? t('family_status_revoked') : member.permissions.shareAppointments ? t('family_granted') : t('family_restricted')}`}
+                                checked={member.permissions.shareAppointments}
+                                disabled={isRevoked}
+                                onChange={() =>
+                                  handleRequestCategoryChange(
+                                    member.id,
+                                    member.caregiverName,
+                                    'shareAppointments',
+                                    member.permissions.shareAppointments
+                                  )
+                                }
+                                className="rounded text-teal-600 focus:ring-2 focus:ring-teal-500 cursor-pointer disabled:cursor-not-allowed"
+                              />
+                            </div>
                           </div>
                           <span className="text-[11px] text-slate-500 leading-snug">
                             {t('family_perm_appointments_desc')}
@@ -547,33 +649,109 @@ export function FamilyConsentManager({ patientId }: FamilyConsentManagerProps) {
                         <div
                           className={cn(
                             'p-3 rounded-xl border transition-all flex flex-col justify-between gap-2',
-                            member.permissions.shareCareInstructions
-                              ? 'bg-teal-50/40 border-teal-200/80 text-teal-900'
-                              : 'bg-slate-50 border-slate-200 text-slate-500 opacity-75'
+                            isRevoked
+                              ? 'bg-rose-50/20 border-rose-200/60 text-slate-500 opacity-60'
+                              : member.permissions.shareCareInstructions
+                              ? 'bg-teal-50/40 border-teal-200/80 text-teal-950'
+                              : 'bg-slate-50 border-slate-200 text-slate-500 opacity-80'
                           )}
                         >
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold flex items-center gap-1.5">
-                              <FileCheck className="w-3.5 h-3.5 text-teal-600" />
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-bold flex items-center gap-1.5 text-slate-800">
+                              <FileCheck className="w-3.5 h-3.5 text-teal-600 flex-shrink-0" aria-hidden="true" />
                               {t('family_perm_instructions')}
                             </span>
-                            <input
-                              type="checkbox"
-                              checked={member.permissions.shareCareInstructions}
-                              disabled={isRevoked}
-                              onChange={() =>
-                                handleRequestCategoryChange(
-                                  member.id,
-                                  member.caregiverName,
-                                  'shareCareInstructions',
-                                  member.permissions.shareCareInstructions
-                                )
-                              }
-                              className="rounded text-teal-600 focus:ring-teal-500 cursor-pointer"
-                            />
+                            <div className="flex items-center gap-2">
+                              {isRevoked ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 border border-rose-200">
+                                  <ShieldX className="w-3 h-3 text-rose-700" aria-hidden="true" />
+                                  <span>{t('family_status_revoked')}</span>
+                                </span>
+                              ) : member.permissions.shareCareInstructions ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-700" aria-hidden="true" />
+                                  <span>{t('family_granted')}</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 border border-slate-300">
+                                  <Lock className="w-3 h-3 text-slate-500" aria-hidden="true" />
+                                  <span>{t('family_restricted')}</span>
+                                </span>
+                              )}
+                              <input
+                                type="checkbox"
+                                aria-label={`${t('family_perm_instructions')} - ${isRevoked ? t('family_status_revoked') : member.permissions.shareCareInstructions ? t('family_granted') : t('family_restricted')}`}
+                                checked={member.permissions.shareCareInstructions}
+                                disabled={isRevoked}
+                                onChange={() =>
+                                  handleRequestCategoryChange(
+                                    member.id,
+                                    member.caregiverName,
+                                    'shareCareInstructions',
+                                    member.permissions.shareCareInstructions
+                                  )
+                                }
+                                className="rounded text-teal-600 focus:ring-2 focus:ring-teal-500 cursor-pointer disabled:cursor-not-allowed"
+                              />
+                            </div>
                           </div>
                           <span className="text-[11px] text-slate-500 leading-snug">
                             {t('family_perm_instructions_desc')}
+                          </span>
+                        </div>
+
+                        {/* Care Milestones & Closed-Loop Care Actions */}
+                        <div
+                          className={cn(
+                            'p-3 rounded-xl border transition-all flex flex-col justify-between gap-2',
+                            isRevoked
+                              ? 'bg-rose-50/20 border-rose-200/60 text-slate-500 opacity-60'
+                              : member.permissions.shareCareActions
+                              ? 'bg-teal-50/40 border-teal-200/80 text-teal-950'
+                              : 'bg-slate-50 border-slate-200 text-slate-500 opacity-80'
+                          )}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-bold flex items-center gap-1.5 text-slate-800">
+                              <Sparkles className="w-3.5 h-3.5 text-teal-600 flex-shrink-0" aria-hidden="true" />
+                              {t('family_perm_care_actions')}
+                            </span>
+                            <div className="flex items-center gap-2">
+                              {isRevoked ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 border border-rose-200">
+                                  <ShieldX className="w-3 h-3 text-rose-700" aria-hidden="true" />
+                                  <span>{t('family_status_revoked')}</span>
+                                </span>
+                              ) : member.permissions.shareCareActions ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-700" aria-hidden="true" />
+                                  <span>{t('family_granted')}</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 border border-slate-300">
+                                  <Lock className="w-3 h-3 text-slate-500" aria-hidden="true" />
+                                  <span>{t('family_restricted')}</span>
+                                </span>
+                              )}
+                              <input
+                                type="checkbox"
+                                aria-label={`${t('family_perm_care_actions')} - ${isRevoked ? t('family_status_revoked') : member.permissions.shareCareActions ? t('family_granted') : t('family_restricted')}`}
+                                checked={member.permissions.shareCareActions}
+                                disabled={isRevoked}
+                                onChange={() =>
+                                  handleRequestCategoryChange(
+                                    member.id,
+                                    member.caregiverName,
+                                    'shareCareActions',
+                                    member.permissions.shareCareActions
+                                  )
+                                }
+                                className="rounded text-teal-600 focus:ring-2 focus:ring-teal-500 cursor-pointer disabled:cursor-not-allowed"
+                              />
+                            </div>
+                          </div>
+                          <span className="text-[11px] text-slate-500 leading-snug">
+                            {t('family_perm_care_actions_desc')}
                           </span>
                         </div>
 
@@ -581,30 +759,51 @@ export function FamilyConsentManager({ patientId }: FamilyConsentManagerProps) {
                         <div
                           className={cn(
                             'p-3 rounded-xl border transition-all flex flex-col justify-between gap-2',
-                            member.permissions.allowDirectCalling
-                              ? 'bg-teal-50/40 border-teal-200/80 text-teal-900'
-                              : 'bg-slate-50 border-slate-200 text-slate-500 opacity-75'
+                            isRevoked
+                              ? 'bg-rose-50/20 border-rose-200/60 text-slate-500 opacity-60'
+                              : member.permissions.allowDirectCalling
+                              ? 'bg-teal-50/40 border-teal-200/80 text-teal-950'
+                              : 'bg-slate-50 border-slate-200 text-slate-500 opacity-80'
                           )}
                         >
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold flex items-center gap-1.5">
-                              <Phone className="w-3.5 h-3.5 text-teal-600" />
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-bold flex items-center gap-1.5 text-slate-800">
+                              <Phone className="w-3.5 h-3.5 text-teal-600 flex-shrink-0" aria-hidden="true" />
                               {t('family_perm_calls')}
                             </span>
-                            <input
-                              type="checkbox"
-                              checked={member.permissions.allowDirectCalling}
-                              disabled={isRevoked}
-                              onChange={() =>
-                                handleRequestCategoryChange(
-                                  member.id,
-                                  member.caregiverName,
-                                  'allowDirectCalling',
-                                  member.permissions.allowDirectCalling
-                                )
-                              }
-                              className="rounded text-teal-600 focus:ring-teal-500 cursor-pointer"
-                            />
+                            <div className="flex items-center gap-2">
+                              {isRevoked ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 border border-rose-200">
+                                  <ShieldX className="w-3 h-3 text-rose-700" aria-hidden="true" />
+                                  <span>{t('family_status_revoked')}</span>
+                                </span>
+                              ) : member.permissions.allowDirectCalling ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-700" aria-hidden="true" />
+                                  <span>{t('family_granted')}</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 border border-slate-300">
+                                  <Lock className="w-3 h-3 text-slate-500" aria-hidden="true" />
+                                  <span>{t('family_restricted')}</span>
+                                </span>
+                              )}
+                              <input
+                                type="checkbox"
+                                aria-label={`${t('family_perm_calls')} - ${isRevoked ? t('family_status_revoked') : member.permissions.allowDirectCalling ? t('family_granted') : t('family_restricted')}`}
+                                checked={member.permissions.allowDirectCalling}
+                                disabled={isRevoked}
+                                onChange={() =>
+                                  handleRequestCategoryChange(
+                                    member.id,
+                                    member.caregiverName,
+                                    'allowDirectCalling',
+                                    member.permissions.allowDirectCalling
+                                  )
+                                }
+                                className="rounded text-teal-600 focus:ring-2 focus:ring-teal-500 cursor-pointer disabled:cursor-not-allowed"
+                              />
+                            </div>
                           </div>
                           <span className="text-[11px] text-slate-500 leading-snug">
                             {t('family_perm_calls_desc')}
@@ -669,10 +868,10 @@ export function FamilyConsentManager({ patientId }: FamilyConsentManagerProps) {
 
                   {inv.status === 'pending' && (
                     <button
-                      onClick={() => handleCancelInvite(inv.id, inv.recipientEmail)}
-                      className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 transition-colors self-start sm:self-center"
+                      onClick={() => handleCancelInviteClick(inv.id, inv.recipientEmail)}
+                      className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 focus:outline-none focus:ring-2 focus:ring-rose-500 transition-colors self-start sm:self-center"
                     >
-                      Cancel Invitation
+                      {lang === 'hi' ? 'निमंत्रण रद्द करें' : 'Cancel Invitation'}
                     </button>
                   )}
                 </div>
@@ -782,43 +981,219 @@ export function FamilyConsentManager({ patientId }: FamilyConsentManagerProps) {
 
       {/* CATEGORY CHANGE CONFIRMATION MODAL */}
       {pendingCategoryChange && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-slate-100 animate-scale-in flex flex-col gap-4">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="category-change-title"
+          className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 motion-reduce:transition-none"
+        >
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-slate-100 animate-scale-in motion-reduce:animate-none flex flex-col gap-4">
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center flex-shrink-0">
-                <AlertTriangle className="w-5 h-5" />
+                <AlertTriangle className="w-5 h-5" aria-hidden="true" />
               </div>
               <div>
-                <h3 className="text-base font-bold text-slate-900">Confirm Permission Change</h3>
+                <h3 id="category-change-title" className="text-base font-bold text-slate-900">
+                  {t('family_category_change_title')}
+                </h3>
                 <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                  Are you sure you want to{' '}
-                  <strong className={pendingCategoryChange.currentValue ? 'text-rose-600' : 'text-emerald-600'}>
-                    {pendingCategoryChange.currentValue ? 'REVOKE' : 'GRANT'}
-                  </strong>{' '}
-                  access to <strong>"{pendingCategoryChange.category}"</strong> for{' '}
-                  <strong>{pendingCategoryChange.memberName}</strong>?
+                  {lang === 'hi' ? (
+                    <>
+                      क्या आप वाकई <strong>{pendingCategoryChange.memberName}</strong> के लिए <strong>"{pendingCategoryChange.category}"</strong> की अनुमति{' '}
+                      <strong className={pendingCategoryChange.currentValue ? 'text-rose-600' : 'text-emerald-600'}>
+                        {pendingCategoryChange.currentValue ? 'रद्द' : 'स्वीकृत'}
+                      </strong>{' '}
+                      करना चाहते हैं?
+                    </>
+                  ) : (
+                    <>
+                      Are you sure you want to{' '}
+                      <strong className={pendingCategoryChange.currentValue ? 'text-rose-600' : 'text-emerald-600'}>
+                        {pendingCategoryChange.currentValue ? 'REVOKE' : 'GRANT'}
+                      </strong>{' '}
+                      access to <strong>"{pendingCategoryChange.category}"</strong> for{' '}
+                      <strong>{pendingCategoryChange.memberName}</strong>?
+                    </>
+                  )}
                 </p>
               </div>
             </div>
 
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-500">
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-600 leading-relaxed">
               {pendingCategoryChange.currentValue
-                ? 'Revoking this category immediately denies subsequent queries for this information.'
-                : 'Granting access permits the family member to view this category in their recovery dashboard.'}
+                ? (lang === 'hi'
+                    ? 'इस श्रेणी को निरस्त करने पर परिवार के डैशबोर्ड में यह जानकारी तुरंत बंद हो जाएगी।'
+                    : 'Revoking this category immediately denies subsequent queries for this information.')
+                : (lang === 'hi'
+                    ? 'अनुमति स्वीकृत करने पर परिवार के सदस्य इसे अपने रिकवरी डैशबोर्ड में देख सकेंगे।'
+                    : 'Granting access permits the family member to view this category in their recovery dashboard.')}
             </div>
 
             <div className="flex items-center justify-end gap-2.5 pt-2">
               <button
+                type="button"
                 onClick={() => setPendingCategoryChange(null)}
-                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800"
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400 rounded-xl transition-colors"
               >
-                Cancel
+                {t('family_btn_cancel')}
               </button>
               <button
+                type="button"
                 onClick={handleConfirmCategoryChange}
-                className="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs shadow-sm transition-colors"
+                className="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-500 text-white font-semibold text-xs shadow-sm transition-colors"
               >
-                Confirm Change
+                {t('family_btn_confirm')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DEDICATED IMMEDIATE REVOCATION CONFIRMATION MODAL */}
+      {revokeTarget && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="revoke-modal-title"
+          className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 motion-reduce:transition-none"
+        >
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-rose-100 animate-scale-in motion-reduce:animate-none flex flex-col gap-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center flex-shrink-0">
+                <ShieldX className="w-5 h-5 text-rose-600" aria-hidden="true" />
+              </div>
+              <div>
+                <h3 id="revoke-modal-title" className="text-base font-bold text-slate-900">
+                  {t('family_revoke_modal_title')}
+                </h3>
+                <span className="text-xs font-semibold text-rose-700 block mt-0.5">
+                  {revokeTarget.name} ({revokeTarget.relationship})
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-2 text-xs text-slate-600 leading-relaxed bg-rose-50/50 border border-rose-200/60 rounded-xl p-3.5">
+              <p className="font-medium text-rose-950">
+                {t('family_revoke_modal_desc')}
+              </p>
+              <p className="text-[11px] text-slate-500 pt-1 border-t border-rose-100">
+                {t('family_past_data_disclosure')}
+              </p>
+            </div>
+
+            <div className="text-[11px] text-slate-500 flex items-center gap-1.5">
+              <Info className="w-3.5 h-3.5 text-teal-600 flex-shrink-0" aria-hidden="true" />
+              <span>{t('family_revoke_modal_reauth_note')}</span>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setRevokeTarget(null)}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400 rounded-xl transition-colors"
+              >
+                {t('family_btn_cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={handleRevokeConfirm}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-500 text-white font-semibold text-xs shadow-sm transition-colors"
+              >
+                {t('family_revoke_modal_confirm_btn')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DEDICATED REMOVE MEMBER MODAL */}
+      {removeTarget && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="remove-modal-title"
+          className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 motion-reduce:transition-none"
+        >
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-slate-100 animate-scale-in motion-reduce:animate-none flex flex-col gap-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center flex-shrink-0">
+                <Trash2 className="w-5 h-5 text-slate-600" aria-hidden="true" />
+              </div>
+              <div>
+                <h3 id="remove-modal-title" className="text-base font-bold text-slate-900">
+                  {t('family_remove_modal_title')}
+                </h3>
+                <span className="text-xs font-semibold text-slate-700 block mt-0.5">
+                  {removeTarget.name}
+                </span>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed bg-slate-50 border border-slate-200 rounded-xl p-3">
+              {t('family_remove_modal_desc')}
+            </p>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setRemoveTarget(null)}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400 rounded-xl transition-colors"
+              >
+                {t('family_btn_cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={handleRemoveConfirm}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-500 text-white font-semibold text-xs shadow-sm transition-colors"
+              >
+                {t('family_btn_remove')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DEDICATED CANCEL INVITATION MODAL */}
+      {cancelInviteTarget && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="cancel-invite-title"
+          className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 motion-reduce:transition-none"
+        >
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-slate-100 animate-scale-in motion-reduce:animate-none flex flex-col gap-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle className="w-5 h-5 text-amber-600" aria-hidden="true" />
+              </div>
+              <div>
+                <h3 id="cancel-invite-title" className="text-base font-bold text-slate-900">
+                  {t('family_cancel_invite_modal_title')}
+                </h3>
+                <span className="text-xs text-slate-600 block mt-0.5">
+                  {cancelInviteTarget.email}
+                </span>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed bg-slate-50 border border-slate-200 rounded-xl p-3">
+              {t('family_cancel_invite_modal_desc')}
+            </p>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setCancelInviteTarget(null)}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400 rounded-xl transition-colors"
+              >
+                {t('family_btn_cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={handleCancelInviteConfirm}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-500 text-white font-semibold text-xs shadow-sm transition-colors"
+              >
+                {lang === 'hi' ? 'रद्द करें' : 'Confirm Cancel'}
               </button>
             </div>
           </div>
@@ -1005,6 +1380,20 @@ export function FamilyConsentManager({ patientId }: FamilyConsentManagerProps) {
                     </div>
                   </label>
 
+                  {/* Care Actions & Milestones (Defaults false for privacy) */}
+                  <label className="flex items-start gap-2.5 p-2.5 rounded-xl border border-slate-200 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={invitePermissions.shareCareActions}
+                      onChange={(e) => setInvitePermissions((p) => ({ ...p, shareCareActions: e.target.checked }))}
+                      className="mt-0.5 rounded text-teal-600 focus:ring-teal-500"
+                    />
+                    <div className="text-xs">
+                      <span className="font-semibold block">{t('family_perm_care_actions')}</span>
+                      <span className="text-[11px] text-slate-500">{t('family_perm_care_actions_desc')}</span>
+                    </div>
+                  </label>
+
                   {/* Direct Calling (Defaults false) */}
                   <label className="flex items-start gap-2.5 p-2.5 rounded-xl border border-slate-200 cursor-pointer select-none">
                     <input
@@ -1057,6 +1446,7 @@ export function FamilyConsentManager({ patientId }: FamilyConsentManagerProps) {
                       {invitePermissions.shareDailyVitals && <li className="text-emerald-700 flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5" /> Daily Health Check-in Status</li>}
                       {invitePermissions.shareAppointments && <li className="text-emerald-700 flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5" /> Doctor Consultations & Appointments</li>}
                       {invitePermissions.shareCareInstructions && <li className="text-emerald-700 flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5" /> Discharge Care & Dietary Guidelines</li>}
+                      {invitePermissions.shareCareActions && <li className="text-emerald-700 flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5" /> Recovery Milestones & Support Actions</li>}
                       {invitePermissions.allowDirectCalling && <li className="text-emerald-700 flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5" /> Direct Calling Access</li>}
                     </ul>
                   </div>
