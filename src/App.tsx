@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { LanguageProvider } from '@/i18n/LanguageContext';
 import { LandingPage } from '@/pages/LandingPage';
 import { PatientIntakeWizard } from '@/pages/PatientIntakeWizard';
@@ -82,6 +82,8 @@ function AppContent() {
     };
   }, []);
   const [activePatientId, setActivePatientId] = useState<string>(DEMO_PATIENT_ID);
+  const activePatientIdRef = useRef<string>(DEMO_PATIENT_ID);
+  const [currentPatient, setCurrentPatient] = useState<PatientProfile | null>(() => demoPatients.find((p) => p.id === DEMO_PATIENT_ID) ?? null);
   const [prescriptionPreview, setPrescriptionPreview] = useState<string | null>(null);
   const [prescriptionFile, setPrescriptionFile] = useState<File | null>(null);
   const [schedules, setSchedules] = useState<MedicationSchedule[]>(demoSchedules[DEMO_PATIENT_ID] ?? []);
@@ -98,23 +100,35 @@ function AppContent() {
     let mounted = true;
     async function loadData() {
       try {
-        const [sched, drafts, gaps, fUps, summs, fam, rep] = await Promise.all([
-          dataService.fetchMedicationSchedules(activePatientId),
-          dataService.fetchPrescriptionDraft(activePatientId),
-          dataService.fetchCareGaps(activePatientId),
-          dataService.fetchFollowUps(activePatientId),
+        const targetId = activePatientIdRef.current || activePatientId || DEMO_PATIENT_ID;
+        const [sched, drafts, gaps, fUps, summs, fam, rep, pat] = await Promise.all([
+          dataService.fetchMedicationSchedules(targetId),
+          dataService.fetchPrescriptionDraft(targetId),
+          dataService.fetchCareGaps(targetId),
+          dataService.fetchFollowUps(targetId),
           dataService.fetchPatientSummaries(),
-          dataService.fetchFamilyView(activePatientId),
-          dataService.fetchMedicalReports(activePatientId),
+          dataService.fetchFamilyView(targetId),
+          dataService.fetchMedicalReports(targetId),
+          dataService.fetchPatient(targetId),
         ]);
         if (!mounted) return;
-        if (sched) setSchedules(sched);
-        if (drafts) setPrescriptionDrafts((prev) => ({ ...prev, [activePatientId]: drafts }));
-        if (gaps && gaps.length > 0) setCareGaps((prev) => ({ ...prev, [activePatientId]: gaps }));
-        if (fUps && fUps.length > 0) setFollowUps((prev) => ({ ...prev, [activePatientId]: fUps }));
+        if (pat) {
+          setCurrentPatient(pat);
+          setPatientProfile(pat);
+        }
+        if (sched && sched.length > 0) {
+          setSchedules(sched);
+        } else if (targetId === DEMO_PATIENT_ID) {
+          setSchedules(demoSchedules[DEMO_PATIENT_ID] ?? []);
+        } else {
+          setSchedules([]);
+        }
+        if (drafts) setPrescriptionDrafts((prev) => ({ ...prev, [targetId]: drafts }));
+        if (gaps && gaps.length > 0) setCareGaps((prev) => ({ ...prev, [targetId]: gaps }));
+        if (fUps && fUps.length > 0) setFollowUps((prev) => ({ ...prev, [targetId]: fUps }));
         if (summs && summs.length > 0) setSummaries(summs);
         if (fam) setFamilyView(fam);
-        if (rep && rep.length > 0) setReports((prev) => ({ ...prev, [activePatientId]: rep }));
+        if (rep && rep.length > 0) setReports((prev) => ({ ...prev, [targetId]: rep }));
       } catch (err) {
         console.warn('Could not fetch remote data, keeping initialized state:', err);
       }
@@ -138,45 +152,112 @@ function AppContent() {
     else if (role === 'doctor') setView('doctor');
     else if (role === 'admin') setView('admin');
     else setView('family');
-  }, []);
+  }, [setView]);
 
   const handleIntakeComplete = useCallback(async (profile: Partial<PatientProfile>, file: File | null) => {
-    setPatientProfile(profile);
-    setPrescriptionFile(file);
-
-    // 1. Establish patient entity and capture the actual returned patient ID
-    const saveRes = await dataService.savePatientIntake(profile);
-    if ('error' in saveRes || !saveRes.data?.id) {
-      console.error('Failed to save patient intake:', 'error' in saveRes ? saveRes.error : 'No patient ID returned');
-      return; // Stop downstream scan rather than attaching to a different patient
-    }
-
-    const newPatientId = saveRes.data.id;
-    setActivePatientId(newPatientId);
-
-    // 2. Upload prescription image under new patient ID if file present
-    if (file) {
-      const uploadRes = await dataService.uploadPrescriptionImage(newPatientId, file);
-      if ('url' in uploadRes) {
-        setPrescriptionPreview(uploadRes.url);
+    try {
+      const res = await dataService.savePatientIntake(profile);
+      if ('error' in res || !res.data) {
+        console.error('Failed to save patient intake:', 'error' in res ? res.error : 'Unknown error');
+        return;
       }
-    }
 
-    setView('patient_processing');
-  }, []);
+      const newPatient = res.data;
+      const newPatientId = newPatient.id;
+
+      activePatientIdRef.current = newPatientId;
+      setActivePatientId(newPatientId);
+      setCurrentPatient(newPatient);
+      setPatientProfile(newPatient);
+      setPrescriptionFile(file);
+
+      if (file) {
+        const uploadRes = await dataService.uploadPrescriptionImage(newPatientId, file);
+        if ('url' in uploadRes) {
+          setPrescriptionPreview(uploadRes.url);
+          const draftRes = await dataService.savePrescriptionDraft(newPatientId, uploadRes.url, [
+            { key: 'medicine', labelKey: 'rx_field_medicine', value: newPatient.currentMeds || 'Prescribed Medicine', status: 'uncertain' },
+            { key: 'dosage', labelKey: 'rx_field_dosage', value: 'As directed', status: 'uncertain' },
+            { key: 'frequency', labelKey: 'rx_field_frequency', value: 'Once daily', status: 'uncertain' },
+            { key: 'duration', labelKey: 'rx_field_duration', value: '5 days', status: 'uncertain' },
+            { key: 'instructions', labelKey: 'rx_field_instructions', value: 'Take after meals', status: 'uncertain' },
+          ]);
+          if ('data' in draftRes) {
+            setPrescriptionDrafts((prev) => ({ ...prev, [newPatientId]: draftRes.data }));
+          }
+        }
+      } else if (newPatient.currentMeds && newPatient.currentMeds.trim()) {
+        const draftRes = await dataService.savePrescriptionDraft(
+          newPatientId,
+          'https://images.pexels.com/photos/139398/brainstorming-meeting-patients-diagnosis-139398.jpeg',
+          [
+            { key: 'medicine', labelKey: 'rx_field_medicine', value: newPatient.currentMeds, status: 'uncertain' },
+            { key: 'dosage', labelKey: 'rx_field_dosage', value: 'As directed', status: 'uncertain' },
+            { key: 'frequency', labelKey: 'rx_field_frequency', value: 'Once daily', status: 'uncertain' },
+            { key: 'duration', labelKey: 'rx_field_duration', value: '30 days', status: 'uncertain' },
+            { key: 'instructions', labelKey: 'rx_field_instructions', value: 'Take in the morning', status: 'uncertain' },
+          ]
+        );
+        if ('data' in draftRes) {
+          setPrescriptionDrafts((prev) => ({ ...prev, [newPatientId]: draftRes.data }));
+        }
+      }
+
+      // Sync patient summaries so the Doctor Clinical Command Center displays the new patient
+      const updatedSummaries = await dataService.fetchPatientSummaries();
+      if (updatedSummaries && updatedSummaries.length > 0) {
+        setSummaries(updatedSummaries);
+      }
+
+      setView('patient_processing');
+    } catch (err) {
+      console.error('Error during intake completion:', err);
+    }
+  }, [setView]);
 
   const handleProcessingComplete = useCallback(async (draft?: PrescriptionDraft) => {
-    const targetPatientId = draft?.patientId || activePatientId;
+    const targetPatientId = draft?.patientId || activePatientIdRef.current || activePatientId;
     if (draft) {
       setPrescriptionDrafts((prev) => ({
         ...prev,
         [targetPatientId]: draft,
       }));
     }
-    const sched = await dataService.fetchMedicationSchedules(targetPatientId);
-    setSchedules(sched.length > 0 ? sched : (targetPatientId === DEMO_PATIENT_ID ? (demoSchedules[DEMO_PATIENT_ID] ?? []) : []));
+    try {
+      const [sched, userFollowUps, userReports, userPatient] = await Promise.all([
+        dataService.fetchMedicationSchedules(targetPatientId),
+        dataService.fetchFollowUps(targetPatientId),
+        dataService.fetchMedicalReports(targetPatientId),
+        dataService.fetchPatient(targetPatientId),
+      ]);
+
+      if (userPatient) {
+        setCurrentPatient(userPatient);
+        setPatientProfile(userPatient);
+      }
+      if (sched && sched.length > 0) {
+        setSchedules(sched);
+      } else if (targetPatientId === DEMO_PATIENT_ID) {
+        setSchedules(demoSchedules[DEMO_PATIENT_ID] ?? []);
+      } else {
+        setSchedules([]);
+      }
+      if (userFollowUps && userFollowUps.length > 0) {
+        setFollowUps((prev) => ({ ...prev, [targetPatientId]: userFollowUps }));
+      }
+      if (userReports && userReports.length > 0) {
+        setReports((prev) => ({ ...prev, [targetPatientId]: userReports }));
+      }
+    } catch (err) {
+      console.warn('Could not fetch patient data after processing:', err);
+      if (targetPatientId === DEMO_PATIENT_ID) {
+        setSchedules(demoSchedules[DEMO_PATIENT_ID] ?? []);
+      } else {
+        setSchedules([]);
+      }
+    }
     setView('patient_dashboard');
-  }, [activePatientId]);
+  }, [activePatientId, setView]);
 
   const handleDoseAction = useCallback(async (scheduleId: string, action: DoseStatus, reason?: string) => {
     setSchedules((prev) =>
@@ -188,27 +269,37 @@ function AppContent() {
     }
   }, []);
 
-
   const handleHealthUpdate = useCallback(async (state: HealthState, description: string) => {
+    const targetPatientId = activePatientIdRef.current || activePatientId;
     const patient =
-      patientProfile?.id === activePatientId
+      patientProfile?.id === targetPatientId
         ? (patientProfile as PatientProfile)
-        : demoPatients.find((p) => p.id === activePatientId) || demoPatients.find((p) => p.id === DEMO_PATIENT_ID);
-    if (!patient) return;
+        : currentPatient || demoPatients.find((p) => p.id === targetPatientId) || {
+            id: targetPatientId,
+            name: 'Patient',
+            age: 40,
+            gender: 'other' as const,
+            phone: '',
+            symptoms: '',
+            allergies: 'None',
+            currentMeds: '',
+            language: 'hi' as const,
+          };
 
-    const updateRes = await dataService.submitHealthUpdate(activePatientId, state, description);
+    const updateRes = await dataService.submitHealthUpdate(targetPatientId, state, description);
     const newUpdate = 'data' in updateRes ? updateRes.data : {
       id: `h-new-${Date.now()}`,
-      patientId: activePatientId,
+      patientId: targetPatientId,
       state,
       symptomDescription: description,
       submittedAt: new Date().toISOString(),
       source: 'patient' as const,
     };
 
-    const allUpdates = [newUpdate, ...(demoHealthUpdates[activePatientId] ?? [])];
+    const existingUpdates = demoHealthUpdates[targetPatientId] ?? [];
+    const allUpdates = [newUpdate, ...existingUpdates];
     const allSchedules = schedules;
-    const allFollowUps = followUps[activePatientId] ?? [];
+    const allFollowUps = followUps[targetPatientId] ?? [];
 
     const { gaps: newGaps } = detectCareGaps(patient, allUpdates, allSchedules, allFollowUps);
 
@@ -217,7 +308,7 @@ function AppContent() {
     }
 
     setCareGaps((prev) => {
-      const existing = prev[activePatientId] ?? [];
+      const existing = prev[targetPatientId] ?? [];
       const withIds = newGaps.map((g) => ({
         ...g,
         id: `g-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -226,10 +317,10 @@ function AppContent() {
       const filtered = withIds.filter((ng) => !existing.some((eg) => eg.type === ng.type && eg.evidence === ng.evidence));
       return {
         ...prev,
-        [activePatientId]: [...filtered, ...existing],
+        [targetPatientId]: [...filtered, ...existing],
       };
     });
-  }, [activePatientId, patientProfile, schedules, followUps]);
+  }, [activePatientId, patientProfile, currentPatient, schedules, followUps]);
 
   const handleFollowUpAnswer = useCallback(async (followUpId: string, answer: string) => {
     setFollowUps((prev) => {
@@ -278,15 +369,14 @@ function AppContent() {
           },
     }));
 
-    // 2. Refresh medication schedules from data service
-    const refreshedSchedules = await dataService.fetchMedicationSchedules(patientId);
-
-    // 3. Update schedules in state if this patient is the active patient (prevent stale async overwrite)
-    if (patientId === activePatientId) {
-      setSchedules(refreshedSchedules);
+    // 2. If the confirmed care plan is for the currently active patient, immediately update their schedules
+    const currentTargetId = activePatientIdRef.current || activePatientId;
+    if (patientId === currentTargetId) {
+      const updatedSchedules = await dataService.fetchMedicationSchedules(patientId);
+      setSchedules(updatedSchedules);
     }
 
-    // 4. Refresh patient summaries for doctor dashboard
+    // 3. Refresh patient summaries for doctor dashboard
     try {
       const updatedSummaries = await dataService.fetchPatientSummaries();
       if (updatedSummaries && updatedSummaries.length > 0) {
@@ -310,6 +400,10 @@ function AppContent() {
       return updated;
     });
     await dataService.updateCareGapStatus(gapId, action);
+    const updatedSummaries = await dataService.fetchPatientSummaries();
+    if (updatedSummaries && updatedSummaries.length > 0) {
+      setSummaries(updatedSummaries);
+    }
   }, []);
 
   const handleFamilyToggleAccess = useCallback(async (authorized: boolean) => {
@@ -353,7 +447,7 @@ function AppContent() {
           prescriptionDraft={prescriptionDrafts[activePatientId] ?? null}
           reports={reports[activePatientId] ?? []}
           patientId={activePatientId}
-          patientProfile={patientProfile}
+          patientProfile={patientProfile || currentPatient}
           onDoseAction={handleDoseAction}
           onHealthUpdate={handleHealthUpdate}
           onFollowUpAnswer={handleFollowUpAnswer}
