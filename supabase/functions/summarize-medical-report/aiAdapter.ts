@@ -159,6 +159,7 @@ ${JSON.stringify(report.structuredFindings || [], null, 2)}`;
           ],
           response_format: { type: 'json_object' },
           temperature: 0.1,
+          max_tokens: 800,
         }),
         signal: controller.signal,
       });
@@ -167,6 +168,44 @@ ${JSON.stringify(report.structuredFindings || [], null, 2)}`;
       const latencyMs = Date.now() - startTime;
 
       if (response.status === 429) {
+        const retryAfterSec = parseFloat(response.headers.get('retry-after') || '2.5');
+        const waitMs = Math.min(Math.max(retryAfterSec * 1000, 2000), 4000);
+        if (Date.now() - startTime + waitMs < timeoutMs - 1000) {
+          await new Promise((r) => setTimeout(r, waitMs));
+          const retryRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${this.apiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: this.modelName,
+              messages: [
+                { role: 'system', content: CLINICAL_SUMMARIZATION_SYSTEM_PROMPT },
+                { role: 'user', content: userPrompt },
+              ],
+              response_format: { type: 'json_object' },
+              temperature: 0.1,
+              max_tokens: 800,
+            }),
+            signal: controller.signal,
+          });
+          if (retryRes.ok) {
+            clearTimeout(timeoutId);
+            const latencyMs = Date.now() - startTime;
+            const data = await retryRes.json();
+            const textContent = data.choices?.[0]?.message?.content;
+            if (!textContent) {
+              throw new Error('Groq model returned an empty choice payload on retry.');
+            }
+            try {
+              const parsed = JSON.parse(textContent);
+              return { rawOutput: parsed, latencyMs };
+            } catch {
+              return { rawOutput: textContent, latencyMs };
+            }
+          }
+        }
         throw new AIProviderRateLimitError('Groq API rate limit exceeded. Please retry shortly.');
       }
 
@@ -175,8 +214,7 @@ ${JSON.stringify(report.structuredFindings || [], null, 2)}`;
       }
 
       if (!response.ok) {
-        const errorText = await response.text().catch(() => '');
-        throw new Error(`Groq API error (HTTP ${response.status}): ${errorText.slice(0, 150)}`);
+        throw new Error(`Groq API returned HTTP error ${response.status}.`);
       }
 
       const responseData = await response.json();
@@ -264,8 +302,7 @@ export class GeminiSummarizerProvider implements AISummarizerProvider {
       }
 
       if (!response.ok) {
-        const errorText = await response.text().catch(() => '');
-        throw new Error(`Google Gemini API error (HTTP ${response.status}): ${errorText.slice(0, 150)}`);
+        throw new Error(`Google Gemini API returned HTTP error ${response.status}.`);
       }
 
       const responseData = await response.json();

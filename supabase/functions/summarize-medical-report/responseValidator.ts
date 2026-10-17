@@ -73,6 +73,67 @@ export function validateAIModelResponse(
   const rawKeyFindings = Array.isArray(output.keyFindings) ? output.keyFindings : [];
   const validatedKeyFindings: ReportSummary['keyFindings'] = [];
 
+/**
+ * Verifies that a finding's extracted value and unit are strictly grounded in the source report.
+ * Rejects altered values, sign changes, fabricated numbers, or substituted units.
+ */
+function verifyFindingValueAndUnitGrounding(
+  name: string,
+  value: string,
+  unit: string | null,
+  sourceReport: Readonly<MedicalReport>
+): { grounded: boolean; reason?: string } {
+  const normName = name.toLowerCase().trim();
+  const normValue = value.toLowerCase().trim();
+  const normUnit = (unit || '').toLowerCase().trim();
+
+  // 1. Check matching structured findings
+  const matchingStructured = (sourceReport.structuredFindings || []).find((sf) => {
+    const sfName = sf.testOrParameter.toLowerCase().trim();
+    return sfName === normName || sfName.includes(normName) || normName.includes(sfName);
+  });
+
+  if (matchingStructured) {
+    const srcVal = matchingStructured.value.toLowerCase().trim();
+    const srcUnit = (matchingStructured.unit || '').toLowerCase().trim();
+
+    if (srcVal !== normValue) {
+      return {
+        grounded: false,
+        reason: `Value mismatch for "${name}": extracted value "${value}" does not match source value "${matchingStructured.value}".`,
+      };
+    }
+
+    if (normUnit && srcUnit && normUnit !== srcUnit) {
+      return {
+        grounded: false,
+        reason: `Unit mismatch for "${name}": extracted unit "${unit}" does not match source unit "${matchingStructured.unit}".`,
+      };
+    }
+
+    return { grounded: true };
+  }
+
+  // 2. If no matching structured finding, check rawText
+  const rawText = (sourceReport.rawText || '').toLowerCase();
+
+  if (!rawText.includes(normValue)) {
+    return {
+      grounded: false,
+      reason: `Extracted value "${value}" for "${name}" is not found in source document text.`,
+    };
+  }
+
+  if (normUnit && !rawText.includes(normUnit)) {
+    return {
+      grounded: false,
+      reason: `Extracted unit "${unit}" for "${name}" is not found in source document text.`,
+    };
+  }
+
+  return { grounded: true };
+}
+
   for (let i = 0; i < rawKeyFindings.length; i++) {
     const kf = rawKeyFindings[i];
     if (!kf || typeof kf !== 'object') {
@@ -107,6 +168,14 @@ export function validateAIModelResponse(
     }
 
     const unit = kf.unit ? String(kf.unit).trim() : null;
+
+    // Strict Grounding check: verify value and unit match source document
+    const valueCheck = verifyFindingValueAndUnitGrounding(name, value, unit, sourceReport);
+    if (!valueCheck.grounded) {
+      errors.push(`Ungrounded clinical detail in keyFindings[${i}]: ${valueCheck.reason}`);
+      continue;
+    }
+
     const refRange = kf.referenceRange ? String(kf.referenceRange).trim() : null;
 
     let flag: 'normal' | 'abnormal' | 'unspecified_range' = 'normal';
@@ -166,6 +235,15 @@ export function validateAIModelResponse(
       continue;
     }
 
+    const unit = af.unit ? String(af.unit).trim() : null;
+
+    // Strict Grounding check: verify abnormal value and unit match source document
+    const valueCheck = verifyFindingValueAndUnitGrounding(name, value, unit, sourceReport);
+    if (!valueCheck.grounded) {
+      errors.push(`Ungrounded clinical detail in abnormalValues[${i}]: ${valueCheck.reason}`);
+      continue;
+    }
+
     const refRange = String(af.referenceRange || 'Reference range not provided').trim();
 
     // Safety rule: Cannot flag as abnormal if reference range is completely missing and unstated
@@ -177,7 +255,7 @@ export function validateAIModelResponse(
     validatedAbnormals.push({
       name,
       value,
-      unit: af.unit ? String(af.unit).trim() : null,
+      unit,
       referenceRange: refRange,
       interpretation: String(af.interpretation || 'Outside clinical reference bounds').trim(),
       sourceEvidence: String(af.sourceEvidence || `${name}: ${value} (Ref: ${refRange})`).trim(),
