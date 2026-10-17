@@ -16,6 +16,7 @@
     "test:closed-loop": "npx tsx --tsconfig tsconfig.app.json scripts/test_closed_loop_care.ts",
     "test:prescription-scanner": "npx tsx --tsconfig tsconfig.app.json scripts/test_prescription_scanner.ts",
     "test:prescription-frontend": "npx tsx --tsconfig tsconfig.app.json scripts/test_prescription_scanner_frontend.ts",
+    "test:caregap-radar": "npx tsx --tsconfig tsconfig.app.json scripts/test_caregap_radar_priority.ts",
     "backend": "npx tsx scripts/backend_server.ts"
   },
   "dependencies": {

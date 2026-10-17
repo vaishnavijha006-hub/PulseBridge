@@ -7,6 +7,7 @@ import type {
   PatientProfile,
   Priority,
 } from '@/types';
+import type { CareAction } from '@/types/careAction';
 
 export interface CareGapRuleResult {
   gaps: Omit<CareGap, 'id' | 'status'>[];
@@ -19,6 +20,28 @@ export interface QueueScoreFactor {
   evidence: string;
 }
 
+export interface ScoringWeights {
+  newSymptom: number;
+  safetyFlag: number;
+  repeatedMissedDoses: number;
+  missingSeverity: number;
+  unansweredFollowup: number;
+  overdueUpdate: number;
+  overdueCareTask: number;
+  unresolvedCareGap: number;
+}
+
+export const DEFAULT_SCORING_WEIGHTS: ScoringWeights = {
+  newSymptom: 40,
+  safetyFlag: 40,
+  repeatedMissedDoses: 30,
+  missingSeverity: 20,
+  unansweredFollowup: 15,
+  overdueUpdate: 10,
+  overdueCareTask: 20,
+  unresolvedCareGap: 15,
+};
+
 export interface PatientTriageResult {
   score: number;
   priority: Priority;
@@ -26,6 +49,7 @@ export interface PatientTriageResult {
   factors: QueueScoreFactor[];
   criticalSafetyOverride: boolean;
   criticalAlertMessage?: string;
+  dataWarnings: string[];
   disclaimer: string;
 }
 
@@ -247,11 +271,15 @@ export function calculatePatientTriageScore(
   healthUpdates: HealthUpdate[],
   schedules: MedicationSchedule[],
   followUps: FollowUp[],
-  careGaps: CareGap[] = []
+  careGaps: CareGap[] = [],
+  customWeights?: Partial<ScoringWeights>,
+  careActions?: CareAction[]
 ): PatientTriageResult {
-  let score = 0;
+  const w: ScoringWeights = { ...DEFAULT_SCORING_WEIGHTS, ...customWeights };
+  let rawScore = 0;
   const factors: QueueScoreFactor[] = [];
   const reasons: string[] = [];
+  const dataWarnings: string[] = [];
 
   const latestUpdate = healthUpdates[0];
   const missedDoses = schedules.filter(
@@ -272,47 +300,47 @@ export function calculatePatientTriageScore(
     }
   }
 
-  // Rule A: New or worsening symptom (+40)
+  // Rule A: New or worsening symptom
   if (latestUpdate && latestUpdate.state === 'bad') {
-    score += 40;
+    rawScore += w.newSymptom;
     factors.push({
       rule: 'new_symptom',
       reason: 'New or worsening symptom reported',
-      points: 40,
+      points: w.newSymptom,
       evidence: latestUpdate.symptomDescription || 'Patient reported feeling bad',
     });
-    reasons.push('New/worsening symptom (+40)');
+    reasons.push(`New/worsening symptom (+${w.newSymptom})`);
   }
 
-  // Rule B: Allergy or duplicate safety flag (+40)
+  // Rule B: Allergy or duplicate safety flag
   const hasAllergyOrDuplicate = careGaps.some(
     (g) => g.status === 'open' && (g.type === 'allergy_conflict' || g.type === 'duplicate_medicine')
   );
   if (hasAllergyOrDuplicate) {
-    score += 40;
+    rawScore += w.safetyFlag;
     factors.push({
       rule: 'safety_flag',
       reason: 'Safety concern: Allergy conflict or duplicate medication',
-      points: 40,
+      points: w.safetyFlag,
       evidence: careGaps.find((g) => g.type === 'allergy_conflict' || g.type === 'duplicate_medicine')?.evidence ?? 'Allergy conflict detected',
     });
-    reasons.push('Safety flag / allergy conflict (+40)');
+    reasons.push(`Safety flag / allergy conflict (+${w.safetyFlag})`);
   }
 
-  // Rule C: Two or more missed doses in 24–48-hour window (+30)
+  // Rule C: Two or more missed doses in 24–48-hour window
   if (missedDoses.length >= 2) {
-    score += 30;
+    rawScore += w.repeatedMissedDoses;
     const meds = [...new Set(missedDoses.map((d) => d.medicineName))].join(', ');
     factors.push({
       rule: 'repeated_missed_dose',
       reason: 'Two or more missed doses in recovery window',
-      points: 30,
+      points: w.repeatedMissedDoses,
       evidence: `${missedDoses.length} doses missed (${meds})`,
     });
-    reasons.push('Repeated missed doses (+30)');
+    reasons.push(`Repeated missed doses (+${w.repeatedMissedDoses})`);
   }
 
-  // Rule D: Missing symptom severity/duration (+20)
+  // Rule D: Missing symptom severity/duration
   const hasMissingSeverityGap = careGaps.some((g) => g.status === 'open' && g.type === 'missing_severity');
   const hasUnratedSymptom = Boolean(
     latestUpdate?.symptomDescription &&
@@ -320,74 +348,111 @@ export function calculatePatientTriageScore(
     !/\b(severity|pain scale|\d+\s*\/\s*10|\b(mild|moderate|severe)\b)\b/i.test(latestUpdate.symptomDescription)
   );
   if (hasMissingSeverityGap || hasUnratedSymptom) {
-    score += 20;
+    rawScore += w.missingSeverity;
     factors.push({
       rule: 'missing_severity',
       reason: 'Symptom reported without clinical severity/duration scale',
-      points: 20,
+      points: w.missingSeverity,
       evidence: 'Missing 1-10 pain/discomfort rating',
     });
-    reasons.push('Missing severity rating (+20)');
+    reasons.push(`Missing severity rating (+${w.missingSeverity})`);
   }
 
-  // Rule E: Unanswered follow-up (>24h) (+15)
-  const hasUnanswered = followUps.some((f) => {
+  // Rule E: Unanswered follow-up (>24h)
+  const overdueFollowUps = followUps.filter((f) => {
     if (f.status !== 'pending') return false;
     const hours = (Date.now() - new Date(f.askedAt).getTime()) / 3600000;
     return hours > 24;
   });
-  if (hasUnanswered) {
-    score += 15;
+  if (overdueFollowUps.length > 0) {
+    rawScore += w.unansweredFollowup;
     factors.push({
       rule: 'unanswered_followup',
       reason: 'Follow-up question unanswered for more than 24 hours',
-      points: 15,
-      evidence: 'Pending clinical question',
+      points: w.unansweredFollowup,
+      evidence: `${overdueFollowUps.length} pending clinical question(s)`,
     });
-    reasons.push('Unanswered follow-up (>24h) (+15)');
+    reasons.push(`Unanswered follow-up (>24h) (+${w.unansweredFollowup})`);
   }
 
-  // Rule F: No health update for > 24 hours (+10)
+  // Rule F: No health update for > 24 hours
   if (!latestUpdate) {
-    score += 10;
+    rawScore += w.overdueUpdate;
     factors.push({
       rule: 'overdue_update',
       reason: 'No health check-in submitted since enrollment',
-      points: 10,
+      points: w.overdueUpdate,
       evidence: 'Check-in overdue',
     });
-    reasons.push('No health update (>24h) (+10)');
+    reasons.push(`No health update (>24h) (+${w.overdueUpdate})`);
+    dataWarnings.push('Missing data: No health check-in submitted since enrollment.');
   } else {
     const hoursSinceUpdate = (Date.now() - new Date(latestUpdate.submittedAt).getTime()) / 3600000;
     if (hoursSinceUpdate > 24) {
-      score += 10;
+      rawScore += w.overdueUpdate;
       factors.push({
         rule: 'overdue_update',
         reason: 'No health update recorded for > 24 hours',
-        points: 10,
+        points: w.overdueUpdate,
         evidence: `Last update ${Math.floor(hoursSinceUpdate)} hours ago`,
       });
-      reasons.push('Overdue health update (+10)');
+      reasons.push(`Overdue health update (+${w.overdueUpdate})`);
+      dataWarnings.push(`Stale data: Last health check-in was submitted ${Math.floor(hoursSinceUpdate)} hours ago.`);
     }
   }
 
+  // Missing medication schedule warning
+  if (!schedules || schedules.length === 0) {
+    dataWarnings.push('No active medication schedules: Awaiting doctor prescription review or lock.');
+  }
+
+  // Overdue follow-up warning
+  if (overdueFollowUps.length > 0) {
+    dataWarnings.push(`${overdueFollowUps.length} follow-up question(s) overdue (> 24 hours).`);
+  }
+
+  // Rule G: Overdue care-plan task
+  if (careActions && careActions.length > 0) {
+    const nowMs = Date.now();
+    const overdueTasks = careActions.filter((a) => {
+      if (a.status === 'resolved' || a.status === 'documented') return false;
+      if (!a.dueDate) return false;
+      return new Date(a.dueDate).getTime() < nowMs;
+    });
+    if (overdueTasks.length > 0) {
+      rawScore += w.overdueCareTask;
+      factors.push({
+        rule: 'overdue_care_task',
+        reason: 'Overdue care-plan action or clinician task',
+        points: w.overdueCareTask,
+        evidence: `${overdueTasks.length} task(s) overdue (e.g. "${overdueTasks[0].title}")`,
+      });
+      reasons.push(`Overdue care-plan task (+${w.overdueCareTask})`);
+      dataWarnings.push(`${overdueTasks.length} care-plan task(s) past due date.`);
+    }
+  }
+
+  // Enforce strict 0 to 100 boundary
+  const boundedScore = Math.min(100, Math.max(0, Math.round(rawScore)));
+
   // Priority categorization
   let priority: Priority;
-  if (criticalSafetyOverride || score >= 80) {
+  if (criticalSafetyOverride || boundedScore >= 80) {
     priority = 'urgent';
-  } else if (score >= 50) {
+  } else if (boundedScore >= 50) {
     priority = 'needs_attention';
   } else {
     priority = 'on_track';
   }
 
   return {
-    score,
+    score: boundedScore,
     priority,
     reasons,
     factors,
     criticalSafetyOverride,
     criticalAlertMessage,
+    dataWarnings,
     disclaimer: 'Prototype queue-sorting heuristic only, not a medical risk prediction. Clinical judgment always supersedes score.',
   };
 }

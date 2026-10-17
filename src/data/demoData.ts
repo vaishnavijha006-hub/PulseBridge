@@ -688,6 +688,9 @@ export function getPatientSummaries(): PatientSummary[] {
       criticalAlertMessage: triageResult.criticalAlertMessage,
       scoreFactors: triageResult.factors,
       pendingRxCount,
+      dataWarnings: triageResult.dataWarnings,
+      overdueFollowUpsCount: followUps.filter((f) => f.status === 'pending' && (Date.now() - new Date(f.askedAt).getTime()) > 86400000).length,
+      overdueTasksCount: patient.id === 'p1' ? 1 : 0,
     };
   });
 }

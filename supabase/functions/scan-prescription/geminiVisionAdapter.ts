@@ -4,7 +4,7 @@
  *
  * Requirements:
  * 1. Multimodal image input via Gemini API generateContent (inlineData: { mimeType, data }).
- * 2. Configurable model via server-side GEMINI_MODEL (default: 'gemini-3.8-flash').
+ * 2. Configurable model via server-side GEMINI_MODEL (default: 'gemini-flash-lite-latest').
  * 3. Request structured JSON containing fields supported by existing PrescriptionDraft/PrescriptionField.
  * 4. Grounding: Extract only visibly present information, preserve original wording, mark missing/illegible as uncertain.
  * 5. Secret Isolation: GEMINI_API_KEY read exclusively from server environment; never logged or leaked.
@@ -122,7 +122,7 @@ export class GeminiVisionAdapter implements PrescriptionVisionAdapter {
       throw new GeminiConfigError('GEMINI_API_KEY is not configured on the server.');
     }
     this.apiKey = key;
-    this.modelName = modelName || getServerEnv('GEMINI_MODEL') || 'gemini-3.8-flash';
+    this.modelName = modelName || getServerEnv('GEMINI_MODEL') || 'gemini-flash-lite-latest';
   }
 
   public async scanPrescription(

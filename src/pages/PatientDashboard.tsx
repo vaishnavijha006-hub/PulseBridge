@@ -7,12 +7,13 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { useLanguage } from '@/i18n/LanguageContext';
 import { cn } from '@/utils/cn';
 import { evaluateDoseTiming, DOSE_REASON_OPTIONS, applyOverdueEvaluations, generateReminders } from '@/utils/reminderEngine';
-import type { MedicationSchedule, DoseStatus, HealthState, FollowUp, PrescriptionDraft } from '@/types';
+import type { MedicationSchedule, DoseStatus, HealthState, FollowUp, PrescriptionDraft, MedicalReport } from '@/types';
 
 interface PatientDashboardProps {
   schedules: MedicationSchedule[];
   followUps: FollowUp[];
   prescriptionDraft?: PrescriptionDraft | null;
+  reports?: MedicalReport[];
   onDoseAction: (scheduleId: string, action: DoseStatus, reason?: string) => void;
   onHealthUpdate: (state: HealthState, description: string) => void;
   onFollowUpAnswer: (followUpId: string, answer: string) => void;
@@ -23,12 +24,14 @@ export function PatientDashboard({
   schedules: initialSchedules,
   followUps,
   prescriptionDraft,
+  reports,
   onDoseAction,
   onHealthUpdate,
   onFollowUpAnswer,
   onBack,
 }: PatientDashboardProps) {
   const { t } = useLanguage();
+  void reports;
   const [schedules, setSchedules] = useState<MedicationSchedule[]>(initialSchedules);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<string | null>(null);

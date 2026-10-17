@@ -194,9 +194,9 @@ console.log('\nSUITE 3: Gemini Vision Adapter & Secret Isolation');
     assert(err.message.includes('GEMINI_API_KEY is not configured'), 'Error message clearly specifies missing environment variable');
   }
 
-  // 3.2 Model defaults to gemini-3.8-flash
+  // 3.2 Model defaults to gemini-flash-lite-latest
   const adapterWithKey = new GeminiVisionAdapter('mock-temp-key');
-  assert(adapterWithKey.modelName === 'gemini-3.8-flash', 'Defaults to gemini-3.8-flash');
+  assert(adapterWithKey.modelName === 'gemini-flash-lite-latest', 'Defaults to gemini-flash-lite-latest');
 
   // 3.3 Configurable model identifier
   const customAdapter = new GeminiVisionAdapter('mock-temp-key', 'gemini-2.0-flash');

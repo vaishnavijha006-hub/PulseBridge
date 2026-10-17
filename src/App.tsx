@@ -253,6 +253,7 @@ function AppContent() {
           schedules={schedules}
           followUps={followUps[DEMO_PATIENT_ID] ?? []}
           prescriptionDraft={prescriptionDrafts[DEMO_PATIENT_ID] ?? null}
+          reports={reports[DEMO_PATIENT_ID] ?? []}
           onDoseAction={handleDoseAction}
           onHealthUpdate={handleHealthUpdate}
           onFollowUpAnswer={handleFollowUpAnswer}

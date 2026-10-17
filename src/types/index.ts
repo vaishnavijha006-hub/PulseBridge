@@ -169,6 +169,9 @@ export interface PatientSummary {
   criticalAlertMessage?: string;
   scoreFactors?: { reason: string; points: number; evidence?: string }[];
   pendingRxCount?: number;
+  dataWarnings?: string[];
+  overdueFollowUpsCount?: number;
+  overdueTasksCount?: number;
 }
 
 

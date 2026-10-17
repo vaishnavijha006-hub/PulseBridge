@@ -25,6 +25,9 @@ export function PatientStatusCard({ summary, onClick }: PatientStatusCardProps) 
     criticalAlertMessage,
     scoreFactors,
     pendingRxCount = 0,
+    dataWarnings = [],
+    overdueFollowUpsCount = 0,
+    overdueTasksCount = 0,
   } = summary;
 
   const priorityConfig: Record<Priority, { status: 'on_track' | 'attention' | 'urgent'; label: string; icon: typeof CheckCircle2 }> = {
@@ -80,6 +83,16 @@ export function PatientStatusCard({ summary, onClick }: PatientStatusCardProps) 
           </span>
         </div>
         <div className="flex items-center gap-1.5 flex-wrap justify-end">
+          {overdueFollowUpsCount > 0 && (
+            <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
+              {overdueFollowUpsCount} overdue Q
+            </span>
+          )}
+          {overdueTasksCount > 0 && (
+            <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-danger-500/20 text-danger-300 border border-danger-500/40">
+              {overdueTasksCount} overdue task{overdueTasksCount > 1 ? 's' : ''}
+            </span>
+          )}
           {typeof triageScore === 'number' && (
             <span
               className={cn(
@@ -171,6 +184,21 @@ export function PatientStatusCard({ summary, onClick }: PatientStatusCardProps) 
         <div className="relative flex items-center gap-1.5 text-xs text-teal-300 bg-teal-500/10 border border-teal-500/20 rounded-lg p-2">
           <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0 text-teal-400" />
           <span>Care plan on track: All doses taken, no adverse symptoms, zero open gaps.</span>
+        </div>
+      )}
+
+      {/* Missing or Stale Data Warnings */}
+      {dataWarnings.length > 0 && (
+        <div className="relative flex flex-col gap-1 rounded-lg bg-navy-800/60 border border-amber-500/30 p-2.5 text-xs text-amber-300">
+          <div className="flex items-center gap-1.5 font-semibold text-amber-400">
+            <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+            <span>Data Freshness & Record Notice:</span>
+          </div>
+          {dataWarnings.map((warn, i) => (
+            <span key={i} className="text-[11px] text-amber-200/90 leading-tight">
+              • {warn}
+            </span>
+          ))}
         </div>
       )}
 
