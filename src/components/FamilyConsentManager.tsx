@@ -28,6 +28,7 @@ import {
 import { familyConsentService } from '@/services/familyConsentService';
 import { useLanguage } from '@/i18n/LanguageContext';
 import { cn } from '@/utils/cn';
+import { validatePhoneNumber, normalizePhoneNumber } from '@/utils/phone';
 import type {
   FamilyCircleMember,
   FamilySupportNote,
@@ -58,6 +59,7 @@ export function FamilyConsentManager({ patientId }: FamilyConsentManagerProps) {
   const [inviteRelationship, setInviteRelationship] = useState('');
   const [inviteEmail, setInviteEmail] = useState('');
   const [invitePhone, setInvitePhone] = useState('');
+  const [invitePhoneError, setInvitePhoneError] = useState<string | null>(null);
   const [explicitReviewConfirmed, setExplicitReviewConfirmed] = useState(false);
 
   // Default permissions: sensitive ones (vitals, direct calling) default to false for safety!
@@ -173,12 +175,16 @@ export function FamilyConsentManager({ patientId }: FamilyConsentManagerProps) {
       return;
     }
 
+    if (invitePhone.trim() && !validatePhoneNumber(invitePhone).valid) {
+      return;
+    }
+
     const newMember = familyConsentService.inviteMember({
       patientId,
       caregiverName: inviteName,
       relationship: inviteRelationship,
       email: inviteEmail,
-      contactNumber: invitePhone || undefined,
+      contactNumber: invitePhone.trim() ? normalizePhoneNumber(invitePhone) : undefined,
       permissions: invitePermissions,
     });
 
@@ -189,6 +195,7 @@ export function FamilyConsentManager({ patientId }: FamilyConsentManagerProps) {
     setInviteRelationship('');
     setInviteEmail('');
     setInvitePhone('');
+    setInvitePhoneError(null);
     setExplicitReviewConfirmed(false);
 
     showToast(
@@ -1274,11 +1281,40 @@ export function FamilyConsentManager({ patientId }: FamilyConsentManagerProps) {
                   </label>
                   <input
                     type="tel"
-                    placeholder="e.g. +91 98765 43210"
+                    placeholder="e.g. 98765 43210"
                     value={invitePhone}
-                    onChange={(e) => setInvitePhone(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    onChange={(e) => {
+                      setInvitePhone(e.target.value);
+                      if (invitePhoneError) setInvitePhoneError(null);
+                    }}
+                    onBlur={() => {
+                      if (invitePhone.trim()) {
+                        const val = validatePhoneNumber(invitePhone);
+                        if (!val.valid) {
+                          setInvitePhoneError(val.error || t('phone_format_error'));
+                        } else {
+                          setInvitePhoneError(null);
+                        }
+                      }
+                    }}
+                    className={cn(
+                      "w-full px-3.5 py-2.5 rounded-xl border text-xs focus:outline-none focus:ring-2",
+                      invitePhoneError
+                        ? "border-rose-400 focus:ring-rose-400"
+                        : "border-slate-200 focus:ring-teal-500"
+                    )}
+                    maxLength={16}
                   />
+                  {invitePhoneError ? (
+                    <p className="text-[11px] text-rose-500 font-medium mt-1 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                      <span>{invitePhoneError}</span>
+                    </p>
+                  ) : (
+                    <span className="text-[10px] text-slate-400 mt-0.5 block">
+                      {t('intake_phone_hint')}
+                    </span>
+                  )}
                 </div>
 
                 <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
@@ -1291,8 +1327,18 @@ export function FamilyConsentManager({ patientId }: FamilyConsentManagerProps) {
                   </button>
                   <button
                     type="button"
-                    disabled={!inviteName.trim() || !inviteRelationship.trim() || !inviteEmail.trim()}
-                    onClick={() => setInviteStep(2)}
+                    disabled={!inviteName.trim() || !inviteRelationship.trim() || !inviteEmail.trim() || Boolean(invitePhone.trim() && invitePhoneError)}
+                    onClick={() => {
+                      if (invitePhone.trim()) {
+                        const val = validatePhoneNumber(invitePhone);
+                        if (!val.valid) {
+                          setInvitePhoneError(val.error || t('phone_format_error'));
+                          return;
+                        }
+                      }
+                      setInvitePhoneError(null);
+                      setInviteStep(2);
+                    }}
                     className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white font-semibold text-xs shadow-sm transition-all"
                   >
                     <span>Next: Granular Consent</span>

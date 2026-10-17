@@ -14,9 +14,9 @@ PulseBridge AI is a clinical intelligence and care-coordination platform designe
 ```bash
 npm test -- --run
 ```
-- **Test Files**: **11 passed (11 of 11 suites)**
-- **Total Tests**: **165 passed | 10 skipped | 0 failed (175 tests)**
-- **Test Execution Time**: ~23.01s
+- **Test Files**: **13 passed (13 of 13 suites)**
+- **Total Tests**: **188 passed | 10 skipped | 0 failed (198 tests)**
+- **Test Execution Time**: ~13.32s
 
 | Test Suite File | Tests Passed | Status | Coverage Scope |
 | :--- | :---: | :---: | :--- |
@@ -26,12 +26,14 @@ npm test -- --run
 | `src/services/voiceGuidanceService.test.ts` | **8** |  Passed | ElevenLabs speech synthesis, rate limits, audio caching |
 | `src/pages/DoctorToPatientWorkflow.test.tsx` | **6** |  Passed | End-to-end doctor review, care-plan update, patient sync |
 | `src/pages/AbhaIntegration.test.tsx` | **12** |  Passed | ABHA format validation, unverified tagging, intake flow |
+| `src/pages/PhoneValidation.test.tsx` | **7** |  Passed | 10-digit phone number intake validation, error states |
+| `src/utils/phone.test.ts` | **16** |  Passed | Phone normalization (+91, trunk 0), 10-digit rule |
 | `src/components/ClosedLoopCareView.test.tsx` | **5** |  Passed | Closed-loop UI components, filter tabs, outcome modals |
 | `src/components/VoiceGuidanceControl.test.tsx` | **7** |  Passed | Bilingual speech playback, accessibility attributes |
 | `src/pages/PatientContextContinuity.test.tsx` | **5** |  Passed | Intake-to-dashboard identity continuity, demo fallback |
 | `src/pages/FamilyRecoveryCircle.test.tsx` | **12** |  Passed | Family portal, timeline updates, notes, consent UI |
 | `src/pages/Dashboards.test.tsx` | **7** |  Passed | Admin System Ops, Doctor Command Center, patient triage |
-| **Total** | **165 passed** |  | *(10 database-level RLS skipped for live Supabase testing)* |
+| **Total** | **188 passed** |  | *(10 database-level RLS skipped for live Supabase testing)* |
 
 ### TypeScript Compilation
 ```bash

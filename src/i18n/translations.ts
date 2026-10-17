@@ -85,6 +85,9 @@ export type TranslationKey =
   | 'intake_age'
   | 'intake_gender'
   | 'intake_phone'
+  | 'phone_format_error'
+  | 'phone_digits_only_error'
+  | 'intake_phone_hint'
   | 'intake_symptoms_q'
   | 'intake_symptoms_hint'
   | 'intake_allergies_q'
@@ -419,6 +422,9 @@ const dict: Dictionary = {
   intake_age: { en: 'Age', hi: 'उम्र' },
   intake_gender: { en: 'Gender', hi: 'लिंग' },
   intake_phone: { en: 'Phone number', hi: 'फ़ोन नंबर' },
+  phone_format_error: { en: 'Phone number must be exactly 10 digits.', hi: 'फ़ोन नंबर ठीक 10 अंकों का होना चाहिए।' },
+  phone_digits_only_error: { en: 'Phone number must contain only numeric digits.', hi: 'फ़ोन नंबर में केवल अंक होने चाहिए।' },
+  intake_phone_hint: { en: '10-digit mobile number', hi: '10 अंकों का मोबाइल नंबर' },
   intake_symptoms_q: { en: 'What symptoms are you experiencing?', hi: 'आपको कौन से लक्षण हैं?' },
   intake_symptoms_hint: { en: 'Describe in your own words.', hi: 'अपने शब्दों में बताएं।' },
   intake_allergies_q: { en: 'Do you have any known allergies?', hi: 'क्या आपको कोई एलर्जी है?' },

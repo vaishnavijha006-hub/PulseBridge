@@ -34,6 +34,7 @@ import type {
   AbhaVerificationStatus,
 } from '@/types';
 import { formatAbhaNumber, resolveAbhaVerificationStatus } from '@/utils/abha';
+import { normalizePhoneNumber } from '@/utils/phone';
 
 export interface PrescriptionScanResult {
   data: PrescriptionDraft;
@@ -598,7 +599,7 @@ const demoService: DataService = {
       name: profile.name || 'New Patient',
       age: profile.age || 40,
       gender: profile.gender || 'other',
-      phone: profile.phone || '',
+      phone: profile.phone ? normalizePhoneNumber(profile.phone) : '',
       symptoms: profile.symptoms || '',
       allergies: profile.allergies || 'None',
       currentMeds: profile.currentMeds || '',
@@ -1217,7 +1218,7 @@ const productionService: DataService = {
         name: profile.name || 'New Patient',
         age: profile.age || 40,
         gender: profile.gender || 'other',
-        phone: profile.phone || '',
+        phone: profile.phone ? normalizePhoneNumber(profile.phone) : '',
         symptoms: profile.symptoms || '',
         allergies: profile.allergies || 'None',
         current_meds: profile.currentMeds || '',

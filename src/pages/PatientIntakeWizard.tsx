@@ -18,6 +18,7 @@ import {
   formatAbhaNumber,
   resolveAbhaVerificationStatus,
 } from '@/utils/abha';
+import { validatePhoneNumber, normalizePhoneNumber } from '@/utils/phone';
 
 interface PatientIntakeWizardProps {
   onComplete: (profile: Partial<PatientProfile>, prescriptionFile: File | null) => void;
@@ -45,6 +46,7 @@ export function PatientIntakeWizard({ onComplete, onBack }: PatientIntakeWizardP
   const [voiceActive, setVoiceActive] = useState(false);
   const [voiceSupported, setVoiceSupported] = useState(false);
   const [abhaError, setAbhaError] = useState<string | null>(null);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
 
   const voice = useVoiceGuidance();
   const step = STEPS[stepIdx];
@@ -61,6 +63,19 @@ export function PatientIntakeWizard({ onComplete, onBack }: PatientIntakeWizardP
 
   const next = () => {
     if (step === 'profile') {
+      if (profile.phone && profile.phone.trim()) {
+        const phoneVal = validatePhoneNumber(profile.phone);
+        if (!phoneVal.valid) {
+          setPhoneError(
+            phoneVal.error?.includes('numeric')
+              ? t('phone_digits_only_error')
+              : t('phone_format_error')
+          );
+          return;
+        }
+      }
+      setPhoneError(null);
+
       if (profile.abhaNumber && profile.abhaNumber.trim()) {
         const numVal = validateAbhaNumber(profile.abhaNumber);
         if (!numVal.valid) {
@@ -136,6 +151,8 @@ export function PatientIntakeWizard({ onComplete, onBack }: PatientIntakeWizardP
               setProfile={setProfile}
               abhaError={abhaError}
               setAbhaError={setAbhaError}
+              phoneError={phoneError}
+              setPhoneError={setPhoneError}
             />
           )}
           {step === 'symptoms' && <TextStep
@@ -259,11 +276,15 @@ function ProfileStep({
   setProfile,
   abhaError,
   setAbhaError,
+  phoneError,
+  setPhoneError,
 }: {
   profile: Partial<PatientProfile>;
   setProfile: (p: Partial<PatientProfile>) => void;
   abhaError: string | null;
   setAbhaError: (err: string | null) => void;
+  phoneError: string | null;
+  setPhoneError: (err: string | null) => void;
 }) {
   const { t } = useLanguage();
   return (
@@ -306,13 +327,49 @@ function ProfileStep({
           </Field>
         </div>
         <Field label={t('intake_phone')}>
-          <input
-            type="tel"
-            value={profile.phone ?? ''}
-            onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
-            className="w-full rounded-xl border border-surface-border bg-white px-4 py-3 text-base text-navy-800 focus:border-teal-400 focus:ring-1 focus:ring-teal-400 outline-none transition-colors"
-            placeholder="9876543210"
-          />
+          <div className="flex flex-col gap-1">
+            <input
+              type="tel"
+              value={profile.phone ?? ''}
+              onChange={(e) => {
+                setProfile({ ...profile, phone: e.target.value });
+                if (phoneError) setPhoneError(null);
+              }}
+              onBlur={() => {
+                if (profile.phone && profile.phone.trim()) {
+                  const phoneVal = validatePhoneNumber(profile.phone);
+                  if (!phoneVal.valid) {
+                    setPhoneError(
+                      phoneVal.error?.includes('numeric')
+                        ? t('phone_digits_only_error')
+                        : t('phone_format_error')
+                    );
+                  } else {
+                    setPhoneError(null);
+                    setProfile({ ...profile, phone: phoneVal.normalized });
+                  }
+                }
+              }}
+              className={cn(
+                "w-full rounded-xl border bg-white px-4 py-3 text-base text-navy-800 focus:ring-1 outline-none transition-colors",
+                phoneError
+                  ? "border-rose-400 focus:border-rose-500 focus:ring-rose-400"
+                  : "border-surface-border focus:border-teal-400 focus:ring-teal-400"
+              )}
+              placeholder="9876543210"
+              maxLength={16}
+            />
+            {phoneError ? (
+              <p className="text-xs text-rose-600 font-medium flex items-center gap-1 mt-0.5">
+                <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                <span>{phoneError}</span>
+              </p>
+            ) : (
+              <span className="text-[11px] text-navy-400">
+                {t('intake_phone_hint')}
+              </span>
+            )}
+          </div>
         </Field>
 
         {/* Optional ABHA Details Card */}
