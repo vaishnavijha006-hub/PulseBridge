@@ -18,6 +18,51 @@ export type TranslationKey =
   | 'role_family'
   | 'role_family_hi'
   | 'role_family_desc'
+  | 'role_admin'
+  | 'role_admin_hi'
+  | 'role_admin_desc'
+  | 'admin_title'
+  | 'admin_subtitle'
+  | 'admin_tab_overview'
+  | 'admin_tab_access'
+  | 'admin_tab_security'
+  | 'admin_tab_settings'
+  | 'admin_stat_patients'
+  | 'admin_stat_actions'
+  | 'admin_stat_gaps'
+  | 'admin_stat_reports'
+  | 'admin_stat_adherence'
+  | 'admin_db_status'
+  | 'admin_db_connected'
+  | 'admin_realtime_status'
+  | 'admin_ai_status'
+  | 'admin_storage_status'
+  | 'admin_unimplemented_note'
+  | 'doctor_nav_overview'
+  | 'doctor_nav_patients'
+  | 'doctor_nav_radar'
+  | 'doctor_nav_actions'
+  | 'doctor_nav_reports'
+  | 'doctor_emergency_override_alert'
+  | 'doctor_actions_count'
+  | 'doctor_tab_summary'
+  | 'doctor_tab_rx'
+  | 'doctor_tab_reports'
+  | 'doctor_tab_gaps'
+  | 'doctor_tab_actions'
+  | 'patient_recovery_status'
+  | 'patient_doses_progress'
+  | 'patient_feeling_title'
+  | 'patient_tab_meds'
+  | 'patient_tab_reports'
+  | 'patient_reports_summary'
+  | 'patient_no_reports'
+  | 'patient_grace_notice'
+  | 'nav_switch_role'
+  | 'nav_doctor_dash'
+  | 'nav_patient_dash'
+  | 'nav_admin_dash'
+  | 'system_operational'
   | 'role_select'
   | 'how_title'
   | 'how_step1'
@@ -332,6 +377,51 @@ const dict: Dictionary = {
   empty_no_data: { en: 'No data available yet.', hi: 'अभी कोई डेटा उपलब्ध नहीं है।' },
   sos_emergency: { en: 'Emergency: Please call 112 immediately.', hi: 'आपातकाल: कृपया तुरंत 112 पर कॉल करें।' },
   sos_call: { en: 'Call 112', hi: '112 पर कॉल करें' },
+  role_admin: { en: 'System Admin', hi: 'सिस्टम एडमिन' },
+  role_admin_hi: { en: 'सिस्टम एडमिन', hi: 'सिस्टम एडमिन' },
+  role_admin_desc: { en: 'System operations, real-time telemetry, role directory, and security compliance.', hi: 'सिस्टम संचालन, रीयल-टाइम टेलीमेट्री, रोल डायरेक्टरी और सुरक्षा अनुपालन।' },
+  admin_title: { en: 'System Operations Center', hi: 'सिस्टम ऑपरेशन्स केंद्र' },
+  admin_subtitle: { en: 'Real-time infrastructure, tenant directory, and clinical security compliance', hi: 'रीयल-टाइम इन्फ्रास्ट्रक्चर, टेनेंट डायरेक्टरी और क्लीनिकल सुरक्षा ऑडिट' },
+  admin_tab_overview: { en: 'System Health & Telemetry', hi: 'सिस्टम स्वास्थ्य एवं टेलीमेट्री' },
+  admin_tab_access: { en: 'Role & Access Directory', hi: 'भूमिका एवं एक्सेस निर्देशिका' },
+  admin_tab_security: { en: 'Security & Compliance', hi: 'सुरक्षा एवं अनुपालन' },
+  admin_tab_settings: { en: 'Platform & Storage', hi: 'प्लेटफॉर्म एवं स्टोरेज' },
+  admin_stat_patients: { en: 'Registered Patients', hi: 'पंजीकृत मरीज' },
+  admin_stat_actions: { en: 'Active Care Actions', hi: 'सक्रिय केयर एक्शन्स' },
+  admin_stat_gaps: { en: 'Detected Care Gaps', hi: 'पहचाने गए केयर गैप्स' },
+  admin_stat_reports: { en: 'Diagnostic Reports', hi: 'डायग्नोस्टिक रिपोर्ट्स' },
+  admin_stat_adherence: { en: 'System Adherence', hi: 'सिस्टम एडहेरेंस' },
+  admin_db_status: { en: 'Database Status', hi: 'डेटाबेस स्थिति' },
+  admin_db_connected: { en: 'Connected & Active', hi: 'सक्रिय एवं कनेक्टेड' },
+  admin_realtime_status: { en: 'Realtime Channel', hi: 'रीयल-टाइम चैनल' },
+  admin_ai_status: { en: 'AI Edge Summarizer', hi: 'एआई एज समराइज़र' },
+  admin_storage_status: { en: 'Medical Doc Storage', hi: 'मेडिकल दस्तावेज़ स्टोरेज' },
+  admin_unimplemented_note: { en: 'Enterprise IAM / Single Sign-On (SSO): Roadmap v2.0 (Unconfigured in this tier)', hi: 'एंटरप्राइज IAM / SSO: आगामी रोडमैप v2.0 (वर्तमान टीयर में अनकॉन्फिगर्ड)' },
+  doctor_nav_overview: { en: 'Clinical Overview', hi: 'क्लीनिकल अवलोकन' },
+  doctor_nav_patients: { en: 'Patient Directory', hi: 'मरीज निर्देशिका' },
+  doctor_nav_radar: { en: 'CareGap Radar', hi: 'केयर गैप रडार' },
+  doctor_nav_actions: { en: 'Closed-Loop Care', hi: 'क्लोज्ड-लूप केयर' },
+  doctor_nav_reports: { en: 'Diagnostic Lab Reports', hi: 'डायग्नोस्टिक लैब रिपोर्ट्स' },
+  doctor_emergency_override_alert: { en: 'Critical Safety Override Active', hi: 'क्रिटिकल सेफ्टी ओवरराइड सक्रिय' },
+  doctor_actions_count: { en: 'Care Actions', hi: 'केयर एक्शन्स' },
+  doctor_tab_summary: { en: 'Clinical Summary', hi: 'क्लीनिकल सारांश' },
+  doctor_tab_rx: { en: 'Prescription Verification', hi: 'पर्ची सत्यापन' },
+  doctor_tab_reports: { en: 'Diagnostic Reports & AI', hi: 'डायग्नोस्टिक रिपोर्ट्स एवं एआई' },
+  doctor_tab_gaps: { en: 'Care Gaps', hi: 'केयर गैप्स' },
+  doctor_tab_actions: { en: 'Action Tracking', hi: 'एक्शन ट्रैकिंग' },
+  patient_recovery_status: { en: 'Recovery Journey', hi: 'रिकवरी यात्रा' },
+  patient_doses_progress: { en: "Today's Medication Progress", hi: 'आज की दवाइयों की प्रगति' },
+  patient_feeling_title: { en: 'How are you feeling right now?', hi: 'आप अभी कैसा महसूस कर रहे हैं?' },
+  patient_tab_meds: { en: "Today's Medicines", hi: 'आज की दवाइयां' },
+  patient_tab_reports: { en: 'My Medical Reports', hi: 'मेरी मेडिकल रिपोर्ट्स' },
+  patient_reports_summary: { en: 'Doctor-verified summaries of your medical tests and discharge plans', hi: 'आपके मेडिकल टेस्ट और डिस्चार्ज प्लान के डॉक्टर-सत्यापित सारांश' },
+  patient_no_reports: { en: 'No medical reports have been recorded for your account yet.', hi: 'आपके खाते के लिए अभी कोई मेडिकल रिपोर्ट दर्ज नहीं है।' },
+  patient_grace_notice: { en: '20-minute gentle grace window active for scheduled doses', hi: 'दवाइयों के लिए 20 मिनट की ग्रेस विंडो सक्रिय है' },
+  nav_switch_role: { en: 'Switch Dashboard', hi: 'डैशबोर्ड बदलें' },
+  nav_doctor_dash: { en: 'Doctor Command Center', hi: 'डॉक्टर कमांड सेंटर' },
+  nav_patient_dash: { en: 'Patient Health Companion', hi: 'मरीज हेल्थ साथी' },
+  nav_admin_dash: { en: 'Admin Operations Center', hi: 'एडमिन ऑपरेशन्स सेंटर' },
+  system_operational: { en: 'System Operational', hi: 'प्रणाली सामान्य रूप से सक्रिय' },
 };
 
 export function translate(key: TranslationKey, lang: Language, params?: Record<string, string | number>): string {

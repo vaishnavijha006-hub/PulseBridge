@@ -1,11 +1,12 @@
-import { HeartPulse, Stethoscope, Users, ArrowRight, ShieldCheck, Activity, Clock } from 'lucide-react';
+import { HeartPulse, Stethoscope, Users, ArrowRight, ShieldCheck, Activity, Clock, Server } from 'lucide-react';
 import { PulseBridgeLogo } from '@/components/PulseBridgeLogo';
 import { RoleCard } from '@/components/RoleCard';
 import { CursorGlow } from '@/components/CursorGlow';
 import { DemoBanner } from '@/components/DemoBanner';
+import { LanguageToggle } from '@/components/LanguageToggle';
 import { useLanguage } from '@/i18n/LanguageContext';
 
-type Role = 'patient' | 'doctor' | 'family';
+type Role = 'patient' | 'doctor' | 'family' | 'admin';
 
 interface LandingPageProps {
   onRoleSelect: (role: Role) => void;
@@ -29,7 +30,7 @@ export function LandingPage({ onRoleSelect }: LandingPageProps) {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between">
             <PulseBridgeLogo variant="dark" size="md" />
-            <nav className="flex items-center gap-2 sm:gap-6">
+            <nav className="flex items-center gap-2 sm:gap-4">
               <a href="#about" className="text-sm font-medium text-navy-200 hover:text-teal-300 transition-colors hidden sm:block">
                 {t('nav_about')}
               </a>
@@ -39,6 +40,7 @@ export function LandingPage({ onRoleSelect }: LandingPageProps) {
               <div className="hidden lg:block">
                 <DemoBanner variant="dark" />
               </div>
+              <LanguageToggle variant="dark" />
               <button
                 onClick={() => onRoleSelect('patient')}
                 className="inline-flex items-center gap-2 rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-navy-900 hover:bg-teal-400 transition-colors min-h-[44px]"
@@ -80,7 +82,7 @@ export function LandingPage({ onRoleSelect }: LandingPageProps) {
       {/* Role cards */}
       <section id="about" className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
         <h2 className="text-center text-xl font-semibold text-navy-100 mb-8">{t('role_select')}</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
           <RoleCard
             icon={HeartPulse}
             title={t('role_patient')}
@@ -104,6 +106,14 @@ export function LandingPage({ onRoleSelect }: LandingPageProps) {
             description={t('role_family_desc')}
             actionLabel={t('continue')}
             onClick={() => onRoleSelect('family')}
+          />
+          <RoleCard
+            icon={Server}
+            title={t('role_admin')}
+            hindiTitle={t('role_admin_hi')}
+            description={t('role_admin_desc')}
+            actionLabel={t('continue')}
+            onClick={() => onRoleSelect('admin')}
           />
         </div>
       </section>

@@ -6,6 +6,7 @@ import { PrescriptionProcessing } from '@/pages/PrescriptionProcessing';
 import { PatientDashboard } from '@/pages/PatientDashboard';
 import { DoctorDashboard } from '@/pages/DoctorDashboard';
 import { FamilyRecoveryCircle } from '@/pages/FamilyRecoveryCircle';
+import { AdminDashboard } from '@/pages/AdminDashboard';
 import { dataService } from '@/services/dataService';
 import { detectCareGaps } from '@/services/careGapRules';
 import {
@@ -33,7 +34,7 @@ import type {
   MedicalReport,
 } from '@/types';
 
-type View = 'landing' | 'patient_intake' | 'patient_processing' | 'patient_dashboard' | 'doctor' | 'family';
+type View = 'landing' | 'patient_intake' | 'patient_processing' | 'patient_dashboard' | 'doctor' | 'family' | 'admin';
 
 const DEMO_PATIENT_ID = 'p1';
 
@@ -88,9 +89,10 @@ function AppContent() {
     };
   }, []);
 
-  const handleRoleSelect = useCallback((role: 'patient' | 'doctor' | 'family') => {
+  const handleRoleSelect = useCallback((role: 'patient' | 'doctor' | 'family' | 'admin') => {
     if (role === 'patient') setView('patient_intake');
     else if (role === 'doctor') setView('doctor');
+    else if (role === 'admin') setView('admin');
     else setView('family');
   }, []);
 
@@ -242,10 +244,16 @@ function AppContent() {
         <PatientDashboard
           schedules={schedules}
           followUps={followUps[DEMO_PATIENT_ID] ?? []}
+          reports={reports[DEMO_PATIENT_ID] ?? []}
           onDoseAction={handleDoseAction}
           onHealthUpdate={handleHealthUpdate}
           onFollowUpAnswer={handleFollowUpAnswer}
           onBack={() => setView('landing')}
+          onNavigateRole={(role) => {
+            if (role === 'doctor') setView('doctor');
+            else if (role === 'admin') setView('admin');
+            else setView('family');
+          }}
         />
       )}
       {view === 'doctor' && (
@@ -258,6 +266,11 @@ function AppContent() {
           onConfirmCarePlan={handleConfirmCarePlan}
           onCareGapAction={handleCareGapAction}
           onBack={() => setView('landing')}
+          onNavigateRole={(role) => {
+            if (role === 'patient') setView('patient_dashboard');
+            else if (role === 'admin') setView('admin');
+            else setView('family');
+          }}
         />
       )}
       {view === 'family' && (
@@ -267,13 +280,23 @@ function AppContent() {
           onToggleAccess={handleFamilyToggleAccess}
         />
       )}
+      {view === 'admin' && (
+        <AdminDashboard
+          onBack={() => setView('landing')}
+          onNavigateRole={(role) => {
+            if (role === 'doctor') setView('doctor');
+            else if (role === 'patient') setView('patient_dashboard');
+            else setView('family');
+          }}
+        />
+      )}
     </>
   );
 }
 
 export default function App() {
   return (
-    <LanguageProvider initialLang="hi">
+    <LanguageProvider>
       <AppContent />
     </LanguageProvider>
   );
