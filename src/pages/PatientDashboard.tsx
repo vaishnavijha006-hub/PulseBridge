@@ -26,10 +26,12 @@ import { FamilyConsentManager } from '@/components/FamilyConsentManager';
 import { useLanguage } from '@/i18n/LanguageContext';
 import { cn } from '@/utils/cn';
 import { evaluateDoseTiming, DOSE_REASON_OPTIONS, applyOverdueEvaluations } from '@/utils/reminderEngine';
-import type { MedicationSchedule, DoseStatus, HealthState, FollowUp, MedicalReport } from '@/types';
-import { demoMedicalReports } from '@/data/demoData';
+import type { MedicationSchedule, DoseStatus, HealthState, FollowUp, MedicalReport, PatientProfile } from '@/types';
+import { demoMedicalReports, demoPatients } from '@/data/demoData';
 
 interface PatientDashboardProps {
+  patient?: PatientProfile | null;
+  patientId?: string;
   schedules: MedicationSchedule[];
   followUps: FollowUp[];
   reports?: MedicalReport[];
@@ -43,9 +45,11 @@ interface PatientDashboardProps {
 type PatientTab = 'meds' | 'reports' | 'checkin' | 'family';
 
 export function PatientDashboard({
+  patient: propPatient,
+  patientId: propPatientId,
   schedules: initialSchedules,
   followUps,
-  reports = demoMedicalReports['p1'] ?? [],
+  reports: propReports,
   onDoseAction,
   onHealthUpdate,
   onFollowUpAnswer,
@@ -53,6 +57,33 @@ export function PatientDashboard({
   onNavigateRole,
 }: PatientDashboardProps) {
   const { t, lang } = useLanguage();
+
+  const activePatient = useMemo<PatientProfile>(() => {
+    if (propPatient && propPatient.id) {
+      return propPatient as PatientProfile;
+    }
+    const resolvedId = propPatientId || (propPatient?.id ?? 'p1');
+    const found = demoPatients.find((p) => p.id === resolvedId);
+    if (found) return found;
+
+    return {
+      id: resolvedId,
+      name: propPatient?.name || 'Patient',
+      age: propPatient?.age || 40,
+      gender: propPatient?.gender || 'other',
+      phone: propPatient?.phone || '',
+      symptoms: propPatient?.symptoms || '',
+      allergies: propPatient?.allergies || 'None',
+      currentMeds: propPatient?.currentMeds || '',
+      language: propPatient?.language || 'hi',
+    };
+  }, [propPatient, propPatientId]);
+
+  const reports = useMemo(() => {
+    if (propReports) return propReports;
+    return demoMedicalReports[activePatient.id] ?? [];
+  }, [propReports, activePatient.id]);
+
   const [schedules, setSchedules] = useState<MedicationSchedule[]>(initialSchedules);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<string | null>(null);
@@ -135,10 +166,10 @@ export function PatientDashboard({
             {/* Patient identity badge */}
             <div className="hidden md:flex items-center gap-2 rounded-xl bg-slate-100 border border-slate-200/80 px-2.5 py-1 text-xs">
               <div className="w-5 h-5 rounded-full bg-teal-600 text-white flex items-center justify-center text-[10px] font-bold">
-                R
+                {activePatient.name.trim().charAt(0).toUpperCase() || 'P'}
               </div>
-              <span className="font-semibold text-slate-700">Ravi Sharma</span>
-              <span className="text-[10px] text-slate-400 font-mono">ID: p1</span>
+              <span className="font-semibold text-slate-700">{activePatient.name}</span>
+              <span className="text-[10px] text-slate-400 font-mono">ID: {activePatient.id}</span>
             </div>
 
             {onNavigateRole && (
@@ -184,7 +215,7 @@ export function PatientDashboard({
                 <span>{t('patient_recovery_status')}</span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-                {t('dash_namaste')}, <span className="text-teal-600 font-bold">Ravi</span>
+                {t('dash_namaste')}, <span className="text-teal-600 font-bold">{activePatient.name.trim().split(' ')[0]}</span>
               </h1>
               <p className="text-sm text-slate-500 mt-1 max-w-lg leading-relaxed">
                 {lang === 'hi'
@@ -463,7 +494,7 @@ export function PatientDashboard({
 
         {/* TAB 4: FAMILY RECOVERY CIRCLE (CONSENT-BASED) */}
         {activeTab === 'family' && (
-          <FamilyConsentManager patientId="p1" />
+          <FamilyConsentManager patientId={activePatient.id} />
         )}
       </main>
     </div>
