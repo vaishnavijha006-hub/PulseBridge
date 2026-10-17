@@ -15,12 +15,14 @@ import {
   ShieldCheck,
   User,
   HeartPulse,
-  ChevronLeft
+  ChevronLeft,
+  Users
 } from 'lucide-react';
 import { PulseBridgeLogo } from '@/components/PulseBridgeLogo';
 import { LanguageToggle } from '@/components/LanguageToggle';
 import { DemoBadge } from '@/components/DemoBanner';
 import { StatusBadge } from '@/components/StatusBadge';
+import { FamilyConsentManager } from '@/components/FamilyConsentManager';
 import { useLanguage } from '@/i18n/LanguageContext';
 import { cn } from '@/utils/cn';
 import { evaluateDoseTiming, DOSE_REASON_OPTIONS, applyOverdueEvaluations } from '@/utils/reminderEngine';
@@ -38,7 +40,7 @@ interface PatientDashboardProps {
   onNavigateRole?: (role: 'doctor' | 'admin' | 'family') => void;
 }
 
-type PatientTab = 'meds' | 'reports' | 'checkin';
+type PatientTab = 'meds' | 'reports' | 'checkin' | 'family';
 
 export function PatientDashboard({
   schedules: initialSchedules,
@@ -285,6 +287,19 @@ export function PatientDashboard({
             <Bell className="w-4 h-4 text-teal-600" />
             <span>{t('patient_feeling_title')}</span>
           </button>
+
+          <button
+            onClick={() => setActiveTab('family')}
+            className={cn(
+              'flex items-center gap-2 px-4 py-3 text-sm font-semibold transition-all border-b-2 -mb-px whitespace-nowrap',
+              activeTab === 'family'
+                ? 'text-teal-700 border-teal-600 bg-white rounded-t-xl'
+                : 'text-slate-500 border-transparent hover:text-slate-800'
+            )}
+          >
+            <Users className="w-4 h-4 text-teal-600" />
+            <span>{t('patient_tab_family')}</span>
+          </button>
         </div>
 
         {/* TAB 1: TODAY'S MEDICINES */}
@@ -434,6 +449,11 @@ export function PatientDashboard({
               )}
             </section>
           </div>
+        )}
+
+        {/* TAB 4: FAMILY RECOVERY CIRCLE (CONSENT-BASED) */}
+        {activeTab === 'family' && (
+          <FamilyConsentManager patientId="p1" />
         )}
       </main>
     </div>

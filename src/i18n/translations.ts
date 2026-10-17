@@ -195,6 +195,38 @@ export type TranslationKey =
   | 'family_revoke'
   | 'family_authorize'
   | 'family_access_limited'
+  | 'patient_tab_family'
+  | 'family_circle_title'
+  | 'family_circle_subtitle'
+  | 'family_invite_btn'
+  | 'family_permissions_title'
+  | 'family_perm_meds'
+  | 'family_perm_meds_desc'
+  | 'family_perm_vitals'
+  | 'family_perm_vitals_desc'
+  | 'family_perm_calls'
+  | 'family_perm_calls_desc'
+  | 'family_perm_instructions'
+  | 'family_perm_instructions_desc'
+  | 'family_revoke_confirm'
+  | 'family_support_note_placeholder'
+  | 'family_send_support_note'
+  | 'family_support_notes_title'
+  | 'family_invite_modal_title'
+  | 'family_member_name'
+  | 'family_relationship'
+  | 'family_contact_number'
+  | 'family_invite_code'
+  | 'family_status_pending'
+  | 'family_status_accepted'
+  | 'family_status_revoked'
+  | 'family_status_expired'
+  | 'family_revoke_btn'
+  | 'family_restore_btn'
+  | 'family_access_revoked_notice'
+  | 'family_no_members'
+  | 'family_care_instructions_title'
+  | 'family_view_as_label'
   | 'reminder_dose'
   | 'reminder_missed'
   | 'reminder_followup'
@@ -367,6 +399,50 @@ const dict: Dictionary = {
     en: 'You see only what the patient has authorized. Full prescriptions and doctor notes are not shown.',
     hi: 'आप केवल वही देखते हैं जो मरीज ने अधिकृत किया है। पूरी पर्ची और डॉक्टर नोट नहीं दिखाई जाती।',
   },
+  patient_tab_family: { en: 'Family Circle', hi: 'परिवार सर्कल' },
+  family_circle_title: { en: 'Consent-Based Family Recovery Circle', hi: 'सहमति-आधारित परिवार रिकवरी सर्कल' },
+  family_circle_subtitle: {
+    en: 'Manage who can view your recovery updates. You hold full control over permissions.',
+    hi: 'प्रबंधित करें कि कौन आपकी रिकवरी अपडेट देख सकता है। अनुमतियों पर आपका पूर्ण नियंत्रण है।',
+  },
+  family_invite_btn: { en: 'Invite Family Member', hi: 'परिवार के सदस्य को आमंत्रित करें' },
+  family_permissions_title: { en: 'Sharing Permissions', hi: 'साझाकरण अनुमतियाँ' },
+  family_perm_meds: { en: 'Daily Medication Progress', hi: 'दैनिक दवाई की प्रगति' },
+  family_perm_meds_desc: { en: 'Share dose counts and upcoming schedule times', hi: 'दवा खुराक संख्या और आगामी समय साझा करें' },
+  family_perm_vitals: { en: 'Daily Health Status', hi: 'दैनिक सेहत स्थिति' },
+  family_perm_vitals_desc: { en: 'Share overall daily feeling and recovery check-in', hi: 'सामान्य सेहत और रिकवरी चेक-इन साझा करें' },
+  family_perm_calls: { en: 'Direct Calling Access', hi: 'सीधे कॉल करने की सुविधा' },
+  family_perm_calls_desc: { en: 'Allow family member to call your phone directly', hi: 'परिवार के सदस्य को सीधे आपके फोन पर कॉल करने दें' },
+  family_perm_instructions: { en: 'Discharge & Care Guidelines', hi: 'डिस्चार्ज एवं देखभाल दिशानिर्देश' },
+  family_perm_instructions_desc: { en: 'Share diet, hydration, and doctor-approved care tips', hi: 'आहार, पानी और डॉक्टर-स्वीकृत देखभाल सुझाव साझा करें' },
+  family_revoke_confirm: {
+    en: 'Are you sure you want to revoke this family member’s access? They will immediately lose access to your updates.',
+    hi: 'क्या आप वाकई इस सदस्य की पहुंच वापस लेना चाहते हैं? वे तुरंत आपकी अपडेट तक पहुंच खो देंगे।',
+  },
+  family_support_note_placeholder: { en: 'Write a warm message or encouragement...', hi: 'एक प्यारा संदेश या प्रोत्साहन लिखें...' },
+  family_send_support_note: { en: 'Send Note of Encouragement', hi: 'प्रोत्साहन संदेश भेजें' },
+  family_support_notes_title: { en: 'Family Support & Warm Wishes', hi: 'परिवार का समर्थन और शुभकामनाएं' },
+  family_invite_modal_title: { en: 'Invite a Family Member to Your Recovery Circle', hi: 'अपने रिकवरी सर्कल में परिवार के सदस्य को आमंत्रित करें' },
+  family_member_name: { en: 'Family Member Name', hi: 'परिवार के सदस्य का नाम' },
+  family_relationship: { en: 'Relationship', hi: 'रिश्ता' },
+  family_contact_number: { en: 'Phone Number', hi: 'फोन नंबर' },
+  family_invite_code: { en: 'Invite Code', hi: 'इनवाइट कोड' },
+  family_status_pending: { en: 'Invitation Pending', hi: 'निमंत्रण लंबित' },
+  family_status_accepted: { en: 'Access Active', hi: 'पहुंच सक्रिय' },
+  family_status_revoked: { en: 'Access Revoked', hi: 'पहुंच वापस ली गई' },
+  family_status_expired: { en: 'Invitation Expired', hi: 'निमंत्रण समाप्त' },
+  family_revoke_btn: { en: 'Revoke Access', hi: 'पहुंच वापस लें' },
+  family_restore_btn: { en: 'Restore Access', hi: 'पहुंच पुनः बहाल करें' },
+  family_access_revoked_notice: {
+    en: 'Access to this patient’s recovery updates has been revoked by the patient.',
+    hi: 'इस मरीज की रिकवरी अपडेट तक पहुंच मरीज द्वारा वापस ले ली गई है।',
+  },
+  family_no_members: {
+    en: 'No family members invited yet. Invite a loved one to keep them reassured.',
+    hi: 'अभी तक कोई सदस्य आमंत्रित नहीं है। अपनों को आश्वस्त रखने के लिए आमंत्रित करें।',
+  },
+  family_care_instructions_title: { en: 'Doctor-Approved Care Guidelines', hi: 'डॉक्टर-स्वीकृत देखभाल निर्देश' },
+  family_view_as_label: { en: 'Viewing as Family Member', hi: 'परिवार के सदस्य के रूप में देख रहे हैं' },
   reminder_dose: { en: 'Dose reminder', hi: 'दवाई रिमाइंडर' },
   reminder_missed: { en: 'Missed-dose reminder', hi: 'छूटी खुराक रिमाइंडर' },
   reminder_followup: { en: 'Follow-up reminder', hi: 'फॉलो-अप रिमाइंडर' },

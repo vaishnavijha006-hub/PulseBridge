@@ -156,11 +156,61 @@ PulseBridge AI features **three distinct visual identities and user experiences*
 - **Comprehensive Coverage**: Natural Hindi translations across all navigation items, role cards, action labels, status badges, emergency banners, telemetry cards, and empty states.
 - **Clinical Data Integrity**: Patient identifiers, medication names, dosages, timestamps, and raw laboratory pathology texts remain unmutated to ensure clinical safety.
 
-### 3. Verification & Quality Assurance
-- **Unit & Integration Tests**: `npm run test` &rarr; **56/56 passing tests** across 3 test suites:
+### 3. Consent-Based Family Recovery Circle
+
+#### Overview
+The **Consent-Based Family Recovery Circle** enables patients to keep loved ones reassured and involved in their recovery journey while maintaining strict, granular privacy boundaries and immediate access revocation.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                   PATIENT DASHBOARD                         │
+│  [ Family Circle Tab ]                                      │
+│  • Patient-controlled invitations with unique invite codes   │
+│  • Granular permission toggles (real-time toggleable)       │
+│  • Immediate access revocation / restoration                │
+│  • Viewing encouragement messages sent by loved ones        │
+└──────────────┬──────────────────────────────▲───────────────┘
+               │                              │
+               │ Patient Grants / Revokes     │ Family Sends Support Note
+               ▼                              │
+┌─────────────────────────────────────────────┴───────────────┐
+│               FAMILY RECOVERY CIRCLE                        │
+│  [ Family-Facing Companion Dashboard ]                      │
+│  • Fail-closed privacy redaction (unconsented fields = null)│
+│  • Medication progress & next dose (if consented)           │
+│  • High-level recovery feeling status (if consented)        │
+│  • Direct phone calling (if consented)                      │
+│  • Doctor-approved discharge guidelines (if consented)      │
+│  • Zero self-authorization (revocation is strictly enforced)│
+│  • Warm encouragement & check-in messaging                  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### Key Capabilities & Security Boundaries
+1. **Granular Consent Controls**:
+   - `shareMedicationStatus`: Share daily dose counts and upcoming schedule times.
+   - `shareDailyVitals`: Share high-level recovery check-in status (e.g. "Recovering steadily").
+   - `allowDirectCalling`: Allow family member to call the patient's phone directly.
+   - `shareCareInstructions`: Share doctor-approved discharge care & dietary guidelines.
+2. **Fail-Closed Privacy Redaction**:
+   - Implemented in `src/services/familyConsentService.ts` and Supabase SQL function `public.get_granular_family_view`.
+   - If consent is missing, pending, expired, or revoked, all sensitive clinical fields are returned as `null` with a clear revocation notice.
+   - Doctor clinical notes, unconfirmed prescription scans, triage scores, and internal care gap logs are never exposed to family under any circumstance.
+3. **Zero Self-Authorization**:
+   - Family members cannot modify permissions or grant themselves access. Only the patient holds the authority to invite, grant permissions, revoke, or restore access.
+4. **Recovery Coordination & Support Notes**:
+   - Family members can send notes of encouragement to their loved one, fostering emotional support throughout recovery.
+
+---
+
+### 4. Verification & Quality Assurance
+- **Unit & Integration Tests**: `npm run test` &rarr; **69/69 passing tests** across 5 test suites:
+  - [`familyConsentService.test.ts`](src/services/familyConsentService.test.ts) (8 tests)
+  - [`FamilyRecoveryCircle.test.tsx`](src/pages/FamilyRecoveryCircle.test.tsx) (5 tests)
   - [`careActionService.test.ts`](src/services/careActionService.test.ts) (44 tests)
   - [`ClosedLoopCareView.test.tsx`](src/components/ClosedLoopCareView.test.tsx) (5 tests)
   - [`Dashboards.test.tsx`](src/pages/Dashboards.test.tsx) (7 tests)
 - **TypeScript Typecheck**: `npm run typecheck` &rarr; **0 errors**.
 - **Production Build**: `npm run build` &rarr; **Successfully built with Vite**.
+
 
