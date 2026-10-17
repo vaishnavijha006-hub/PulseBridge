@@ -190,6 +190,18 @@ class CareActionStore {
   }
 
   /**
+   * Seeds actions idempotently (does not duplicate records with existing IDs).
+   */
+  public seed(seedActions: CareAction[] = demoCareActions): void {
+    for (const a of seedActions) {
+      if (!this.actions.has(a.id)) {
+        this.actions.set(a.id, { ...a });
+      }
+    }
+    this.notify();
+  }
+
+  /**
    * Subscribes to changes in the action store.
    */
   public subscribe(listener: () => void): () => void {

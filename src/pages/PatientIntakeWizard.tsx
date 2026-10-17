@@ -1,12 +1,15 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { ArrowLeft, ArrowRight, Mic, MicOff, User } from 'lucide-react';
 import { PulseBridgeLogo } from '@/components/PulseBridgeLogo';
 import { PulseProgress } from '@/components/PulseProgress';
 import { LanguageToggle } from '@/components/LanguageToggle';
 import { DemoBadge } from '@/components/DemoBanner';
 import { PrescriptionUpload } from '@/components/PrescriptionUpload';
+import { VoiceGuidanceControl } from '@/components/VoiceGuidanceControl';
+import { useVoiceGuidance } from '@/hooks/useVoiceGuidance';
 
 import { useLanguage } from '@/i18n/LanguageContext';
+import type { TranslationKey } from '@/i18n/translations';
 import type { Language, PatientProfile } from '@/types';
 import { cn } from '@/utils/cn';
 
@@ -19,6 +22,15 @@ type Step = 'language' | 'profile' | 'symptoms' | 'allergies' | 'meds' | 'upload
 
 const STEPS: Step[] = ['language', 'profile', 'symptoms', 'allergies', 'meds', 'upload'];
 
+const STEP_VOICE_KEYS: Record<Step, TranslationKey> = {
+  language: 'voice_step_language',
+  profile: 'voice_step_profile',
+  symptoms: 'voice_step_symptoms',
+  allergies: 'voice_step_allergies',
+  meds: 'voice_step_meds',
+  upload: 'voice_step_upload',
+};
+
 export function PatientIntakeWizard({ onComplete, onBack }: PatientIntakeWizardProps) {
   const { t, lang, setLang } = useLanguage();
   const [stepIdx, setStepIdx] = useState(0);
@@ -27,8 +39,18 @@ export function PatientIntakeWizard({ onComplete, onBack }: PatientIntakeWizardP
   const [voiceActive, setVoiceActive] = useState(false);
   const [voiceSupported, setVoiceSupported] = useState(false);
 
+  const voice = useVoiceGuidance();
   const step = STEPS[stepIdx];
   const isLast = stepIdx === STEPS.length - 1;
+
+  useEffect(() => {
+    if (voice.isEnabled) {
+      const voiceKey = STEP_VOICE_KEYS[step];
+      if (voiceKey) {
+        voice.speakInstruction(voiceKey, lang);
+      }
+    }
+  }, [stepIdx, lang, voice.isEnabled]);
 
   const next = () => {
     if (isLast) {
@@ -48,21 +70,27 @@ export function PatientIntakeWizard({ onComplete, onBack }: PatientIntakeWizardP
 
   return (
     <div className="min-h-screen bg-surface-light flex flex-col">
-      {/* Header */}
-      <header className="border-b border-surface-border bg-white">
-        <div className="mx-auto max-w-3xl px-4 sm:px-6 py-3 flex items-center justify-between">
-          <button onClick={onBack} className="flex items-center gap-2 text-sm font-medium text-navy-500 hover:text-navy-700 transition-colors">
-            <ArrowLeft className="w-4 h-4" />
-            <span className="hidden sm:inline">{t('back')}</span>
-          </button>
-          <PulseBridgeLogo variant="light" size="sm" showTagline={false} />
+      {/* Top Toolbar / Header */}
+      <header className="border-b border-surface-border bg-white sticky top-0 z-20 shadow-sm">
+        <div className="mx-auto max-w-3xl px-4 sm:px-6 py-3 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-3">
+            <button onClick={onBack} className="flex items-center gap-2 text-sm font-medium text-navy-500 hover:text-navy-700 transition-colors">
+              <ArrowLeft className="w-4 h-4" />
+              <span className="hidden sm:inline">{t('back')}</span>
+            </button>
+            <PulseBridgeLogo variant="light" size="sm" showTagline={false} />
+            <span className="hidden md:inline-flex text-xs font-bold px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200">
+              {t('nav_patient_intake')}
+            </span>
+          </div>
           <div className="flex items-center gap-2">
+            {/* Voice Guidance Toggle in Top Toolbar */}
+            <VoiceGuidanceControl voice={voice} variant="compact" />
             <DemoBadge variant="light" />
             <LanguageToggle variant="light" />
           </div>
         </div>
       </header>
-
 
       {/* Progress */}
       <div className="mx-auto max-w-2xl w-full px-4 sm:px-6 pt-6">
@@ -177,11 +205,11 @@ function LanguageStep({ current, onSelect }: { current: Language; onSelect: (l: 
               'flex w-10 h-10 items-center justify-center rounded-full text-lg font-bold',
               current === l ? 'bg-teal-500 text-white' : 'bg-surface-muted text-navy-500',
             )}>
-              {l === 'hi' ? 'A' : 'E'}
+              {l === 'hi' ? 'अ' : 'E'}
             </div>
             <div className="flex flex-col text-left">
-              <span className="text-base font-semibold text-navy-800">{l === 'hi' ? 'हिंदी / Hinglish' : 'English'}</span>
-              <span className="text-sm text-navy-500">{l === 'hi' ? 'Hindi first, English optional' : 'English interface'}</span>
+              <span className="text-base font-semibold text-navy-800">{l === 'hi' ? 'हिंदी (Hindi)' : 'English'}</span>
+              <span className="text-sm text-navy-500">{l === 'hi' ? 'संपूर्ण इंटरफ़ेस और आवाज़ हिंदी में' : 'Complete interface & voice in English'}</span>
             </div>
           </button>
         ))}
@@ -279,7 +307,7 @@ function TextStep({
   setVoiceActive: (v: boolean) => void;
   onVoiceResult: (v: string) => void;
 }) {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const recognitionRef = useRef<any>(null);
 
   const toggleVoice = useCallback(() => {
@@ -298,7 +326,7 @@ function TextStep({
     }
 
     const rec = new SR();
-    rec.lang = 'hi-IN';
+    rec.lang = lang === 'hi' ? 'hi-IN' : 'en-US';
     rec.continuous = false;
     rec.interimResults = false;
     rec.onresult = (e: any) => {
@@ -310,7 +338,7 @@ function TextStep({
     rec.start();
     recognitionRef.current = rec;
     setVoiceActive(true);
-  }, [voiceActive, onVoiceResult, setVoiceActive, setVoiceSupported]);
+  }, [voiceActive, onVoiceResult, setVoiceActive, setVoiceSupported, lang]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -336,9 +364,13 @@ function TextStep({
           )}
         >
           {voiceActive ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4 text-teal-500" />}
-          {voiceActive ? 'Stop' : t('intake_voice')}
+          {voiceActive ? t('voice_stop') : t('intake_voice')}
         </button>
-        {voiceActive && <span className="text-sm text-danger-500 font-medium animate-pulse">Listening...</span>}
+        {voiceActive && (
+          <span className="text-sm text-rose-500 font-medium animate-pulse">
+            {lang === 'hi' ? 'सुन रहा है...' : 'Listening...'}
+          </span>
+        )}
         {allowNone && (
           <button
             onClick={() => onChange(t('intake_none'))}

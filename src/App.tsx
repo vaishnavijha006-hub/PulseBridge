@@ -6,6 +6,7 @@ import { PrescriptionProcessing } from '@/pages/PrescriptionProcessing';
 import { PatientDashboard } from '@/pages/PatientDashboard';
 import { DoctorDashboard } from '@/pages/DoctorDashboard';
 import { FamilyRecoveryCircle } from '@/pages/FamilyRecoveryCircle';
+import { AdminDashboard } from '@/pages/AdminDashboard';
 import { dataService } from '@/services/dataService';
 import { detectCareGaps } from '@/services/careGapRules';
 import {
@@ -33,12 +34,53 @@ import type {
   MedicalReport,
 } from '@/types';
 
-type View = 'landing' | 'patient_intake' | 'patient_processing' | 'patient_dashboard' | 'doctor' | 'family';
+type View = 'landing' | 'patient_intake' | 'patient_processing' | 'patient_dashboard' | 'doctor' | 'family' | 'admin';
 
 const DEMO_PATIENT_ID = 'p1';
 
+function getViewFromLocation(): View {
+  if (typeof window === 'undefined') return 'landing';
+  const params = new URLSearchParams(window.location.search);
+  const q = params.get('view') || params.get('tab') || params.get('page');
+  if (q && ['landing', 'patient_intake', 'patient_processing', 'patient_dashboard', 'doctor', 'family', 'admin'].includes(q)) {
+    return q as View;
+  }
+  const hash = window.location.hash.replace(/^#\/?/, '').toLowerCase();
+  if (hash === 'intake' || hash === 'patient-intake' || hash === 'patient_intake') {
+    return 'patient_intake';
+  }
+  if (hash === 'patient' || hash === 'patient-dashboard' || hash === 'patient_dashboard') {
+    return 'patient_dashboard';
+  }
+  if (hash === 'doctor') return 'doctor';
+  if (hash === 'family') return 'family';
+  if (hash === 'admin') return 'admin';
+  return 'landing';
+}
+
 function AppContent() {
-  const [view, setView] = useState<View>('landing');
+  const [view, setViewState] = useState<View>(() => getViewFromLocation());
+
+  const setView = useCallback((nextView: View) => {
+    setViewState(nextView);
+    if (typeof window !== 'undefined') {
+      const hash = nextView === 'landing' ? '' : `#${nextView.replace('_', '-')}`;
+      const url = hash ? `${window.location.pathname}${hash}` : window.location.pathname;
+      window.history.pushState(null, '', url);
+    }
+  }, []);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setViewState(getViewFromLocation());
+    };
+    window.addEventListener('popstate', handlePopState);
+    window.addEventListener('hashchange', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('hashchange', handlePopState);
+    };
+  }, []);
   const [prescriptionPreview, setPrescriptionPreview] = useState<string | null>(null);
   const [prescriptionFile, setPrescriptionFile] = useState<File | null>(null);
   const [schedules, setSchedules] = useState<MedicationSchedule[]>(demoSchedules[DEMO_PATIENT_ID] ?? []);
@@ -89,9 +131,11 @@ function AppContent() {
     };
   }, []);
 
-  const handleRoleSelect = useCallback((role: 'patient' | 'doctor' | 'family') => {
-    if (role === 'patient') setView('patient_intake');
+  const handleRoleSelect = useCallback((role: 'patient' | 'doctor' | 'family' | 'admin' | 'patient_intake') => {
+    if (role === 'patient') setView('patient_dashboard');
+    else if (role === 'patient_intake') setView('patient_intake');
     else if (role === 'doctor') setView('doctor');
+    else if (role === 'admin') setView('admin');
     else setView('family');
   }, []);
 
@@ -258,6 +302,12 @@ function AppContent() {
           onHealthUpdate={handleHealthUpdate}
           onFollowUpAnswer={handleFollowUpAnswer}
           onBack={() => setView('landing')}
+          onNavigateRole={(role) => {
+            if (role === 'doctor') setView('doctor');
+            else if (role === 'admin') setView('admin');
+            else if (role === 'patient_intake') setView('patient_intake');
+            else setView('family');
+          }}
         />
       )}
       {view === 'doctor' && (
@@ -270,6 +320,11 @@ function AppContent() {
           onConfirmCarePlan={handleConfirmCarePlan}
           onCareGapAction={handleCareGapAction}
           onBack={() => setView('landing')}
+          onNavigateRole={(role) => {
+            if (role === 'patient') setView('patient_dashboard');
+            else if (role === 'admin') setView('admin');
+            else setView('family');
+          }}
         />
       )}
       {view === 'family' && (
@@ -277,6 +332,21 @@ function AppContent() {
           view={familyView}
           onBack={() => setView('landing')}
           onToggleAccess={handleFamilyToggleAccess}
+          onNavigateRole={(role) => {
+            if (role === 'doctor') setView('doctor');
+            else if (role === 'patient') setView('patient_dashboard');
+            else if (role === 'admin') setView('admin');
+          }}
+        />
+      )}
+      {view === 'admin' && (
+        <AdminDashboard
+          onBack={() => setView('landing')}
+          onNavigateRole={(role) => {
+            if (role === 'doctor') setView('doctor');
+            else if (role === 'patient') setView('patient_dashboard');
+            else setView('family');
+          }}
         />
       )}
     </>
@@ -285,7 +355,7 @@ function AppContent() {
 
 export default function App() {
   return (
-    <LanguageProvider initialLang="hi">
+    <LanguageProvider>
       <AppContent />
     </LanguageProvider>
   );
