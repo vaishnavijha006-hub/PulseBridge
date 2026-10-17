@@ -74,6 +74,7 @@ export type ConsentAuditAction =
   | 'member_revoked'
   | 'member_restored'
   | 'member_removed'
+  | 'action_acknowledged'
   | 'access_denied_unauthorized';
 
 export interface ConsentAuditLogEntry {
@@ -115,6 +116,25 @@ export interface SendSupportNoteInput {
   caregiverName: string;
   relationship: string;
   message: string;
+}
+
+/**
+ * Family-appropriate representation of a Closed-Loop Care Action.
+ * Internal diagnostic deliberations and raw medical jargon are omitted or simplified.
+ */
+export interface FamilyCareActionUpdate {
+  id: string;
+  title: string;
+  explanation: string;
+  status: 'open' | 'in_progress' | 'resolved' | 'documented';
+  statusLabel: string;
+  priority?: 'urgent' | 'high' | 'routine';
+  sourceRole: string;
+  responsibleName?: string;
+  timestamp: string;
+  dueDate?: string | null;
+  familyAcknowledged: boolean;
+  acknowledgedAt?: string | null;
 }
 
 export interface GranularFamilyView {
@@ -159,6 +179,8 @@ export interface GranularFamilyView {
     achieved: boolean;
     date?: string;
   }[] | null;
+  /** Closed-loop care coordination actions explicitly permitted by patient consent */
+  sharedCareActions: FamilyCareActionUpdate[] | null;
   /** IDs of recovery timeline updates acknowledged by this family member */
   acknowledgedUpdates: string[];
   redactedReason?: string | null;

@@ -25,7 +25,8 @@ import {
   ChevronDown,
   UserCheck,
   Hourglass,
-  AlertCircle
+  AlertCircle,
+  ListTodo
 } from 'lucide-react';
 import { PulseBridgeLogo } from '@/components/PulseBridgeLogo';
 import { LanguageToggle } from '@/components/LanguageToggle';
@@ -783,7 +784,113 @@ export function FamilyRecoveryCircle({ onBack, onNavigateRole }: FamilyRecoveryC
                           </div>
                         ) : null}
 
-                        {/* 4. Recent Encouragement Notes Thread */}
+                        {/* 4. Closed-Loop Care & Recovery Actions Card */}
+                        {perms.shareCareActions && (
+                          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs flex flex-col gap-4">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="p-1.5 rounded-lg bg-teal-50 text-teal-600">
+                                  <ListTodo className="w-4 h-4" />
+                                </span>
+                                <div>
+                                  <h3 className="text-sm font-bold text-slate-900">
+                                    {t('family_care_actions_title')}
+                                  </h3>
+                                  <span className="text-[11px] text-slate-400">
+                                    {t('family_care_actions_subtitle')}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {liveView.sharedCareActions && liveView.sharedCareActions.length > 0 ? (
+                              <div className="space-y-3">
+                                {liveView.sharedCareActions.map((action) => (
+                                  <div
+                                    key={action.id}
+                                    className="rounded-xl border border-slate-200/80 bg-slate-50/60 p-3.5 flex flex-col gap-2 hover:bg-slate-50 transition-colors"
+                                  >
+                                    <div className="flex items-start justify-between gap-2">
+                                      <div className="flex-1">
+                                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                                          <h4 className="text-xs font-bold text-slate-900">
+                                            {action.title}
+                                          </h4>
+                                          <span
+                                            className={cn(
+                                              'text-[10px] font-bold px-2 py-0.5 rounded-full border',
+                                              action.status === 'resolved'
+                                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                                : action.status === 'in_progress'
+                                                ? 'bg-sky-50 text-sky-700 border-sky-200'
+                                                : action.status === 'documented'
+                                                ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                                                : 'bg-amber-50 text-amber-700 border-amber-200'
+                                            )}
+                                          >
+                                            {action.statusLabel}
+                                          </span>
+                                          {action.priority === 'urgent' && (
+                                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-rose-100 text-rose-700 border border-rose-200">
+                                              Urgent
+                                            </span>
+                                          )}
+                                        </div>
+                                        <p className="text-xs text-slate-600 leading-relaxed">
+                                          {action.explanation}
+                                        </p>
+                                      </div>
+
+                                      {/* Acknowledge Button */}
+                                      <div className="flex-shrink-0">
+                                        {action.familyAcknowledged ? (
+                                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">
+                                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                            {t('family_care_action_acked_badge')}
+                                          </span>
+                                        ) : (
+                                          <button
+                                            onClick={() => handleAcknowledge(action.id)}
+                                            className="text-[11px] font-semibold text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-200 px-2.5 py-1 rounded-full transition-colors active:scale-95"
+                                          >
+                                            {t('family_care_action_ack_btn')}
+                                          </button>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-200/50 flex-wrap gap-2">
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-medium text-slate-600">
+                                          {action.sourceRole}
+                                          {action.responsibleName ? ` • ${action.responsibleName}` : ''}
+                                        </span>
+                                      </div>
+                                      {action.dueDate && (
+                                        <span className="flex items-center gap-1 text-slate-500 font-medium">
+                                          <Clock className="w-3 h-3 text-slate-400" />
+                                          {t('family_care_action_due_label')}: {new Date(action.dueDate).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 p-4 text-center text-xs text-slate-400">
+                                {t('family_care_actions_empty')}
+                              </div>
+                            )}
+
+                            {/* Safety Decoupling Disclaimer */}
+                            <div className="text-[11px] text-slate-500 bg-slate-50 border border-slate-100 rounded-xl p-2.5 flex items-center gap-2">
+                              <Info className="w-3.5 h-3.5 text-teal-600 flex-shrink-0" />
+                              <span>{t('family_care_action_decoupled_disclaimer')}</span>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* 5. Recent Encouragement Notes Thread */}
                         {liveView.supportNotes.length > 0 && (
                           <div className="rounded-2xl border border-rose-100 bg-white p-5 shadow-xs flex flex-col gap-3">
                             <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">

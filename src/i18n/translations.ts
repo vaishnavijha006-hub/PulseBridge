@@ -282,6 +282,18 @@ export type TranslationKey =
   | 'family_tab_consent_invitations'
   | 'family_tab_consent_audit'
   | 'family_past_data_disclosure'
+  | 'family_care_actions_title'
+  | 'family_care_actions_subtitle'
+  | 'family_care_actions_empty'
+  | 'family_care_action_status_open'
+  | 'family_care_action_status_in_progress'
+  | 'family_care_action_status_resolved'
+  | 'family_care_action_status_documented'
+  | 'family_care_action_ack_btn'
+  | 'family_care_action_acked_badge'
+  | 'family_care_action_due_label'
+  | 'family_care_action_role_label'
+  | 'family_care_action_decoupled_disclaimer'
   | 'reminder_dose'
   | 'reminder_missed'
   | 'reminder_followup'
@@ -585,6 +597,54 @@ const dict: Dictionary = {
   family_past_data_disclosure: {
     en: 'Important: Immediate revocation prevents all future reads. However, it cannot erase information previously viewed or saved.',
     hi: 'महत्वपूर्ण: तत्काल निरस्तीकरण भविष्य के सभी अनुरोधों को रोकता है। हालांकि, यह पहले से देखी गई जानकारी को मिटा नहीं सकता।',
+  },
+  family_care_actions_title: {
+    en: 'Recovery Coordination & Care Actions',
+    hi: 'रिकवरी समन्वय एवं केयर एक्शन्स',
+  },
+  family_care_actions_subtitle: {
+    en: 'Active recovery milestones and care-team tasks explicitly shared with family',
+    hi: 'सक्रिय रिकवरी मील के पत्थर एवं मरीज द्वारा साझा किए गए केयर टीम कार्य',
+  },
+  family_care_actions_empty: {
+    en: 'No shared care actions currently scheduled for your loved one.',
+    hi: 'वर्तमान में आपके प्रियजन के लिए कोई साझा केयर एक्शन निर्धारित नहीं है।',
+  },
+  family_care_action_status_open: {
+    en: 'Needs Attention',
+    hi: 'ध्यान देने की आवश्यकता',
+  },
+  family_care_action_status_in_progress: {
+    en: 'In Progress',
+    hi: 'प्रगति पर है',
+  },
+  family_care_action_status_resolved: {
+    en: 'Clinically Completed',
+    hi: 'क्लीनिकल रूप से पूर्ण',
+  },
+  family_care_action_status_documented: {
+    en: 'Doctor Evaluated',
+    hi: 'डॉक्टर द्वारा मूल्यांकित',
+  },
+  family_care_action_ack_btn: {
+    en: 'Acknowledge Update',
+    hi: 'अपडेट देखा',
+  },
+  family_care_action_acked_badge: {
+    en: 'Family Acknowledged',
+    hi: 'परिवार द्वारा देखा गया',
+  },
+  family_care_action_due_label: {
+    en: 'Target Due',
+    hi: 'अपेक्षित समय',
+  },
+  family_care_action_role_label: {
+    en: 'Lead Role',
+    hi: 'जिम्मेदार',
+  },
+  family_care_action_decoupled_disclaimer: {
+    en: 'Family acknowledgment confirms support awareness only. Clinical completion is governed strictly by the treating physician.',
+    hi: 'परिवार की स्वीकृति केवल जागरूकता की पुष्टि करती है। क्लीनिकल पूर्णता का निर्णय केवल चिकित्सक द्वारा लिया जाता है।',
   },
   reminder_dose: { en: 'Dose reminder', hi: 'दवाई रिमाइंडर' },
   reminder_missed: { en: 'Missed-dose reminder', hi: 'छूटी खुराक रिमाइंडर' },

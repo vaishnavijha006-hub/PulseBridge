@@ -22,8 +22,10 @@ import type {
   UpdateConsentPermissionsInput,
   SendSupportNoteInput,
   GranularFamilyView,
+  FamilyCareActionUpdate,
 } from '@/types/familyConsent';
 import { demoSchedules, demoPatients } from '@/data/demoData';
+import { careActionService } from '@/services/careActionService';
 
 const STORAGE_KEY_MEMBERS = 'pulsebridge_family_circle_members';
 const STORAGE_KEY_NOTES = 'pulsebridge_family_support_notes';
@@ -623,6 +625,20 @@ class FamilyConsentService {
     }
     if (!this.acknowledgedUpdates[memberId].includes(updateId)) {
       this.acknowledgedUpdates[memberId].push(updateId);
+
+      const member = this.getMember(memberId);
+      if (member) {
+        this.logAudit({
+          patientId: member.patientId,
+          caregiverId: memberId,
+          caregiverName: member.caregiverName,
+          action: 'action_acknowledged',
+          category: 'shareCareActions',
+          details: `Family member acknowledged care update "${updateId}". (Clinical workflow decoupled & preserved).`,
+          actorRole: 'caregiver',
+        });
+      }
+
       this.saveState();
     }
   }
@@ -687,6 +703,7 @@ class FamilyConsentService {
         lastUpdateTimestamp: null,
         sharedAppointments: null,
         recoveryMilestones: null,
+        sharedCareActions: null,
         acknowledgedUpdates: [],
         redactedReason: 'Access is not authorized or has been revoked by the patient.',
       };
@@ -754,6 +771,40 @@ class FamilyConsentService {
         ]
       : null;
 
+    // Closed-Loop Care Actions (family-appropriate view, strictly consent-gated)
+    const sharedCareActions: FamilyCareActionUpdate[] | null = perms.shareCareActions
+      ? careActionService.getByPatient(patientId).map((action) => {
+          const isAcked = (this.acknowledgedUpdates[member.id] || []).includes(action.id);
+
+          let sourceRole = 'Care Team';
+          if (action.assignedRole === 'doctor') sourceRole = 'Physician (डॉक्टर)';
+          else if (action.assignedRole === 'nurse') sourceRole = 'Nursing Care (नर्सिंग)';
+          else if (action.assignedRole === 'care_coordinator') sourceRole = 'Care Coordinator (केयर डेस्क)';
+          else if (action.assignedRole === 'caregiver') sourceRole = 'Family Caregiver (परिवार)';
+          else if (action.assignedRole === 'pharmacist') sourceRole = 'Pharmacy (फार्मेसी)';
+
+          let statusLabel = 'In Progress';
+          if (action.status === 'open') statusLabel = 'Needs Attention';
+          else if (action.status === 'in_progress') statusLabel = 'In Progress';
+          else if (action.status === 'resolved') statusLabel = 'Completed';
+          else if (action.status === 'documented') statusLabel = 'Doctor Evaluated';
+
+          return {
+            id: action.id,
+            title: action.title,
+            explanation: action.description,
+            status: action.status,
+            statusLabel,
+            priority: action.priority,
+            sourceRole,
+            responsibleName: action.assignedTo,
+            timestamp: action.updatedAt || action.createdAt,
+            dueDate: action.dueDate || null,
+            familyAcknowledged: isAcked,
+          };
+        })
+      : null;
+
     return {
       patientName: patient.name,
       patientId,
@@ -773,6 +824,7 @@ class FamilyConsentService {
       lastUpdateTimestamp: new Date(Date.now() - 3600000 * 1.5).toISOString(),
       sharedAppointments,
       recoveryMilestones,
+      sharedCareActions,
       acknowledgedUpdates: this.acknowledgedUpdates[member.id] || [],
       redactedReason: null,
     };

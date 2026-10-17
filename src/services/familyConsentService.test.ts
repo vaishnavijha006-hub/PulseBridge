@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { familyConsentService, hashToken } from './familyConsentService';
+import { careActionService } from '@/services/careActionService';
 
 describe('FamilyConsentService (Patient-Controlled Consent Management Center)', () => {
   const PATIENT_ID = 'p1';
@@ -203,5 +204,74 @@ describe('FamilyConsentService (Patient-Controlled Consent Management Center)', 
     expect(view.dosesToday).toBeNull();
     expect(view.healthUpdateStatus).toBeNull();
     expect(view.redactedReason).toBeDefined();
+  });
+
+  describe('Closed-Loop Care Integration with Family Recovery Circle', () => {
+    it('shares real Closed-Loop Care actions when shareCareActions consent is active', () => {
+      const view = familyConsentService.getGranularFamilyView(PATIENT_ID, 'fcm_1');
+      expect(view.authorized).toBe(true);
+      expect(view.sharedCareActions).not.toBeNull();
+      expect(view.sharedCareActions!.length).toBeGreaterThan(0);
+
+      // Verify human-friendly formatting of real care actions
+      const urgentAction = view.sharedCareActions!.find((a) => a.id === 'act-p1-1');
+      expect(urgentAction).toBeDefined();
+      expect(urgentAction!.title).toContain('Cardiology Teleconsult');
+      expect(urgentAction!.sourceRole).toBe('Physician (डॉक्टर)');
+      expect(urgentAction!.status).toBe('in_progress');
+      expect(urgentAction!.statusLabel).toBe('In Progress');
+      expect(urgentAction!.familyAcknowledged).toBe(false);
+    });
+
+    it('redacts shared care actions when shareCareActions permission is false', () => {
+      familyConsentService.updatePermissions({
+        patientId: PATIENT_ID,
+        memberId: 'fcm_1',
+        permissions: {
+          shareCareActions: false,
+        },
+      });
+
+      const view = familyConsentService.getGranularFamilyView(PATIENT_ID, 'fcm_1');
+      expect(view.authorized).toBe(true);
+      expect(view.sharedCareActions).toBeNull();
+    });
+
+    it('family acknowledgment records acknowledgment in audit log without altering clinical status in careActionService', () => {
+      const actionBefore = careActionService.getById('act-p1-1');
+      expect(actionBefore).not.toBeNull();
+      const originalStatus = actionBefore!.status; // 'in_progress'
+
+      // Family member acknowledges the update
+      familyConsentService.acknowledgeUpdate('act-p1-1', 'fcm_1');
+
+      // 1. Family view reflects acknowledgment
+      const view = familyConsentService.getGranularFamilyView(PATIENT_ID, 'fcm_1');
+      const actionInView = view.sharedCareActions!.find((a) => a.id === 'act-p1-1');
+      expect(actionInView!.familyAcknowledged).toBe(true);
+
+      // 2. Audit log records the acknowledgment
+      const auditLogs = familyConsentService.listAuditLogs(PATIENT_ID);
+      const ackLog = auditLogs.find((l) => l.action === 'action_acknowledged');
+      expect(ackLog).toBeDefined();
+      expect(ackLog!.details).toContain('act-p1-1');
+
+      // 3. CLINICAL SAFETY INVARIANT: Clinical status in careActionService remains unchanged!
+      const actionAfter = careActionService.getById('act-p1-1');
+      expect(actionAfter!.status).toBe(originalStatus); // Still 'in_progress', NEVER marked resolved
+      expect(actionAfter!.outcomeNote).toBeUndefined(); // Doctor outcome note requirement is preserved
+    });
+
+    it('revoking consent immediately stops rendering care actions fail-closed', () => {
+      familyConsentService.revokeConsent('fcm_1', PATIENT_ID);
+
+      const view = familyConsentService.getGranularFamilyView(PATIENT_ID, 'fcm_1');
+      expect(view.authorized).toBe(false);
+      expect(view.sharedCareActions).toBeNull();
+
+      // Underlying care action in careActionService remains preserved and safe
+      const underlyingAction = careActionService.getById('act-p1-1');
+      expect(underlyingAction).not.toBeNull();
+    });
   });
 });

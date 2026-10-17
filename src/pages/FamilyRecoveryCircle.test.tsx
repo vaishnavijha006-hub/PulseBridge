@@ -124,6 +124,32 @@ describe('FamilyRecoveryCircle — Dedicated Premium Healthcare Dashboard', () =
     // Security check: Family member CANNOT self-authorize
     expect(screen.queryByText('Authorize Access')).not.toBeInTheDocument();
   });
+
+  it('renders shared Closed-Loop Care actions with source roles and allows family acknowledgment', () => {
+    render(
+      <LanguageProvider initialLang="en">
+        <FamilyRecoveryCircle onBack={vi.fn()} />
+      </LanguageProvider>
+    );
+
+    // Section title
+    expect(screen.getByText('Recovery Coordination & Care Actions')).toBeInTheDocument();
+    expect(screen.getByText(/Active recovery milestones and care-team tasks/i)).toBeInTheDocument();
+
+    // Renders real care actions from careActionService
+    expect(screen.getByText('Urgent Cardiology Teleconsult & 12-Lead ECG Requisition')).toBeInTheDocument();
+    expect(screen.getAllByText(/Physician \(डॉक्टर\)/i)[0]).toBeInTheDocument();
+
+    // Acknowledge a care action
+    const ackBtns = screen.getAllByRole('button', { name: /Acknowledge Update/i });
+    expect(ackBtns.length).toBeGreaterThan(0);
+    fireEvent.click(ackBtns[ackBtns.length - 1]);
+
+    // Safety decoupling notice is rendered
+    expect(
+      screen.getByText(/Family acknowledgment confirms support awareness only/i)
+    ).toBeInTheDocument();
+  });
 });
 
 describe('PatientDashboard — Family Consent Management', () => {
