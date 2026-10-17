@@ -12,6 +12,7 @@ import type {
   Medicine,
   FamilyView,
   CaregiverAccess,
+  MedicalReport,
 } from '@/types';
 
 export const demoPatients: PatientProfile[] = [
@@ -200,6 +201,150 @@ export const demoFamilyView: FamilyView = {
   healthUpdateStatus: 'Submitted',
   missedDose: false,
   caregiverAccess: demoCaregiverAccess,
+};
+
+export const demoMedicalReports: Record<string, MedicalReport[]> = {
+  p1: [
+    {
+      id: 'rep-p1-1',
+      patientId: 'p1',
+      title: 'Cardiac Biomarker & Lipid Panel',
+      reportType: 'cardiology',
+      date: '2026-10-16',
+      facilityOrLab: 'Apex Heart & Vascular Institute — Diagnostic Pathology',
+      orderingDoctor: 'Dr. S. Sharma, MD',
+      rawText: `APEX HEART & VASCULAR INSTITUTE
+PATIENT: Ravi Sharma | AGE: 62 | GENDER: Male | REF: PB-7019
+DATE OF SERVICE: 16-OCT-2026 | ORDERING: Dr. S. Sharma, MD
+
+TEST NAME                       RESULT      UNITS      REFERENCE INTERVAL
+--------------------------------------------------------------------------
+High-Sensitivity Troponin I      48          ng/L       < 14 (99th percentile)   [HIGH]
+Total Cholesterol               215         mg/dL      < 200                    [HIGH]
+HDL Cholesterol                  42          mg/dL      > 40                     [NORMAL]
+LDL Cholesterol                 138         mg/dL      < 100                    [HIGH]
+Random Blood Glucose            142         mg/dL      (None provided on req)   [NOT RANGED]
+Serum Creatinine                [unreadable smudge] mg/dL 0.7 - 1.3              [DAMAGED PRINT]
+--------------------------------------------------------------------------
+CLINICAL PATHOLOGIST NOTE: Hs-Troponin elevation detected in patient reporting chest heaviness. Urgent clinical correlation recommended. Re-draw recommended if acute coronary syndrome suspected.`,
+      structuredFindings: [
+        {
+          testOrParameter: 'High-Sensitivity Troponin I',
+          value: '48',
+          unit: 'ng/L',
+          referenceRange: '< 14 ng/L',
+          isAbnormal: true,
+          clinicalNotes: 'Elevated above 99th percentile upper reference limit',
+          sourceEvidence: 'High-Sensitivity Troponin I: 48 ng/L (Ref: < 14)',
+        },
+        {
+          testOrParameter: 'Total Cholesterol',
+          value: '215',
+          unit: 'mg/dL',
+          referenceRange: '< 200 mg/dL',
+          isAbnormal: true,
+          clinicalNotes: 'Borderline elevated lipid standard',
+          sourceEvidence: 'Total Cholesterol: 215 mg/dL (Ref: < 200)',
+        },
+        {
+          testOrParameter: 'HDL Cholesterol',
+          value: '42',
+          unit: 'mg/dL',
+          referenceRange: '> 40 mg/dL',
+          isAbnormal: false,
+          clinicalNotes: 'Within target range',
+          sourceEvidence: 'HDL Cholesterol: 42 mg/dL (Ref: > 40)',
+        },
+        {
+          testOrParameter: 'LDL Cholesterol',
+          value: '138',
+          unit: 'mg/dL',
+          referenceRange: '< 100 mg/dL',
+          isAbnormal: true,
+          clinicalNotes: 'Elevated atherogenic lipoprotein',
+          sourceEvidence: 'LDL Cholesterol: 138 mg/dL (Ref: < 100)',
+        },
+        {
+          testOrParameter: 'Random Blood Glucose',
+          value: '142',
+          unit: 'mg/dL',
+          referenceRange: null, // No reference range provided!
+          isAbnormal: null,
+          clinicalNotes: 'Reference range omitted on laboratory requisition',
+          sourceEvidence: 'Random Blood Glucose: 142 mg/dL (None provided)',
+        },
+        {
+          testOrParameter: 'Serum Creatinine',
+          value: '[unreadable smudge]',
+          unit: 'mg/dL',
+          referenceRange: '0.7 - 1.3 mg/dL',
+          isAbnormal: null,
+          clinicalNotes: 'Print artifact obscured numeric value',
+          sourceEvidence: 'Serum Creatinine: [unreadable smudge]',
+        },
+      ],
+    },
+  ],
+  p4: [
+    {
+      id: 'rep-p4-1',
+      patientId: 'p4',
+      title: 'Diabetic Metabolic & Renal Function Panel',
+      reportType: 'lab',
+      date: '2026-10-15',
+      facilityOrLab: 'City Care Clinical Laboratories',
+      orderingDoctor: 'Dr. V. Gupta, MD',
+      rawText: `CITY CARE CLINICAL LABORATORIES
+PATIENT: Lakshmi Rao | AGE: 70 | GENDER: Female | REF: PB-9481
+DATE: 15-OCT-2026
+
+TEST                    VALUE       UNITS       REFERENCE INTERVAL
+--------------------------------------------------------------------------
+Glycated Hemoglobin (HbA1c) 8.4     %           < 5.7 (Normal), 5.7-6.4 (Prediabetes) [ELEVATED]
+Estimated GFR (eGFR)    68          mL/min/1.73m2 > 60                             [NORMAL]
+Urine Microalbumin      45          mg/L        < 30                              [ELEVATED]
+Serum Potassium         4.8         mEq/L       3.5 - 5.1                         [NORMAL]
+--------------------------------------------------------------------------`,
+      structuredFindings: [
+        {
+          testOrParameter: 'Glycated Hemoglobin (HbA1c)',
+          value: '8.4',
+          unit: '%',
+          referenceRange: '< 5.7 %',
+          isAbnormal: true,
+          clinicalNotes: 'Elevated glycemic control marker in T2D',
+          sourceEvidence: 'Glycated Hemoglobin (HbA1c): 8.4 % (Ref: < 5.7)',
+        },
+        {
+          testOrParameter: 'Estimated GFR (eGFR)',
+          value: '68',
+          unit: 'mL/min/1.73m2',
+          referenceRange: '> 60 mL/min/1.73m2',
+          isAbnormal: false,
+          clinicalNotes: 'Adequate renal filtration',
+          sourceEvidence: 'Estimated GFR (eGFR): 68 mL/min/1.73m2 (Ref: > 60)',
+        },
+        {
+          testOrParameter: 'Urine Microalbumin',
+          value: '45',
+          unit: 'mg/L',
+          referenceRange: '< 30 mg/L',
+          isAbnormal: true,
+          clinicalNotes: 'Microalbuminuria present',
+          sourceEvidence: 'Urine Microalbumin: 45 mg/L (Ref: < 30)',
+        },
+        {
+          testOrParameter: 'Serum Potassium',
+          value: '4.8',
+          unit: 'mEq/L',
+          referenceRange: '3.5 - 5.1 mEq/L',
+          isAbnormal: false,
+          clinicalNotes: 'Normokalemic',
+          sourceEvidence: 'Serum Potassium: 4.8 mEq/L (Ref: 3.5 - 5.1)',
+        },
+      ],
+    },
+  ],
 };
 
 export function getPatientSummaries(): PatientSummary[] {

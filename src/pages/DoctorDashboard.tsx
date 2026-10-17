@@ -9,14 +9,16 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { DemoBanner, DemoBadge } from '@/components/DemoBanner';
 import { useLanguage } from '@/i18n/LanguageContext';
 import { cn } from '@/utils/cn';
-import type { PatientSummary, CareGap, PrescriptionDraft, FollowUp } from '@/types';
-
+import type { PatientSummary, CareGap, PrescriptionDraft, FollowUp, MedicalReport } from '@/types';
+import { ReportSummaryView } from '@/components/ReportSummaryView';
+import { demoMedicalReports } from '@/data/demoData';
 
 interface DoctorDashboardProps {
   summaries: PatientSummary[];
   careGaps: Record<string, CareGap[]>;
   prescriptionDrafts: Record<string, PrescriptionDraft>;
   followUps: Record<string, FollowUp[]>;
+  reports?: Record<string, MedicalReport[]>;
   onConfirmCarePlan: (patientId: string, fields: any[]) => void;
   onCareGapAction: (gapId: string, action: 'reviewed' | 'followup_planned') => void;
   onBack: () => void;
@@ -29,6 +31,7 @@ export function DoctorDashboard({
   careGaps,
   prescriptionDrafts,
   followUps,
+  reports,
   onConfirmCarePlan,
   onCareGapAction,
   onBack,
@@ -71,6 +74,7 @@ export function DoctorDashboard({
         gaps={careGaps[selectedPatient] ?? []}
         draft={prescriptionDrafts[selectedPatient]}
         followUps={followUps[selectedPatient] ?? []}
+        reports={reports?.[selectedPatient] ?? demoMedicalReports[selectedPatient] ?? []}
         onConfirmCarePlan={(fields) => onConfirmCarePlan(selectedPatient, fields)}
         onCareGapAction={onCareGapAction}
         onBack={() => setSelectedPatient(null)}
@@ -226,6 +230,7 @@ function PatientDetail({
   gaps,
   draft,
   followUps,
+  reports,
   onConfirmCarePlan,
   onCareGapAction,
   onBack,
@@ -234,12 +239,13 @@ function PatientDetail({
   gaps: CareGap[];
   draft?: PrescriptionDraft;
   followUps: FollowUp[];
+  reports: MedicalReport[];
   onConfirmCarePlan: (fields: any[]) => void;
   onCareGapAction: (gapId: string, action: 'reviewed' | 'followup_planned') => void;
   onBack: () => void;
 }) {
   const { t } = useLanguage();
-  const [activeTab, setActiveTab] = useState<'overview' | 'rx' | 'gaps'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'rx' | 'reports' | 'gaps'>('overview');
 
   return (
     <div className="relative min-h-screen bg-navy-800 overflow-hidden dark-surface">
@@ -277,11 +283,13 @@ function PatientDetail({
         <div className="flex items-center gap-2 border-b border-navy-600">
           <TabButton active={activeTab === 'overview'} onClick={() => setActiveTab('overview')} label="Overview" />
           {draft && <TabButton active={activeTab === 'rx'} onClick={() => setActiveTab('rx')} label={t('doctor_rx_verify')} badge={draft.confirmed ? undefined : '!'} />}
+          <TabButton active={activeTab === 'reports'} onClick={() => setActiveTab('reports')} label="Reports & Labs" badge={reports.length > 0 ? reports.length : undefined} />
           <TabButton active={activeTab === 'gaps'} onClick={() => setActiveTab('gaps')} label={t('doctor_caregap_radar')} badge={gaps.filter(g => g.status === 'open').length || undefined} />
         </div>
 
         {activeTab === 'overview' && <OverviewTab summary={summary} followUps={followUps} />}
         {activeTab === 'rx' && draft && <PrescriptionReview draft={draft} patientAllergies={summary.patient.allergies} onConfirm={onConfirmCarePlan} />}
+        {activeTab === 'reports' && <ReportSummaryView reports={reports} />}
         {activeTab === 'gaps' && (
           <div className="flex flex-col gap-3">
             {gaps.length === 0 ? (

@@ -9,10 +9,12 @@ import {
   demoFamilyView,
   demoCaregiverAccess,
   demoAdherenceLogs,
+  demoMedicalReports,
   getPatientSummaries,
 } from '@/data/demoData';
 import { calculatePatientTriageScore } from '@/services/careGapRules';
 import { calculateSnoozeTimestamp } from '@/utils/reminderEngine';
+import { summarizeMedicalReport } from '@/services/reportSummarizer';
 import type {
   PatientSummary,
   MedicationSchedule,
@@ -27,6 +29,8 @@ import type {
   PrescriptionField,
   PatientProfile,
   AdherenceLog,
+  MedicalReport,
+  ReportSummary,
 } from '@/types';
 
 export interface DataService {
@@ -96,6 +100,14 @@ export interface DataService {
 
   // 11. Realtime / Live Synchronizations
   subscribeToLiveUpdates(onUpdate: () => void): () => void;
+
+  // 12. Medical Reports & Safe Summarization
+  fetchMedicalReports(patientId: string): Promise<MedicalReport[]>;
+  getReportSummary(
+    reportId: string,
+    patientId: string,
+    options?: { preferAI?: boolean }
+  ): Promise<ReportSummary | null>;
 }
 
 // In-memory demo store for fully interactive demo mode without DB
@@ -109,6 +121,7 @@ const mutableDemoCaregiverAccess: Record<string, CaregiverAccess> = {
   p1: { ...demoCaregiverAccess },
 };
 const mutableDemoAdherenceLogs: Record<string, AdherenceLog[]> = { ...demoAdherenceLogs };
+const mutableDemoMedicalReports: Record<string, MedicalReport[]> = { ...demoMedicalReports };
 
 // Listeners for demo mode live reactivity
 const demoListeners = new Set<() => void>();
@@ -452,6 +465,45 @@ const demoService: DataService = {
     return () => {
       demoListeners.delete(onUpdate);
     };
+  },
+
+  async fetchMedicalReports(patientId) {
+    return mutableDemoMedicalReports[patientId] ?? [];
+  },
+
+  async getReportSummary(reportId, patientId, options) {
+    const reports = await this.fetchMedicalReports(patientId);
+    const report = reports.find((r) => r.id === reportId);
+    if (!report) return null;
+
+    if (options?.preferAI) {
+      if (supabase) {
+        try {
+          const { data, error } = await supabase.functions.invoke('summarize-medical-report', {
+            body: { report, isDemoOrTest: true },
+          });
+          if (error) throw error;
+          if (data && data.data) return data.data as ReportSummary;
+        } catch (err: any) {
+          console.warn('[Demo AI Summarizer] Edge function failed or unreachable:', err.message);
+        }
+      }
+
+      // Safe fallback: never label mock as real AI
+      const fallback = summarizeMedicalReport(report);
+      return {
+        ...fallback,
+        engineMode: 'ai_unavailable_fallback',
+        aiMetadata: {
+          provider: 'none',
+          modelName: 'none',
+          verifiedGrounded: true,
+          failureReason: 'AI service unavailable in demo environment; showing rule-based fallback.',
+        },
+      };
+    }
+
+    return summarizeMedicalReport(report);
   },
 };
 
@@ -1131,6 +1183,46 @@ const productionService: DataService = {
     };
   },
 
+  async fetchMedicalReports(patientId) {
+    return demoService.fetchMedicalReports(patientId);
+  },
+
+  async getReportSummary(reportId, patientId, options) {
+    const reports = await this.fetchMedicalReports(patientId);
+    const report = reports.find((r) => r.id === reportId);
+    if (!report) return null;
+
+    if (options?.preferAI) {
+      if (!supabase) {
+        return demoService.getReportSummary(reportId, patientId, options);
+      }
+
+      try {
+        const { data, error } = await supabase.functions.invoke('summarize-medical-report', {
+          body: { report },
+        });
+
+        if (error) throw error;
+        if (data && data.data) return data.data as ReportSummary;
+        throw new Error('Empty payload returned from summarize-medical-report.');
+      } catch (err: any) {
+        console.warn('[AI Edge Function Proxy] Unreachable or failed, falling back:', err.message);
+        const fallback = summarizeMedicalReport(report);
+        return {
+          ...fallback,
+          engineMode: 'ai_unavailable_fallback',
+          aiMetadata: {
+            provider: 'none',
+            modelName: 'none',
+            verifiedGrounded: true,
+            failureReason: err.message || 'Supabase Edge Function unreachable.',
+          },
+        };
+      }
+    }
+
+    return summarizeMedicalReport(report);
+  },
 };
 
 export const dataService: DataService = isDemoMode ? demoService : productionService;
