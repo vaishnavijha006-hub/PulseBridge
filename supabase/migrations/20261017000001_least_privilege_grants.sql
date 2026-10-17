@@ -1,23 +1,24 @@
 -- =============================================================================
 -- PulseBridge AI — Phase 4 Remediation Migration: Strict Least-Privilege & Hardened Clinical Triggers
 -- File: supabase/migrations/20261017000001_least_privilege_grants.sql
--- Revision: Final Pre-Execution Hardening (Dynamic Policy Drop, Restrictive Deny, Full Rx Immutability)
+-- Revision: Final Pre-Execution Hardening (Explicit RLS Verification, Restrictive Deny, Full Rx Immutability)
 --
 -- PURPOSE:
 -- 1. Revoke broad "GRANT ALL" and lock down DEFAULT PRIVILEGES for role postgres and invoking role.
--- 2. Dynamically drop ALL existing policies on sensitive tables from pg_policies to ensure no
+-- 2. Explicitly enforce relrowsecurity (ENABLE ROW LEVEL SECURITY) across all nine sensitive tables.
+-- 3. Dynamically drop ALL existing policies on sensitive tables from pg_policies to ensure no
 --    permissive policy survives.
--- 3. Deploy explicit interim RESTRICTIVE deny-by-default RLS policies (USING false) for anon & authenticated.
--- 4. Set security_invoker = true on patient_summaries view to respect underlying table RLS.
--- 5. Revoke execution of get_family_view from anon, authenticated, and PUBLIC until verified
+-- 4. Deploy explicit interim RESTRICTIVE deny-by-default RLS policies (USING false) for anon & authenticated.
+-- 5. Set security_invoker = true on patient_summaries view to respect underlying table RLS.
+-- 6. Revoke execution of get_family_view from anon, authenticated, and PUBLIC until verified
 --    caregiver identity (caregiver_user_id) and server-side relationship checks are implemented.
--- 6. Deploy hardened prescription confirmation trigger:
+-- 7. Deploy hardened prescription confirmation trigger:
 --    - Covers INSERT and UPDATE
---    - Enforces strict immutability on confirmed prescriptions (prohibits unconfirming or altering fields,
---      patient_id, image_url, confirmed_at, or doctor_notes)
+--    - Enforces strict immutability on confirmed prescriptions (prohibits unconfirming or altering
+--      id, patient_id, image_url, fields, confirmed_at, doctor_notes, or created_at)
 --    - Rejects duplicate critical keys, null/unexpected statuses, empty values, and missing keys
 --    - Sets search_path = public, pg_temp
--- 7. Secure internal trigger functions with explicit search_path and revoked execution.
+-- 8. Secure internal trigger functions with explicit search_path and revoked execution.
 -- =============================================================================
 
 -- Step 1: Revoke existing overbroad privileges from anon, authenticated, and PUBLIC
@@ -38,7 +39,18 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON FUNCTIONS FROM anon, aut
 GRANT USAGE ON SCHEMA public TO authenticated;
 GRANT USAGE ON SCHEMA public TO anon;
 
--- Step 4: Dynamically Drop ALL Existing Policies on Sensitive Tables
+-- Step 4: Explicitly Enforce Row Level Security (relrowsecurity) on All 9 Sensitive Tables
+ALTER TABLE public.patients ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.prescriptions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.care_plans ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.medication_schedules ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.adherence_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.health_updates ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.care_gaps ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.caregiver_consent ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.follow_ups ENABLE ROW LEVEL SECURITY;
+
+-- Step 5: Dynamically Drop ALL Existing Policies on Sensitive Tables
 -- Inspects pg_policies dynamically to ensure NO legacy permissive policy survives
 DO $$
 DECLARE
@@ -61,7 +73,7 @@ BEGIN
 END;
 $$;
 
--- Step 5: Deploy Explicit Interim RESTRICTIVE Deny-by-Default RLS Policies
+-- Step 6: Deploy Explicit Interim RESTRICTIVE Deny-by-Default RLS Policies
 -- Using AS RESTRICTIVE ensures that all queries are evaluated with an AND condition,
 -- guaranteeing that even if a permissive policy is added later, access is denied.
 CREATE POLICY "Interim restrictive deny access to patients"
@@ -91,13 +103,13 @@ CREATE POLICY "Interim restrictive deny access to caregiver_consent"
 CREATE POLICY "Interim restrictive deny access to follow_ups"
   ON public.follow_ups AS RESTRICTIVE FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);
 
--- Step 6: View Security Invoker Setting
+-- Step 7: View Security Invoker Setting
 -- Set security_invoker = true so view queries execute with calling user permissions
 -- and respect underlying table RLS policies.
 ALTER VIEW public.patient_summaries SET (security_invoker = true);
 REVOKE ALL ON public.patient_summaries FROM anon, authenticated, PUBLIC;
 
--- Step 7: Secure get_family_view RPC & Search Path Hardening
+-- Step 8: Secure get_family_view RPC & Search Path Hardening
 -- Revoke execution from anon, authenticated, and PUBLIC until verified caregiver identity is implemented.
 REVOKE EXECUTE ON FUNCTION public.get_family_view(text) FROM anon, authenticated, PUBLIC;
 
@@ -187,11 +199,11 @@ BEGIN
 END;
 $$;
 
--- Step 8: Hardened Prescription Immutability & Clinical Validation Trigger
+-- Step 9: Hardened Prescription Immutability & Clinical Validation Trigger
 -- Covers INSERT and UPDATE.
 -- 1. Enforces strict immutability on confirmed prescriptions:
---    Prohibits unconfirming (confirmed = false or null) and prohibits altering fields,
---    patient_id, image_url, confirmed_at, or doctor_notes.
+--    Prohibits unconfirming (confirmed = false or null) and prohibits altering
+--    id, patient_id, image_url, fields, confirmed_at, doctor_notes, or created_at.
 -- 2. Validates clinical payload: non-empty JSON array, no duplicate critical keys, non-null status,
 --    and confirmed status on medicine, dosage, frequency, and duration.
 CREATE OR REPLACE FUNCTION public.trg_validate_prescription_confirmation()
@@ -218,13 +230,15 @@ BEGIN
       RAISE EXCEPTION 'Prescription security error: A confirmed prescription cannot be unconfirmed. To modify a treatment plan, the doctor must issue a replacement prescription draft.';
     END IF;
 
-    -- Prohibit altering any clinically relevant column
-    IF NEW.fields IS DISTINCT FROM OLD.fields
+    -- Prohibit altering any clinically relevant or identity column
+    IF NEW.id IS DISTINCT FROM OLD.id
        OR NEW.patient_id IS DISTINCT FROM OLD.patient_id
        OR NEW.image_url IS DISTINCT FROM OLD.image_url
+       OR NEW.fields IS DISTINCT FROM OLD.fields
        OR NEW.confirmed_at IS DISTINCT FROM OLD.confirmed_at
-       OR NEW.doctor_notes IS DISTINCT FROM OLD.doctor_notes THEN
-      RAISE EXCEPTION 'Prescription security error: Confirmed prescriptions are immutable clinical records. Modifying fields, patient, image, confirmation timestamp, or doctor notes is forbidden. To change medication or instructions, issue a replacement prescription draft.';
+       OR NEW.doctor_notes IS DISTINCT FROM OLD.doctor_notes
+       OR NEW.created_at IS DISTINCT FROM OLD.created_at THEN
+      RAISE EXCEPTION 'Prescription security error: Confirmed prescriptions are immutable clinical records. Modifying id, patient, image, fields, confirmation timestamp, doctor notes, or creation timestamp is forbidden. To change medication or instructions, issue a replacement prescription draft.';
     END IF;
   END IF;
 
@@ -311,7 +325,7 @@ CREATE TRIGGER trg_validate_prescription_confirmation
   FOR EACH ROW
   EXECUTE FUNCTION public.trg_validate_prescription_confirmation();
 
--- Step 9: Trigger Function Security Hardening
+-- Step 10: Trigger Function Security Hardening
 ALTER FUNCTION public.trg_adherence_logs_fill() SET search_path = public, pg_temp;
 
 REVOKE EXECUTE ON FUNCTION public.trg_validate_prescription_confirmation() FROM anon, authenticated, PUBLIC;
