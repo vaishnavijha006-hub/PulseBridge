@@ -56,7 +56,7 @@ export interface PatientTriageResult {
 // Emergency red-flag symptoms requiring immediate clinical override regardless of score
 export const EMERGENCY_SYMPTOM_PATTERNS = [
   /\b(chest pain|chest pressure|chest heaviness|chhati me dard|angina)\b/i,
-  /\b(breathless(ness)?|shortness of breath|saans phoolna|dyspnea|difficulty breathing)\b/i,
+  /\b(breathless(ness)?|shortness of breath|saans\s*(phool|fool)\w*|dyspnea|difficulty breathing)\b/i,
   /\b(unconscious|fainted|behoshi|syncope)\b/i,
   /\b(severe bleeding|khun behna|hemorrhage)\b/i,
   /\b(stroke|facial droop|slurred speech)\b/i,
@@ -73,6 +73,7 @@ export const NEGATION_PATTERNS = [
 export const THIRD_PARTY_OR_INFO_PATTERNS = [
   /\b(my father|my mother|my brother|my sister|my parent|my parents|my friend|my husband|my wife|my son|my daughter|father had|mother had|brother had|sister had|family history|dad had|mom had)\b/i,
   /\b(read an article|read about|watching|news about|documentary about|movie about|story about|article about|book about)\b/i,
+  /\b(history of|past history|years ago|months ago|in \d{4})\b/i,
 ];
 
 /**

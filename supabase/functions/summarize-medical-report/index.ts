@@ -18,6 +18,11 @@ import {
   AIProviderTimeoutError,
   AIProviderRateLimitError,
 } from './aiAdapter.ts';
+import {
+  checkRateLimit,
+  createRateLimitResponse,
+  type RateLimitStorage,
+} from '../_shared/rateLimiter.ts';
 import type { MedicalReport } from '../../../src/types';
 
 // Max allowed payload size (60 KB)
@@ -190,7 +195,10 @@ async function verifyReportAuthorization(
   }
 }
 
-export async function handleSummarizeRequest(req: Request): Promise<Response> {
+export async function handleSummarizeRequest(
+  req: Request,
+  options?: { rateLimitStorage?: RateLimitStorage }
+): Promise<Response> {
   const corsHeaders = getCorsHeaders(req);
 
   // 1. Handle CORS preflight
@@ -317,6 +325,22 @@ export async function handleSummarizeRequest(req: Request): Promise<Response> {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );
+  }
+
+  // 5b. Inbound Rate Limiting Gate (Server-Enforced Caller Identity & IP)
+  const rateLimitResult = await checkRateLimit(
+    req,
+    authResult.userId || 'anonymous-user',
+    {
+      endpointName: 'summarize-medical-report',
+      windowSeconds: 60,
+      maxRequests: 15,
+    },
+    options?.rateLimitStorage
+  );
+
+  if (!rateLimitResult.allowed) {
+    return createRateLimitResponse(rateLimitResult, corsHeaders);
   }
 
   const startTime = Date.now();

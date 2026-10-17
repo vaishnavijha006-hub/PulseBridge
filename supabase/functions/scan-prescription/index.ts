@@ -24,6 +24,11 @@ import {
   validatePrescriptionScanOutput,
   PrescriptionValidationError,
 } from './prescriptionValidator.ts';
+import {
+  checkRateLimit,
+  createRateLimitResponse,
+  type RateLimitStorage,
+} from '../_shared/rateLimiter.ts';
 
 // Maximum allowed decoded image size (10 MB)
 const MAX_DECODED_IMAGE_BYTES = 10 * 1024 * 1024;
@@ -193,7 +198,10 @@ async function verifyPrescriptionAuthorization(
 /**
  * Main HTTP Handler for prescription scanning.
  */
-export async function handleScanPrescriptionRequest(req: Request): Promise<Response> {
+export async function handleScanPrescriptionRequest(
+  req: Request,
+  options?: { rateLimitStorage?: RateLimitStorage }
+): Promise<Response> {
   const corsHeaders = getCorsHeaders(req);
 
   // 1. Handle CORS preflight
@@ -370,6 +378,22 @@ export async function handleScanPrescriptionRequest(req: Request): Promise<Respo
     );
   }
 
+  // 7b. Inbound Rate Limiting Gate (Server-Enforced Caller Identity & IP)
+  const rateLimitResult = await checkRateLimit(
+    req,
+    authResult.userId || 'anonymous-user',
+    {
+      endpointName: 'scan-prescription',
+      windowSeconds: 60,
+      maxRequests: 10,
+    },
+    options?.rateLimitStorage
+  );
+
+  if (!rateLimitResult.allowed) {
+    return createRateLimitResponse(rateLimitResult, corsHeaders);
+  }
+
   // 8. Invoke Vision Adapter
   let adapter: PrescriptionVisionAdapter;
   const isServerTestEnv =
@@ -379,8 +403,19 @@ export async function handleScanPrescriptionRequest(req: Request): Promise<Respo
       ? process.env?.PULSEBRIDGE_ENV
       : undefined) === 'test';
 
-  if (useMock || (isServerTestEnv && !process.env.GEMINI_API_KEY)) {
+  if (isServerTestEnv && (useMock || !process.env.GEMINI_API_KEY)) {
     adapter = new MockGeminiVisionAdapter(mockOutput);
+  } else if (useMock && !isServerTestEnv) {
+    return new Response(
+      JSON.stringify({
+        error: 'Client cannot force mock extraction in production.',
+        code: 'MOCK_FORBIDDEN_IN_PRODUCTION',
+      }),
+      {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
   } else {
     try {
       adapter = new GeminiVisionAdapter();

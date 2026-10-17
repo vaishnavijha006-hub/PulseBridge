@@ -515,6 +515,66 @@ async function runCareGapRadarTests() {
   const mixRes = calculatePatientTriageScore(mockPatient, [mixedClauseUpdate], onTrackSchedules, []);
   assert(mixRes.criticalSafetyOverride === true, 'Contrasting clause with affirmative emergency symptom triggers override');
 
+  // Phrase 7: Historical non-acute event ("History of angina in 2021")
+  const historicalUpdate: HealthUpdate = {
+    id: 'upd-hist',
+    patientId: mockPatient.id,
+    submittedAt: new Date().toISOString(),
+    state: 'ok',
+    symptomDescription: 'Past history of angina in 2021',
+    source: 'patient',
+  };
+  const histRes = calculatePatientTriageScore(mockPatient, [historicalUpdate], onTrackSchedules, []);
+  assert(histRes.criticalSafetyOverride === false, 'Historical: "Past history of angina in 2021" does NOT trigger false override');
+
+  // Phrase 8: Hinglish negation ("Chhati me dard nahi hai")
+  const hinglishNegUpdate: HealthUpdate = {
+    id: 'upd-hneg',
+    patientId: mockPatient.id,
+    submittedAt: new Date().toISOString(),
+    state: 'ok',
+    symptomDescription: 'Chhati me dard nahi hai, normal feel ho raha hai',
+    source: 'patient',
+  };
+  const hnegRes = calculatePatientTriageScore(mockPatient, [hinglishNegUpdate], onTrackSchedules, []);
+  assert(hnegRes.criticalSafetyOverride === false, 'Hinglish negation: "Chhati me dard nahi hai" does NOT trigger false override');
+
+  // Phrase 9: Hinglish affirmative ("Chhati me dard aur saans phoolna shuru hua")
+  const hinglishAffUpdate: HealthUpdate = {
+    id: 'upd-haff',
+    patientId: mockPatient.id,
+    submittedAt: new Date().toISOString(),
+    state: 'bad',
+    symptomDescription: 'Chhati me dard aur saans phoolna shuru hua',
+    source: 'patient',
+  };
+  const haffRes = calculatePatientTriageScore(mockPatient, [hinglishAffUpdate], onTrackSchedules, []);
+  assert(haffRes.criticalSafetyOverride === true, 'Hinglish affirmative: "Chhati me dard aur saans phoolna shuru hua" triggers override');
+
+  // Phrase 10: Hinglish contrasting clause ("Chhati me dard nahi hai, lekin saans phool rahi hai")
+  const hinglishContrastUpdate: HealthUpdate = {
+    id: 'upd-hcontrast',
+    patientId: mockPatient.id,
+    submittedAt: new Date().toISOString(),
+    state: 'bad',
+    symptomDescription: 'Chhati me dard nahi hai, lekin saans phool rahi hai',
+    source: 'patient',
+  };
+  const hcontrastRes = calculatePatientTriageScore(mockPatient, [hinglishContrastUpdate], onTrackSchedules, []);
+  assert(hcontrastRes.criticalSafetyOverride === true, 'Hinglish contrasting clause triggers override for affirmative dyspnea');
+
+  // Phrase 11: Multi-clause punctuation ("Mild fever; sudden severe difficulty breathing")
+  const multiClauseUpdate: HealthUpdate = {
+    id: 'upd-multiclause',
+    patientId: mockPatient.id,
+    submittedAt: new Date().toISOString(),
+    state: 'bad',
+    symptomDescription: 'Mild fever; sudden severe difficulty breathing',
+    source: 'patient',
+  };
+  const multiClauseRes = calculatePatientTriageScore(mockPatient, [multiClauseUpdate], onTrackSchedules, []);
+  assert(multiClauseRes.criticalSafetyOverride === true, 'Multi-clause punctuation handles acute symptom in secondary clause');
+
 
   console.log('');
 

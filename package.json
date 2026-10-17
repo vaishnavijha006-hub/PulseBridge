@@ -17,6 +17,8 @@
     "test:prescription-scanner": "npx tsx --tsconfig tsconfig.app.json scripts/test_prescription_scanner.ts",
     "test:prescription-frontend": "npx tsx --tsconfig tsconfig.app.json scripts/test_prescription_scanner_frontend.ts",
     "test:caregap-radar": "npx tsx --tsconfig tsconfig.app.json scripts/test_caregap_radar_priority.ts",
+    "test:security-hardening": "npx tsx --tsconfig tsconfig.app.json scripts/test_security_hardening.ts",
+    "test:e2e-three-features": "npx tsx --tsconfig tsconfig.app.json scripts/test_three_features_e2e.ts",
     "backend": "npx tsx scripts/backend_server.ts"
   },
   "dependencies": {

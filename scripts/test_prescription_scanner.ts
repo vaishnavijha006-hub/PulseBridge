@@ -310,6 +310,25 @@ console.log('\nSUITE 5: Full Mocked Request Processing & Zero Secret Leakage');
 
   // Verify CORS headers
   assert(response.headers.get('Access-Control-Allow-Origin') !== '*', 'Does NOT use wildcard CORS origin');
+
+  // Verify production request cannot force mock extraction
+  process.env.PULSEBRIDGE_ENV = 'production';
+  const prodMockRequest = new Request('http://localhost:54321/functions/v1/scan-prescription', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer test-valid-jwt-token',
+    },
+    body: JSON.stringify({
+      patientId: 'p1',
+      imageBase64: VALID_SAMPLE_BASE64_PNG,
+      mimeType: 'image/png',
+      useMock: true,
+    }),
+  });
+  const prodMockRes = await handleScanPrescriptionRequest(prodMockRequest);
+  assert(prodMockRes.status === 400 || prodMockRes.status === 401, 'Production request cannot force mock extraction');
+  process.env.PULSEBRIDGE_ENV = 'test';
 }
 
 // -----------------------------------------------------------------------------
