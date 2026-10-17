@@ -37,7 +37,7 @@ interface PatientDashboardProps {
   onHealthUpdate: (state: HealthState, description: string) => void;
   onFollowUpAnswer: (followUpId: string, answer: string) => void;
   onBack: () => void;
-  onNavigateRole?: (role: 'doctor' | 'admin' | 'family') => void;
+  onNavigateRole?: (role: 'doctor' | 'admin' | 'family' | 'patient_intake') => void;
 }
 
 type PatientTab = 'meds' | 'reports' | 'checkin' | 'family';
@@ -142,19 +142,29 @@ export function PatientDashboard({
             </div>
 
             {onNavigateRole && (
-              <div className="hidden lg:flex items-center gap-1.5 border-r border-slate-200 pr-3 mr-1">
+              <div className="flex items-center gap-1.5 border-r border-slate-200 pr-3 mr-1">
                 <button
-                  onClick={() => onNavigateRole('doctor')}
-                  className="px-2.5 py-1 text-xs rounded-md text-slate-600 hover:text-teal-700 hover:bg-slate-100 transition-colors"
+                  onClick={() => onNavigateRole('patient_intake')}
+                  className="px-2.5 py-1 text-xs rounded-lg bg-teal-50 text-teal-700 hover:bg-teal-100 font-semibold border border-teal-200/80 transition-colors flex items-center gap-1"
+                  title={t('nav_patient_intake')}
                 >
-                  {t('role_doctor')}
+                  <Sparkles className="w-3.5 h-3.5 text-teal-600" />
+                  <span className="hidden sm:inline">{t('nav_patient_intake')}</span>
                 </button>
-                <button
-                  onClick={() => onNavigateRole('admin')}
-                  className="px-2.5 py-1 text-xs rounded-md text-slate-600 hover:text-teal-700 hover:bg-slate-100 transition-colors"
-                >
-                  {t('role_admin')}
-                </button>
+                <div className="hidden lg:flex items-center gap-1.5">
+                  <button
+                    onClick={() => onNavigateRole('doctor')}
+                    className="px-2.5 py-1 text-xs rounded-md text-slate-600 hover:text-teal-700 hover:bg-slate-100 transition-colors"
+                  >
+                    {t('role_doctor')}
+                  </button>
+                  <button
+                    onClick={() => onNavigateRole('admin')}
+                    className="px-2.5 py-1 text-xs rounded-md text-slate-600 hover:text-teal-700 hover:bg-slate-100 transition-colors"
+                  >
+                    {t('role_admin')}
+                  </button>
+                </div>
               </div>
             )}
 

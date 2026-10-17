@@ -662,7 +662,7 @@ describe('Cryptographic Token Tests', () => {
     // tokenHash should be a hash value, not a human-readable code
     expect(member.tokenHash).toBeDefined();
     expect(member.tokenHash).not.toBe(member.inviteCode);
-    expect(member.tokenHash.length).toBeGreaterThan(10);
+    expect(member.tokenHash!.length).toBeGreaterThan(10);
   });
 });
 

@@ -1,4 +1,4 @@
-import { HeartPulse, Stethoscope, Users, ArrowRight, ShieldCheck, Activity, Clock, Server } from 'lucide-react';
+import { HeartPulse, Stethoscope, Users, ArrowRight, ShieldCheck, Activity, Clock, Server, Sparkles } from 'lucide-react';
 import { PulseBridgeLogo } from '@/components/PulseBridgeLogo';
 import { RoleCard } from '@/components/RoleCard';
 import { CursorGlow } from '@/components/CursorGlow';
@@ -6,7 +6,7 @@ import { DemoBanner } from '@/components/DemoBanner';
 import { LanguageToggle } from '@/components/LanguageToggle';
 import { useLanguage } from '@/i18n/LanguageContext';
 
-type Role = 'patient' | 'doctor' | 'family' | 'admin';
+type Role = 'patient' | 'doctor' | 'family' | 'admin' | 'patient_intake';
 
 interface LandingPageProps {
   onRoleSelect: (role: Role) => void;
@@ -42,8 +42,16 @@ export function LandingPage({ onRoleSelect }: LandingPageProps) {
               </div>
               <div className="hidden md:flex items-center gap-1 border-l border-r border-navy-600/70 px-2.5 py-1">
                 <button
+                  onClick={() => onRoleSelect('patient_intake')}
+                  className="px-2.5 py-1 text-xs rounded-md text-teal-300 bg-teal-500/20 hover:bg-teal-500/30 font-bold transition-colors flex items-center gap-1 border border-teal-500/40"
+                  title={t('nav_patient_intake')}
+                >
+                  <Sparkles className="w-3 h-3 text-teal-400" />
+                  <span>{t('nav_patient_intake')}</span>
+                </button>
+                <button
                   onClick={() => onRoleSelect('patient')}
-                  className="px-2 py-1 text-xs rounded-md text-teal-300 bg-teal-500/10 hover:bg-teal-500/20 font-semibold transition-colors"
+                  className="px-2 py-1 text-xs rounded-md text-slate-200 hover:text-teal-300 hover:bg-navy-700 font-semibold transition-colors"
                 >
                   {t('role_patient')}
                 </button>
@@ -62,10 +70,10 @@ export function LandingPage({ onRoleSelect }: LandingPageProps) {
               </div>
               <LanguageToggle variant="dark" />
               <button
-                onClick={() => onRoleSelect('patient')}
+                onClick={() => onRoleSelect('patient_intake')}
                 className="inline-flex items-center gap-2 rounded-lg bg-teal-500 px-4 py-2.5 text-sm font-semibold text-navy-900 hover:bg-teal-400 transition-colors min-h-[44px]"
               >
-                {t('cta_start')}
+                <span>{t('cta_patient_intake')}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </nav>
@@ -78,7 +86,7 @@ export function LandingPage({ onRoleSelect }: LandingPageProps) {
         <div className="flex flex-col items-center text-center gap-6">
           <div className="inline-flex items-center gap-2 rounded-full border border-teal-500/30 bg-teal-500/10 px-4 py-1.5">
             <HeartPulse className="w-4 h-4 text-teal-400" />
-            <span className="text-xs font-medium text-teal-300">Doctor-Verified Recovery Platform</span>
+            <span className="text-xs font-medium text-teal-300">{t('hero_badge_platform')}</span>
           </div>
           <h1 className="max-w-3xl text-3xl sm:text-4xl lg:text-5xl font-bold text-white leading-tight tracking-tight">
             {t('hero_title')}
@@ -90,10 +98,10 @@ export function LandingPage({ onRoleSelect }: LandingPageProps) {
             {t('hero_hindi')}
           </p>
           <button
-            onClick={() => onRoleSelect('patient')}
+            onClick={() => onRoleSelect('patient_intake')}
             className="mt-4 inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-teal-500 to-cyan-400 px-8 py-4 text-base font-bold text-navy-900 hover:from-teal-400 hover:to-cyan-300 transition-all shadow-lg shadow-teal-500/20 hover:shadow-teal-400/30 min-h-[52px]"
           >
-            {t('cta_start')}
+            <span>{t('cta_patient_intake')}</span>
             <ArrowRight className="w-5 h-5" />
           </button>
         </div>
@@ -105,11 +113,11 @@ export function LandingPage({ onRoleSelect }: LandingPageProps) {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
           <RoleCard
             icon={HeartPulse}
-            title={t('role_patient')}
+            title={t('nav_patient_intake')}
             hindiTitle={t('role_patient_hi')}
             description={t('role_patient_desc')}
-            actionLabel={t('cta_start')}
-            onClick={() => onRoleSelect('patient')}
+            actionLabel={t('cta_patient_intake')}
+            onClick={() => onRoleSelect('patient_intake')}
           />
           <RoleCard
             icon={Stethoscope}
@@ -171,7 +179,7 @@ export function LandingPage({ onRoleSelect }: LandingPageProps) {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 flex flex-col sm:flex-row items-center justify-between gap-4">
           <PulseBridgeLogo variant="dark" size="sm" showTagline={false} />
           <p className="text-sm text-navy-300 text-center sm:text-right">
-            PulseBridge AI — Prescription ke baad patient akela nahi hota. Ghar tak ilaaj ka saath.
+            {t('footer_tagline')}
           </p>
         </div>
       </footer>

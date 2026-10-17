@@ -38,8 +38,49 @@ type View = 'landing' | 'patient_intake' | 'patient_processing' | 'patient_dashb
 
 const DEMO_PATIENT_ID = 'p1';
 
+function getViewFromLocation(): View {
+  if (typeof window === 'undefined') return 'landing';
+  const params = new URLSearchParams(window.location.search);
+  const q = params.get('view') || params.get('tab') || params.get('page');
+  if (q && ['landing', 'patient_intake', 'patient_processing', 'patient_dashboard', 'doctor', 'family', 'admin'].includes(q)) {
+    return q as View;
+  }
+  const hash = window.location.hash.replace(/^#\/?/, '').toLowerCase();
+  if (hash === 'intake' || hash === 'patient-intake' || hash === 'patient_intake') {
+    return 'patient_intake';
+  }
+  if (hash === 'patient' || hash === 'patient-dashboard' || hash === 'patient_dashboard') {
+    return 'patient_dashboard';
+  }
+  if (hash === 'doctor') return 'doctor';
+  if (hash === 'family') return 'family';
+  if (hash === 'admin') return 'admin';
+  return 'landing';
+}
+
 function AppContent() {
-  const [view, setView] = useState<View>('landing');
+  const [view, setViewState] = useState<View>(() => getViewFromLocation());
+
+  const setView = useCallback((nextView: View) => {
+    setViewState(nextView);
+    if (typeof window !== 'undefined') {
+      const hash = nextView === 'landing' ? '' : `#${nextView.replace('_', '-')}`;
+      const url = hash ? `${window.location.pathname}${hash}` : window.location.pathname;
+      window.history.pushState(null, '', url);
+    }
+  }, []);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setViewState(getViewFromLocation());
+    };
+    window.addEventListener('popstate', handlePopState);
+    window.addEventListener('hashchange', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('hashchange', handlePopState);
+    };
+  }, []);
   const [prescriptionPreview, setPrescriptionPreview] = useState<string | null>(null);
   const [schedules, setSchedules] = useState<MedicationSchedule[]>(demoSchedules[DEMO_PATIENT_ID] ?? []);
   const [careGaps, setCareGaps] = useState<Record<string, CareGap[]>>(demoCareGaps);
@@ -253,6 +294,7 @@ function AppContent() {
           onNavigateRole={(role) => {
             if (role === 'doctor') setView('doctor');
             else if (role === 'admin') setView('admin');
+            else if (role === 'patient_intake') setView('patient_intake');
             else setView('family');
           }}
         />

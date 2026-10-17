@@ -326,7 +326,28 @@ export type TranslationKey =
   | 'success_saved'
   | 'empty_no_data'
   | 'sos_emergency'
-  | 'sos_call';
+  | 'sos_call'
+  | 'voice_step_language'
+  | 'voice_step_profile'
+  | 'voice_step_symptoms'
+  | 'voice_step_allergies'
+  | 'voice_step_meds'
+  | 'voice_step_upload'
+  | 'voice_step_review_submit'
+  | 'voice_guidance_title'
+  | 'voice_enable'
+  | 'voice_disable'
+  | 'voice_repeat'
+  | 'voice_stop'
+  | 'voice_speaking'
+  | 'voice_loading'
+  | 'voice_fallback_badge'
+  | 'voice_elevenlabs_badge'
+  | 'voice_error'
+  | 'nav_patient_intake'
+  | 'cta_patient_intake'
+  | 'hero_badge_platform'
+  | 'footer_tagline';
 
 type Dictionary = Record<TranslationKey, { en: string; hi: string }>;
 
@@ -762,6 +783,51 @@ const dict: Dictionary = {
   nav_patient_dash: { en: 'Patient Health Companion', hi: 'मरीज हेल्थ साथी' },
   nav_admin_dash: { en: 'Admin Operations Center', hi: 'एडमिन ऑपरेशन्स सेंटर' },
   system_operational: { en: 'System Operational', hi: 'प्रणाली सामान्य रूप से सक्रिय' },
+  voice_step_language: {
+    en: 'Welcome to PulseBridge AI. Please select your preferred language to begin.',
+    hi: 'नमस्ते! पल्सब्रिज एआई में आपका स्वागत है। शुरू करने के लिए अपनी पसंदीदा भाषा चुनें।',
+  },
+  voice_step_profile: {
+    en: "Let's begin with your basic information. Please enter your name, age, gender, and phone number.",
+    hi: 'चलिए, आपकी बुनियादी जानकारी से शुरू करते हैं। कृपया अपना नाम, उम्र, लिंग और फोन नंबर दर्ज करें।',
+  },
+  voice_step_symptoms: {
+    en: 'Now provide information about your symptoms. You can type them or tap the microphone to speak.',
+    hi: 'अब अपने लक्षणों की जानकारी दें। आप लिख सकते हैं या बोलने के लिए माइक का उपयोग कर सकते हैं।',
+  },
+  voice_step_allergies: {
+    en: "Please list any known drug or food allergies, or select 'No Known Allergies'.",
+    hi: "यदि आपको किसी दवाई या भोजन से एलर्जी है तो बताएं, अथवा 'कोई एलर्जी नहीं' चुनें।",
+  },
+  voice_step_meds: {
+    en: "Please list the medicines you are currently taking, or select 'No Current Medicines'.",
+    hi: "वर्तमान में आप जो दवाइयां ले रहे हैं उनकी जानकारी दें, अथवा 'कोई दवाई नहीं' चुनें।",
+  },
+  voice_step_upload: {
+    en: "Please upload a clear image or PDF of your doctor's prescription or medical report.",
+    hi: 'अपनी डॉक्टर की पर्ची या मेडिकल रिपोर्ट की साफ फोटो अथवा PDF अपलोड करें।',
+  },
+  voice_step_review_submit: {
+    en: 'Please review your details before continuing. Select Submit when you are ready to send your information.',
+    hi: 'आगे बढ़ने से पहले अपनी डिटेल्स चेक कर लें। अपनी जानकारी सबमिट करने के लिए बटन दबाएं।',
+  },
+  voice_guidance_title: { en: 'Voice Guidance', hi: 'आवाज़ मार्गदर्शन' },
+  voice_enable: { en: 'Turn on voice guidance', hi: 'आवाज़ मार्गदर्शन चालू करें' },
+  voice_disable: { en: 'Mute voice guidance', hi: 'आवाज़ मार्गदर्शन म्यूट करें' },
+  voice_repeat: { en: 'Repeat instruction', hi: 'निर्देश दोबारा सुनें' },
+  voice_stop: { en: 'Stop speaking', hi: 'बोलना बंद करें' },
+  voice_speaking: { en: 'Speaking...', hi: 'बोल रहा है...' },
+  voice_loading: { en: 'Preparing audio...', hi: 'ऑडियो तैयार हो रहा है...' },
+  voice_fallback_badge: { en: 'Standard Voice', hi: 'मानक आवाज़' },
+  voice_elevenlabs_badge: { en: 'ElevenLabs AI Voice', hi: 'ElevenLabs एआई आवाज़' },
+  voice_error: { en: 'Voice unavailable', hi: 'आवाज़ उपलब्ध नहीं है' },
+  nav_patient_intake: { en: 'Patient Intake', hi: 'मरीज इनटेक' },
+  cta_patient_intake: { en: 'Start Patient Intake', hi: 'मरीज इनटेक शुरू करें' },
+  hero_badge_platform: { en: 'Doctor-Verified Recovery Platform', hi: 'डॉक्टर-सत्यापित रिकवरी प्लेटफॉर्म' },
+  footer_tagline: {
+    en: 'PulseBridge AI — Prescription ke baad patient akela nahi hota. Ghar tak ilaaj ka saath.',
+    hi: 'PulseBridge AI — पर्ची के बाद मरीज अकेला नहीं होता। घर तक इलाज का साथ।',
+  },
 };
 
 export function translate(key: TranslationKey, lang: Language, params?: Record<string, string | number>): string {
