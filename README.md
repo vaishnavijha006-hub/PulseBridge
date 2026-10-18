@@ -3,7 +3,7 @@
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen?style=flat-square)](https://github.com/vaishnavijha006-hub/PulseBridge)
 [![Tests Passing](https://img.shields.io/badge/tests-194%20passed-success?style=flat-square)](https://github.com/vaishnavijha006-hub/PulseBridge)
 [![TypeScript](https://img.shields.io/badge/typescript-strict%20%7C%200%20errors-blue?style=flat-square)](https://github.com/vaishnavijha006-hub/PulseBridge)
-[![Deployment](https://img.shields.io/badge/deployment-Not%20yet%20verified-lightgrey?style=flat-square&logo=vercel)](https://vercel.com/vaishnavijha006-3492s-projects/pulse-bridge)
+[![Deployment](https://img.shields.io/badge/deployment-GitHub%20Pages%20Live-brightgreen?style=flat-square&logo=githubpages)](https://vaishnavijha006-hub.github.io/PulseBridge/)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
 
 > **PulseBridge AI** is an enterprise-grade clinical intelligence and care-coordination platform designed to bridge communication gaps among doctors, patients, and family caregivers during post-consultation recovery. It transforms static prescription papers and laboratory pathology reports into active, closed-loop recovery workflows with bilingual voice guidance, smart triage prioritization, and patient-controlled family circles.
@@ -14,7 +14,7 @@
 
 | Environment | URL / Destination | Description |
 | :--- | :--- | :--- |
-| 🚀 **Production Deployment** | *Not yet verified* | Deployment domain pending verification on production host |
+| 🚀 **Live Production App (GitHub Pages)** | [https://vaishnavijha006-hub.github.io/PulseBridge/](https://vaishnavijha006-hub.github.io/PulseBridge/) | Verified live production web deployment |
 | ⚡ **Vercel Project Dashboard** | [vercel.com/vaishnavijha006-3492s-projects/pulse-bridge](https://vercel.com/vaishnavijha006-3492s-projects/pulse-bridge) | Deployment management, logs & environment variables |
 | 💻 **GitHub Repository** | [github.com/vaishnavijha006-hub/PulseBridge](https://github.com/vaishnavijha006-hub/PulseBridge) | Complete source code, branch history & CI workflows |
 | 🛠️ **Local Development** | `http://localhost:5173` *(Local development only)* | Run `npm run dev` locally |
