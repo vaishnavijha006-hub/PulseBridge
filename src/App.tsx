@@ -7,7 +7,7 @@ import { PatientDashboard } from '@/pages/PatientDashboard';
 import { DoctorDashboard } from '@/pages/DoctorDashboard';
 import { FamilyRecoveryCircle } from '@/pages/FamilyRecoveryCircle';
 import { AdminDashboard } from '@/pages/AdminDashboard';
-import { dataService } from '@/services/dataService';
+import { dataService, demoService } from '@/services/dataService';
 import { detectCareGaps } from '@/services/careGapRules';
 import {
   getPatientSummaries,
@@ -153,7 +153,11 @@ function AppContent() {
 
   const handleIntakeComplete = useCallback(async (profile: Partial<PatientProfile>, file: File | null) => {
     try {
-      const res = await dataService.savePatientIntake(profile);
+      let res = await dataService.savePatientIntake(profile);
+      if ('error' in res || !res.data) {
+        console.warn('Primary savePatientIntake failed, falling back to local store:', 'error' in res ? res.error : 'Unknown error');
+        res = await demoService.savePatientIntake(profile);
+      }
       if ('error' in res || !res.data) {
         console.error('Failed to save patient intake:', 'error' in res ? res.error : 'Unknown error');
         return;
@@ -169,19 +173,22 @@ function AppContent() {
       setPrescriptionFile(file);
 
       if (file) {
+        let previewUrl = URL.createObjectURL(file);
+        setPrescriptionPreview(previewUrl);
         const uploadRes = await dataService.uploadPrescriptionImage(newPatientId, file);
         if ('url' in uploadRes) {
-          setPrescriptionPreview(uploadRes.url);
-          const draftRes = await dataService.savePrescriptionDraft(newPatientId, uploadRes.url, [
-            { key: 'medicine', labelKey: 'rx_field_medicine', value: newPatient.currentMeds || 'Prescribed Medicine', status: 'uncertain' },
-            { key: 'dosage', labelKey: 'rx_field_dosage', value: 'As directed', status: 'uncertain' },
-            { key: 'frequency', labelKey: 'rx_field_frequency', value: 'Once daily', status: 'uncertain' },
-            { key: 'duration', labelKey: 'rx_field_duration', value: '5 days', status: 'uncertain' },
-            { key: 'instructions', labelKey: 'rx_field_instructions', value: 'Take after meals', status: 'uncertain' },
-          ]);
-          if ('data' in draftRes) {
-            setPrescriptionDrafts((prev) => ({ ...prev, [newPatientId]: draftRes.data }));
-          }
+          previewUrl = uploadRes.url;
+          setPrescriptionPreview(previewUrl);
+        }
+        const draftRes = await dataService.savePrescriptionDraft(newPatientId, previewUrl, [
+          { key: 'medicine', labelKey: 'rx_field_medicine', value: newPatient.currentMeds || 'Prescribed Medicine', status: 'uncertain' },
+          { key: 'dosage', labelKey: 'rx_field_dosage', value: 'As directed', status: 'uncertain' },
+          { key: 'frequency', labelKey: 'rx_field_frequency', value: 'Once daily', status: 'uncertain' },
+          { key: 'duration', labelKey: 'rx_field_duration', value: '5 days', status: 'uncertain' },
+          { key: 'instructions', labelKey: 'rx_field_instructions', value: 'Take after meals', status: 'uncertain' },
+        ]);
+        if ('data' in draftRes) {
+          setPrescriptionDrafts((prev) => ({ ...prev, [newPatientId]: draftRes.data }));
         }
       } else if (newPatient.currentMeds && newPatient.currentMeds.trim()) {
         const draftRes = await dataService.savePrescriptionDraft(
@@ -201,14 +208,20 @@ function AppContent() {
       }
 
       // Sync patient summaries so the Doctor Clinical Command Center displays the new patient
-      const updatedSummaries = await dataService.fetchPatientSummaries();
-      if (updatedSummaries && updatedSummaries.length > 0) {
-        setSummaries(updatedSummaries);
+      try {
+        const updatedSummaries = await dataService.fetchPatientSummaries();
+        if (updatedSummaries && updatedSummaries.length > 0) {
+          setSummaries(updatedSummaries);
+        }
+      } catch (sumErr) {
+        console.warn('Could not refresh summaries after intake:', sumErr);
       }
 
       setView('patient_processing');
     } catch (err) {
       console.error('Error during intake completion:', err);
+      // Guarantee the user is never stuck on intake
+      setView('patient_processing');
     }
   }, [setView]);
 
