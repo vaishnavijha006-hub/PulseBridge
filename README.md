@@ -1,12 +1,14 @@
 # PulseBridge AI — Clinical Intelligence & Care-Coordination Platform
 
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen?style=flat-square)](https://github.com/vaishnavijha006-hub/PulseBridge)
+[![Deploy to GitHub Pages](https://github.com/vaishnavijha006-hub/PulseBridge/actions/workflows/deploy.yml/badge.svg)](https://github.com/vaishnavijha006-hub/PulseBridge/actions/workflows/deploy.yml)
 [![Tests Passing](https://img.shields.io/badge/tests-194%20passed-success?style=flat-square)](https://github.com/vaishnavijha006-hub/PulseBridge)
 [![TypeScript](https://img.shields.io/badge/typescript-strict%20%7C%200%20errors-blue?style=flat-square)](https://github.com/vaishnavijha006-hub/PulseBridge)
 [![Deployment](https://img.shields.io/badge/deployment-GitHub%20Pages%20Live-brightgreen?style=flat-square&logo=githubpages)](https://vaishnavijha006-hub.github.io/PulseBridge/)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
 
 > **PulseBridge AI** is an enterprise-grade clinical intelligence and care-coordination platform designed to bridge communication gaps among doctors, patients, and family caregivers during post-consultation recovery. It transforms static prescription papers and laboratory pathology reports into active, closed-loop recovery workflows with bilingual voice guidance, smart triage prioritization, and patient-controlled family circles.
+
+🌐 **Live Application**: [https://vaishnavijha006-hub.github.io/PulseBridge/](https://vaishnavijha006-hub.github.io/PulseBridge/)
 
 ---
 
@@ -174,7 +176,7 @@ All 6 primary feature branches are unified into `main` with zero merge conflicts
 
 ## Live Quality Assurance & Verification Report
 
-*Commit: [`36eb03a`](https://github.com/vaishnavijha006-hub/PulseBridge/commit/36eb03a) | Automated Test Run Status: 100% Passing*
+*Commit: [`f6cf877`](https://github.com/vaishnavijha006-hub/PulseBridge/commit/f6cf8779f16e8802a64799795989dcddf26ccdac) | Automated Test Run Status: 100% Passing | Deployment: [GitHub Pages Live (200 OK)](https://vaishnavijha006-hub.github.io/PulseBridge/)*
 
 ### Test Suite Execution
 ```bash
