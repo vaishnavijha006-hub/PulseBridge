@@ -38,6 +38,7 @@ export class VoiceGuidanceService {
   private abortController: AbortController | null = null;
   private lastSpokenText: string | null = null;
   private lastSpokenLang: Language = 'en';
+  private isEdgeFunctionAvailable = true;
 
   /**
    * Generates a cache key based on language and text.
@@ -171,7 +172,7 @@ export class VoiceGuidanceService {
     voiceId?: string,
     signal?: AbortSignal
   ): Promise<Blob | null> {
-    if (!supabase) {
+    if (!supabase || !this.isEdgeFunctionAvailable) {
       return null;
     }
 
@@ -183,7 +184,12 @@ export class VoiceGuidanceService {
         },
       });
 
-      if (error || !data) {
+      if (error) {
+        this.isEdgeFunctionAvailable = false;
+        return null;
+      }
+
+      if (!data) {
         return null;
       }
 
@@ -199,6 +205,7 @@ export class VoiceGuidanceService {
 
       return null;
     } catch {
+      this.isEdgeFunctionAvailable = false;
       return null;
     }
   }
