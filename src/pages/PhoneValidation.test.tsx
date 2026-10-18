@@ -86,7 +86,7 @@ describe('Phone Number 10-Digit Validation Integration', () => {
       expect(screen.queryByText(/What symptoms are you experiencing/i)).not.toBeInTheDocument();
     });
 
-    it('allows advancing when a valid 10-digit phone number is provided', () => {
+    it('allows advancing when a valid 10-digit phone number and mandatory fields are provided', () => {
       render(
         <LanguageProvider initialLang="en">
           <PatientIntakeWizard onComplete={vi.fn()} onBack={vi.fn()} />
@@ -96,7 +96,9 @@ describe('Phone Number 10-Digit Validation Integration', () => {
       // Advance to profile step
       fireEvent.click(screen.getByText('Continue'));
 
-      // Fill valid 10-digit phone
+      // Fill mandatory fields and valid 10-digit phone
+      fireEvent.change(screen.getByPlaceholderText('Ravi Sharma'), { target: { value: 'Ravi Sharma' } });
+      fireEvent.change(screen.getByPlaceholderText('62'), { target: { value: '55' } });
       const phoneInput = screen.getByPlaceholderText('9876543210');
       fireEvent.change(phoneInput, { target: { value: '9876543210' } });
 
@@ -105,6 +107,68 @@ describe('Phone Number 10-Digit Validation Integration', () => {
 
       // Should advance successfully to symptoms step
       expect(screen.getByText(/What symptoms are you experiencing/i)).toBeInTheDocument();
+    });
+
+    it('blocks advancing when mandatory phone number is empty', () => {
+      render(
+        <LanguageProvider initialLang="en">
+          <PatientIntakeWizard onComplete={vi.fn()} onBack={vi.fn()} />
+        </LanguageProvider>
+      );
+
+      // Advance to profile step
+      fireEvent.click(screen.getByText('Continue'));
+
+      // Fill Name and Age, but leave Phone empty
+      fireEvent.change(screen.getByPlaceholderText('Ravi Sharma'), { target: { value: 'Ravi Sharma' } });
+      fireEvent.change(screen.getByPlaceholderText('62'), { target: { value: '55' } });
+
+      // Click Continue
+      fireEvent.click(screen.getByText('Continue'));
+
+      // Expect phone required error
+      expect(screen.getByText(/Phone number is required and must be exactly 10 digits/i)).toBeInTheDocument();
+      expect(screen.queryByText(/What symptoms are you experiencing/i)).not.toBeInTheDocument();
+    });
+
+    it('blocks advancing when mandatory full name is empty', () => {
+      render(
+        <LanguageProvider initialLang="en">
+          <PatientIntakeWizard onComplete={vi.fn()} onBack={vi.fn()} />
+        </LanguageProvider>
+      );
+
+      fireEvent.click(screen.getByText('Continue'));
+
+      // Fill Age and Phone, but leave Name empty
+      fireEvent.change(screen.getByPlaceholderText('62'), { target: { value: '55' } });
+      const phoneInput = screen.getByPlaceholderText('9876543210');
+      fireEvent.change(phoneInput, { target: { value: '9876543210' } });
+
+      fireEvent.click(screen.getByText('Continue'));
+
+      expect(screen.getByText(/Please enter your full name/i)).toBeInTheDocument();
+      expect(screen.queryByText(/What symptoms are you experiencing/i)).not.toBeInTheDocument();
+    });
+
+    it('blocks advancing when mandatory age is empty or invalid', () => {
+      render(
+        <LanguageProvider initialLang="en">
+          <PatientIntakeWizard onComplete={vi.fn()} onBack={vi.fn()} />
+        </LanguageProvider>
+      );
+
+      fireEvent.click(screen.getByText('Continue'));
+
+      // Fill Name and Phone, but leave Age empty
+      fireEvent.change(screen.getByPlaceholderText('Ravi Sharma'), { target: { value: 'Ravi Sharma' } });
+      const phoneInput = screen.getByPlaceholderText('9876543210');
+      fireEvent.change(phoneInput, { target: { value: '9876543210' } });
+
+      fireEvent.click(screen.getByText('Continue'));
+
+      expect(screen.getByText(/Please enter a valid age/i)).toBeInTheDocument();
+      expect(screen.queryByText(/What symptoms are you experiencing/i)).not.toBeInTheDocument();
     });
 
     it('displays Hindi error message when language is Hindi and phone is invalid', () => {

@@ -87,7 +87,12 @@ export type TranslationKey =
   | 'intake_phone'
   | 'phone_format_error'
   | 'phone_digits_only_error'
+  | 'phone_required_error'
   | 'intake_phone_hint'
+  | 'intake_name_required_error'
+  | 'intake_age_required_error'
+  | 'intake_gender_required_error'
+  | 'intake_required_label'
   | 'intake_symptoms_q'
   | 'intake_symptoms_hint'
   | 'intake_allergies_q'
@@ -424,7 +429,12 @@ const dict: Dictionary = {
   intake_phone: { en: 'Phone number', hi: 'फ़ोन नंबर' },
   phone_format_error: { en: 'Phone number must be exactly 10 digits.', hi: 'फ़ोन नंबर ठीक 10 अंकों का होना चाहिए।' },
   phone_digits_only_error: { en: 'Phone number must contain only numeric digits.', hi: 'फ़ोन नंबर में केवल अंक होने चाहिए।' },
-  intake_phone_hint: { en: '10-digit mobile number', hi: '10 अंकों का मोबाइल नंबर' },
+  phone_required_error: { en: 'Phone number is required and must be exactly 10 digits.', hi: 'फ़ोन नंबर दर्ज करना अनिवार्य है और यह ठीक 10 अंकों का होना चाहिए।' },
+  intake_phone_hint: { en: '10-digit mobile number (e.g. 9876543210)', hi: '10 अंकों का मोबाइल नंबर (उदा. 9876543210)' },
+  intake_name_required_error: { en: 'Please enter your full name.', hi: 'कृपया अपना पूरा नाम दर्ज करें।' },
+  intake_age_required_error: { en: 'Please enter a valid age (1-120).', hi: 'कृपया मान्य आयु दर्ज करें (1-120)।' },
+  intake_gender_required_error: { en: 'Please select your gender.', hi: 'कृपया अपना लिंग चुनें।' },
+  intake_required_label: { en: 'Required', hi: 'अनिवार्य' },
   intake_symptoms_q: { en: 'What symptoms are you experiencing?', hi: 'आपको कौन से लक्षण हैं?' },
   intake_symptoms_hint: { en: 'Describe in your own words.', hi: 'अपने शब्दों में बताएं।' },
   intake_allergies_q: { en: 'Do you have any known allergies?', hi: 'क्या आपको कोई एलर्जी है?' },

@@ -45,8 +45,11 @@ export function PatientIntakeWizard({ onComplete, onBack }: PatientIntakeWizardP
   const [prescriptionFile, setPrescriptionFile] = useState<File | null>(null);
   const [voiceActive, setVoiceActive] = useState(false);
   const [voiceSupported, setVoiceSupported] = useState(false);
-  const [abhaError, setAbhaError] = useState<string | null>(null);
+  const [nameError, setNameError] = useState<string | null>(null);
+  const [ageError, setAgeError] = useState<string | null>(null);
+  const [genderError, setGenderError] = useState<string | null>(null);
   const [phoneError, setPhoneError] = useState<string | null>(null);
+  const [abhaError, setAbhaError] = useState<string | null>(null);
 
   const voice = useVoiceGuidance();
   const step = STEPS[stepIdx];
@@ -63,34 +66,71 @@ export function PatientIntakeWizard({ onComplete, onBack }: PatientIntakeWizardP
 
   const next = () => {
     if (step === 'profile') {
-      if (profile.phone && profile.phone.trim()) {
-        const phoneVal = validatePhoneNumber(profile.phone);
+      let hasError = false;
+
+      // 1. Mandatory Name Validation
+      if (!profile.name || !profile.name.trim()) {
+        setNameError(t('intake_name_required_error'));
+        hasError = true;
+      } else {
+        setNameError(null);
+      }
+
+      // 2. Mandatory Age Validation (1-125)
+      const parsedAge = Number(profile.age);
+      if (profile.age === undefined || profile.age === null || isNaN(parsedAge) || parsedAge <= 0 || parsedAge > 125) {
+        setAgeError(t('intake_age_required_error'));
+        hasError = true;
+      } else {
+        setAgeError(null);
+      }
+
+      // 3. Gender (Optional, defaults to other if unselected)
+      setGenderError(null);
+
+      // 4. Mandatory Strict 10-Digit Phone Validation
+      if (!profile.phone || !profile.phone.trim()) {
+        setPhoneError(t('phone_required_error'));
+        hasError = true;
+      } else {
+        const phoneVal = validatePhoneNumber(profile.phone, true);
         if (!phoneVal.valid) {
           setPhoneError(
             phoneVal.error?.includes('numeric')
               ? t('phone_digits_only_error')
               : t('phone_format_error')
           );
-          return;
+          hasError = true;
+        } else {
+          setPhoneError(null);
+          profile.phone = phoneVal.normalized;
         }
       }
-      setPhoneError(null);
 
+      // 5. ABHA Validation (Optional, strictly 14 digits if provided)
       if (profile.abhaNumber && profile.abhaNumber.trim()) {
         const numVal = validateAbhaNumber(profile.abhaNumber);
         if (!numVal.valid) {
           setAbhaError(numVal.error || t('intake_abha_format_error'));
-          return;
+          hasError = true;
+        } else {
+          setAbhaError(null);
         }
+      } else {
+        setAbhaError(null);
       }
+
       if (profile.abhaAddress && profile.abhaAddress.trim()) {
         const addrVal = validateAbhaAddress(profile.abhaAddress);
         if (!addrVal.valid) {
           setAbhaError(addrVal.error || t('intake_abha_address_error'));
-          return;
+          hasError = true;
         }
       }
-      setAbhaError(null);
+
+      if (hasError) {
+        return;
+      }
     }
 
     if (isLast) {
@@ -149,10 +189,16 @@ export function PatientIntakeWizard({ onComplete, onBack }: PatientIntakeWizardP
             <ProfileStep
               profile={profile}
               setProfile={setProfile}
-              abhaError={abhaError}
-              setAbhaError={setAbhaError}
+              nameError={nameError}
+              setNameError={setNameError}
+              ageError={ageError}
+              setAgeError={setAgeError}
+              genderError={genderError}
+              setGenderError={setGenderError}
               phoneError={phoneError}
               setPhoneError={setPhoneError}
+              abhaError={abhaError}
+              setAbhaError={setAbhaError}
             />
           )}
           {step === 'symptoms' && <TextStep
@@ -274,17 +320,29 @@ function LanguageStep({ current, onSelect }: { current: Language; onSelect: (l: 
 function ProfileStep({
   profile,
   setProfile,
-  abhaError,
-  setAbhaError,
+  nameError,
+  setNameError,
+  ageError,
+  setAgeError,
+  genderError,
+  setGenderError,
   phoneError,
   setPhoneError,
+  abhaError,
+  setAbhaError,
 }: {
   profile: Partial<PatientProfile>;
   setProfile: (p: Partial<PatientProfile>) => void;
-  abhaError: string | null;
-  setAbhaError: (err: string | null) => void;
+  nameError: string | null;
+  setNameError: (err: string | null) => void;
+  ageError: string | null;
+  setAgeError: (err: string | null) => void;
+  genderError: string | null;
+  setGenderError: (err: string | null) => void;
   phoneError: string | null;
   setPhoneError: (err: string | null) => void;
+  abhaError: string | null;
+  setAbhaError: (err: string | null) => void;
 }) {
   const { t } = useLanguage();
   return (
@@ -294,77 +352,127 @@ function ProfileStep({
         <h2 className="text-xl font-bold text-navy-800">{t('intake_profile_q')}</h2>
       </div>
       <div className="flex flex-col gap-4">
-        <Field label={t('intake_name')}>
+        {/* Mandatory Full Name */}
+        <Field label={t('intake_name')} required error={nameError}>
           <input
             type="text"
             value={profile.name ?? ''}
-            onChange={(e) => setProfile({ ...profile, name: e.target.value })}
-            className="w-full rounded-xl border border-surface-border bg-white px-4 py-3 text-base text-navy-800 focus:border-teal-400 focus:ring-1 focus:ring-teal-400 outline-none transition-colors"
+            onChange={(e) => {
+              setProfile({ ...profile, name: e.target.value });
+              if (nameError) setNameError(null);
+            }}
+            onBlur={() => {
+              if (!profile.name || !profile.name.trim()) {
+                setNameError(t('intake_name_required_error'));
+              }
+            }}
+            className={cn(
+              "w-full rounded-xl border bg-white px-4 py-3 text-base text-navy-800 focus:ring-1 outline-none transition-colors",
+              nameError
+                ? "border-rose-400 focus:border-rose-500 focus:ring-rose-400 bg-rose-50/20"
+                : "border-surface-border focus:border-teal-400 focus:ring-teal-400"
+            )}
             placeholder="Ravi Sharma"
           />
         </Field>
+
         <div className="grid grid-cols-2 gap-4">
-          <Field label={t('intake_age')}>
+          {/* Mandatory Age */}
+          <Field label={t('intake_age')} required error={ageError}>
             <input
               type="number"
+              min={1}
+              max={120}
               value={profile.age ?? ''}
-              onChange={(e) => setProfile({ ...profile, age: Number(e.target.value) })}
-              className="w-full rounded-xl border border-surface-border bg-white px-4 py-3 text-base text-navy-800 focus:border-teal-400 focus:ring-1 focus:ring-teal-400 outline-none transition-colors"
+              onChange={(e) => {
+                const val = e.target.value === '' ? undefined : Number(e.target.value);
+                setProfile({ ...profile, age: val });
+                if (ageError) setAgeError(null);
+              }}
+              onBlur={() => {
+                const parsed = Number(profile.age);
+                if (profile.age === undefined || profile.age === null || isNaN(parsed) || parsed <= 0 || parsed > 125) {
+                  setAgeError(t('intake_age_required_error'));
+                }
+              }}
+              className={cn(
+                "w-full rounded-xl border bg-white px-4 py-3 text-base text-navy-800 focus:ring-1 outline-none transition-colors",
+                ageError
+                  ? "border-rose-400 focus:border-rose-500 focus:ring-rose-400 bg-rose-50/20"
+                  : "border-surface-border focus:border-teal-400 focus:ring-teal-400"
+              )}
               placeholder="62"
             />
           </Field>
-          <Field label={t('intake_gender')}>
+
+          {/* Gender (Optional) */}
+          <Field label={t('intake_gender')} error={genderError}>
             <select
               value={profile.gender ?? ''}
-              onChange={(e) => setProfile({ ...profile, gender: e.target.value as 'male' | 'female' | 'other' })}
-              className="w-full rounded-xl border border-surface-border bg-white px-4 py-3 text-base text-navy-800 focus:border-teal-400 focus:ring-1 focus:ring-teal-400 outline-none transition-colors"
+              onChange={(e) => {
+                const val = e.target.value as 'male' | 'female' | 'other' | '';
+                setProfile({ ...profile, gender: val ? val : undefined });
+                if (genderError) setGenderError(null);
+              }}
+              onBlur={() => {
+                if (!profile.gender || String(profile.gender).trim() === '') {
+                  setGenderError(t('intake_gender_required_error'));
+                }
+              }}
+              className={cn(
+                "w-full rounded-xl border bg-white px-4 py-3 text-base text-navy-800 focus:ring-1 outline-none transition-colors",
+                genderError
+                  ? "border-rose-400 focus:border-rose-500 focus:ring-rose-400 bg-rose-50/20"
+                  : "border-surface-border focus:border-teal-400 focus:ring-teal-400"
+              )}
             >
-              <option value="">—</option>
+              <option value="">— Select —</option>
               <option value="male">{t('gender_male')}</option>
               <option value="female">{t('gender_female')}</option>
               <option value="other">{t('gender_other')}</option>
             </select>
           </Field>
         </div>
-        <Field label={t('intake_phone')}>
+
+        {/* Mandatory Strict 10-Digit Mobile */}
+        <Field label={t('intake_phone')} required error={phoneError}>
           <div className="flex flex-col gap-1">
             <input
               type="tel"
               value={profile.phone ?? ''}
               onChange={(e) => {
-                setProfile({ ...profile, phone: e.target.value });
+                // Allow digits, +91, spaces, dashes
+                const val = e.target.value;
+                setProfile({ ...profile, phone: val });
                 if (phoneError) setPhoneError(null);
               }}
               onBlur={() => {
-                if (profile.phone && profile.phone.trim()) {
-                  const phoneVal = validatePhoneNumber(profile.phone);
-                  if (!phoneVal.valid) {
-                    setPhoneError(
-                      phoneVal.error?.includes('numeric')
-                        ? t('phone_digits_only_error')
-                        : t('phone_format_error')
-                    );
-                  } else {
-                    setPhoneError(null);
-                    setProfile({ ...profile, phone: phoneVal.normalized });
-                  }
+                if (!profile.phone || !profile.phone.trim()) {
+                  setPhoneError(t('phone_required_error'));
+                  return;
+                }
+                const phoneVal = validatePhoneNumber(profile.phone, true);
+                if (!phoneVal.valid) {
+                  setPhoneError(
+                    phoneVal.error?.includes('numeric')
+                      ? t('phone_digits_only_error')
+                      : t('phone_format_error')
+                  );
+                } else {
+                  setPhoneError(null);
+                  setProfile({ ...profile, phone: phoneVal.normalized });
                 }
               }}
               className={cn(
                 "w-full rounded-xl border bg-white px-4 py-3 text-base text-navy-800 focus:ring-1 outline-none transition-colors",
                 phoneError
-                  ? "border-rose-400 focus:border-rose-500 focus:ring-rose-400"
+                  ? "border-rose-400 focus:border-rose-500 focus:ring-rose-400 bg-rose-50/20"
                   : "border-surface-border focus:border-teal-400 focus:ring-teal-400"
               )}
               placeholder="9876543210"
-              maxLength={16}
+              maxLength={15}
             />
-            {phoneError ? (
-              <p className="text-xs text-rose-600 font-medium flex items-center gap-1 mt-0.5">
-                <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
-                <span>{phoneError}</span>
-              </p>
-            ) : (
+            {!phoneError && (
               <span className="text-[11px] text-navy-400">
                 {t('intake_phone_hint')}
               </span>
@@ -444,12 +552,39 @@ function ProfileStep({
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  label,
+  children,
+  required,
+  error,
+}: {
+  label: string;
+  children: React.ReactNode;
+  required?: boolean;
+  error?: string | null;
+}) {
+  const { t } = useLanguage();
   return (
-    <label className="flex flex-col gap-1.5">
-      <span className="text-sm font-semibold text-navy-600">{label}</span>
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center justify-between">
+        <label className="text-sm font-semibold text-navy-700 flex items-center gap-1">
+          <span>{label}</span>
+          {required && <span className="text-rose-500 font-bold">*</span>}
+        </label>
+        {required && (
+          <span className="text-[10px] font-semibold text-rose-600 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded-md">
+            {t('intake_required_label')}
+          </span>
+        )}
+      </div>
       {children}
-    </label>
+      {error && (
+        <p className="text-xs text-rose-600 font-medium flex items-center gap-1 mt-0.5 animate-shake">
+          <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+          <span>{error}</span>
+        </p>
+      )}
+    </div>
   );
 }
 
