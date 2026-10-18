@@ -153,71 +153,99 @@ function AppContent() {
 
   const handleIntakeComplete = useCallback(async (profile: Partial<PatientProfile>, file: File | null) => {
     try {
-      let res = await dataService.savePatientIntake(profile);
-      if ('error' in res || !res.data) {
-        console.warn('Primary savePatientIntake failed, falling back to local store:', 'error' in res ? res.error : 'Unknown error');
+      // 1. Immediately set preview URL and prescription file
+      let previewUrl = file ? URL.createObjectURL(file) : null;
+      if (previewUrl) {
+        setPrescriptionPreview(previewUrl);
+      }
+      setPrescriptionFile(file);
+
+      // 2. Persist patient intake with fast fallback so patient is never blocked
+      let res: { data: PatientProfile } | { error: string };
+      try {
+        res = await Promise.race([
+          dataService.savePatientIntake(profile),
+          new Promise<{ error: string }>((_, reject) =>
+            setTimeout(() => reject(new Error('Intake timeout')), 3500)
+          ),
+        ]);
+        if ('error' in res || !res.data) {
+          console.warn('savePatientIntake remote returned error, using local fallback:', 'error' in res ? res.error : 'Unknown');
+          res = await demoService.savePatientIntake(profile);
+        }
+      } catch (saveErr) {
+        console.warn('Remote savePatientIntake timed out or failed, falling back:', saveErr);
         res = await demoService.savePatientIntake(profile);
       }
-      if ('error' in res || !res.data) {
-        console.error('Failed to save patient intake:', 'error' in res ? res.error : 'Unknown error');
-        return;
-      }
 
-      const newPatient = res.data;
+      const newPatient: PatientProfile = ('data' in res && res.data)
+        ? res.data
+        : {
+            id: `p-${Date.now()}`,
+            name: profile.name || 'New Patient',
+            age: profile.age || 40,
+            gender: profile.gender || 'other',
+            phone: profile.phone || '',
+            symptoms: profile.symptoms || '',
+            allergies: profile.allergies || 'None',
+            currentMeds: profile.currentMeds || '',
+            language: profile.language || 'hi',
+            abhaVerificationStatus: profile.abhaVerificationStatus || 'not_provided',
+          };
+
       const newPatientId = newPatient.id;
-
       activePatientIdRef.current = newPatientId;
       setActivePatientId(newPatientId);
       setCurrentPatient(newPatient);
       setPatientProfile(newPatient);
-      setPrescriptionFile(file);
 
-      if (file) {
-        let previewUrl = URL.createObjectURL(file);
-        setPrescriptionPreview(previewUrl);
-        const uploadRes = await dataService.uploadPrescriptionImage(newPatientId, file);
-        if ('url' in uploadRes) {
-          previewUrl = uploadRes.url;
-          setPrescriptionPreview(previewUrl);
-        }
-        const draftRes = await dataService.savePrescriptionDraft(newPatientId, previewUrl, [
-          { key: 'medicine', labelKey: 'rx_field_medicine', value: newPatient.currentMeds || 'Prescribed Medicine', status: 'uncertain' },
-          { key: 'dosage', labelKey: 'rx_field_dosage', value: 'As directed', status: 'uncertain' },
-          { key: 'frequency', labelKey: 'rx_field_frequency', value: 'Once daily', status: 'uncertain' },
-          { key: 'duration', labelKey: 'rx_field_duration', value: '5 days', status: 'uncertain' },
-          { key: 'instructions', labelKey: 'rx_field_instructions', value: 'Take after meals', status: 'uncertain' },
-        ]);
-        if ('data' in draftRes) {
-          setPrescriptionDrafts((prev) => ({ ...prev, [newPatientId]: draftRes.data }));
-        }
-      } else if (newPatient.currentMeds && newPatient.currentMeds.trim()) {
-        const draftRes = await dataService.savePrescriptionDraft(
-          newPatientId,
-          'https://images.pexels.com/photos/139398/brainstorming-meeting-patients-diagnosis-139398.jpeg',
-          [
-            { key: 'medicine', labelKey: 'rx_field_medicine', value: newPatient.currentMeds, status: 'uncertain' },
-            { key: 'dosage', labelKey: 'rx_field_dosage', value: 'As directed', status: 'uncertain' },
-            { key: 'frequency', labelKey: 'rx_field_frequency', value: 'Once daily', status: 'uncertain' },
-            { key: 'duration', labelKey: 'rx_field_duration', value: '30 days', status: 'uncertain' },
-            { key: 'instructions', labelKey: 'rx_field_instructions', value: 'Take in the morning', status: 'uncertain' },
-          ]
-        );
-        if ('data' in draftRes) {
-          setPrescriptionDrafts((prev) => ({ ...prev, [newPatientId]: draftRes.data }));
-        }
-      }
-
-      // Sync patient summaries so the Doctor Clinical Command Center displays the new patient
-      try {
-        const updatedSummaries = await dataService.fetchPatientSummaries();
-        if (updatedSummaries && updatedSummaries.length > 0) {
-          setSummaries(updatedSummaries);
-        }
-      } catch (sumErr) {
-        console.warn('Could not refresh summaries after intake:', sumErr);
-      }
-
+      // 3. Immediately switch view to patient_processing!
       setView('patient_processing');
+
+      // 4. Background tasks: storage upload, initial draft, sync summaries
+      void (async () => {
+        try {
+          if (file) {
+            const uploadRes = await dataService.uploadPrescriptionImage(newPatientId, file).catch(() => ({ url: previewUrl }));
+            if (uploadRes && 'url' in uploadRes && uploadRes.url) {
+              previewUrl = uploadRes.url;
+              setPrescriptionPreview(previewUrl);
+            }
+            const draftRes = await dataService.savePrescriptionDraft(newPatientId, previewUrl || 'uploaded-prescription.jpg', [
+              { key: 'medicine', labelKey: 'rx_field_medicine', value: newPatient.currentMeds || 'Prescribed Medicine', status: 'uncertain' },
+              { key: 'dosage', labelKey: 'rx_field_dosage', value: 'As directed', status: 'uncertain' },
+              { key: 'frequency', labelKey: 'rx_field_frequency', value: 'Once daily', status: 'uncertain' },
+              { key: 'duration', labelKey: 'rx_field_duration', value: '5 days', status: 'uncertain' },
+              { key: 'instructions', labelKey: 'rx_field_instructions', value: 'Take after meals', status: 'uncertain' },
+            ]).catch(() => null);
+            if (draftRes && 'data' in draftRes) {
+              setPrescriptionDrafts((prev) => ({ ...prev, [newPatientId]: draftRes.data }));
+            }
+          } else if (newPatient.currentMeds && newPatient.currentMeds.trim()) {
+            const draftRes = await dataService.savePrescriptionDraft(
+              newPatientId,
+              'https://images.pexels.com/photos/139398/brainstorming-meeting-patients-diagnosis-139398.jpeg',
+              [
+                { key: 'medicine', labelKey: 'rx_field_medicine', value: newPatient.currentMeds, status: 'uncertain' },
+                { key: 'dosage', labelKey: 'rx_field_dosage', value: 'As directed', status: 'uncertain' },
+                { key: 'frequency', labelKey: 'rx_field_frequency', value: 'Once daily', status: 'uncertain' },
+                { key: 'duration', labelKey: 'rx_field_duration', value: '30 days', status: 'uncertain' },
+                { key: 'instructions', labelKey: 'rx_field_instructions', value: 'Take in the morning', status: 'uncertain' },
+              ]
+            ).catch(() => null);
+            if (draftRes && 'data' in draftRes) {
+              setPrescriptionDrafts((prev) => ({ ...prev, [newPatientId]: draftRes.data }));
+            }
+          }
+
+          const updatedSummaries = await dataService.fetchPatientSummaries().catch(() => null);
+          if (updatedSummaries && updatedSummaries.length > 0) {
+            setSummaries(updatedSummaries);
+          }
+        } catch (bgErr) {
+          console.warn('[Background Intake Sync] Notice:', bgErr);
+        }
+      })();
     } catch (err) {
       console.error('Error during intake completion:', err);
       // Guarantee the user is never stuck on intake
@@ -407,10 +435,7 @@ function AppContent() {
       {view === 'landing' && <LandingPage onRoleSelect={handleRoleSelect} />}
       {view === 'patient_intake' && (
         <PatientIntakeWizard
-          onComplete={(profile, file) => {
-            if (file) setPrescriptionPreview(URL.createObjectURL(file));
-            handleIntakeComplete(profile, file);
-          }}
+          onComplete={handleIntakeComplete}
           onBack={() => setView('landing')}
         />
       )}

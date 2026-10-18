@@ -72,6 +72,7 @@ export type TranslationKey =
   | 'back'
   | 'continue'
   | 'submit'
+  | 'submitting'
   | 'cancel'
   | 'save'
   | 'confirm'
@@ -416,6 +417,7 @@ const dict: Dictionary = {
   back: { en: 'Back', hi: 'वापस' },
   continue: { en: 'Continue', hi: 'आगे बढ़ें' },
   submit: { en: 'Submit', hi: 'जमा करें' },
+  submitting: { en: 'Submitting...', hi: 'जमा हो रहा है...' },
   cancel: { en: 'Cancel', hi: 'रद्द करें' },
   save: { en: 'Save', hi: 'सेव करें' },
   confirm: { en: 'Confirm', hi: 'पुष्टि करें' },

@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { ArrowLeft, ArrowRight, Mic, MicOff, User, CreditCard, AlertCircle, Info } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Mic, MicOff, User, CreditCard, AlertCircle, Info, Loader2 } from 'lucide-react';
 import { PulseBridgeLogo } from '@/components/PulseBridgeLogo';
 import { PulseProgress } from '@/components/PulseProgress';
 import { LanguageToggle } from '@/components/LanguageToggle';
@@ -21,7 +21,7 @@ import {
 import { validatePhoneNumber, normalizePhoneNumber } from '@/utils/phone';
 
 interface PatientIntakeWizardProps {
-  onComplete: (profile: Partial<PatientProfile>, prescriptionFile: File | null) => void;
+  onComplete: (profile: Partial<PatientProfile>, prescriptionFile: File | null) => void | Promise<void>;
   onBack: () => void;
 }
 
@@ -43,6 +43,7 @@ export function PatientIntakeWizard({ onComplete, onBack }: PatientIntakeWizardP
   const [stepIdx, setStepIdx] = useState(0);
   const [profile, setProfile] = useState<Partial<PatientProfile>>({ language: lang });
   const [prescriptionFile, setPrescriptionFile] = useState<File | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [voiceActive, setVoiceActive] = useState(false);
   const [voiceSupported, setVoiceSupported] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
@@ -64,7 +65,9 @@ export function PatientIntakeWizard({ onComplete, onBack }: PatientIntakeWizardP
     }
   }, [stepIdx, lang, voice.isEnabled]);
 
-  const next = () => {
+  const next = async () => {
+    if (isSubmitting) return;
+
     if (step === 'profile') {
       let hasError = false;
 
@@ -134,17 +137,24 @@ export function PatientIntakeWizard({ onComplete, onBack }: PatientIntakeWizardP
     }
 
     if (isLast) {
-      const finalProfile: Partial<PatientProfile> = {
-        ...profile,
-        abhaVerificationStatus: resolveAbhaVerificationStatus(profile),
-      };
-      onComplete(finalProfile, prescriptionFile);
+      setIsSubmitting(true);
+      try {
+        const finalProfile: Partial<PatientProfile> = {
+          ...profile,
+          abhaVerificationStatus: resolveAbhaVerificationStatus(profile),
+        };
+        await onComplete(finalProfile, prescriptionFile);
+      } catch (err) {
+        console.error('Submission error in PatientIntakeWizard:', err);
+        setIsSubmitting(false);
+      }
     } else {
       setStepIdx((i) => Math.min(i + 1, STEPS.length - 1));
     }
   };
 
   const prev = () => {
+    if (isSubmitting) return;
     if (stepIdx === 0) {
       onBack();
     } else {
@@ -255,24 +265,36 @@ export function PatientIntakeWizard({ onComplete, onBack }: PatientIntakeWizardP
       <footer className="border-t border-surface-border bg-white">
         <div className="mx-auto max-w-2xl px-4 sm:px-6 py-4 flex items-center justify-between gap-4">
           <button
+            type="button"
             onClick={prev}
-            className="inline-flex items-center gap-2 rounded-lg border border-surface-border bg-white px-5 py-3 text-sm font-semibold text-navy-600 hover:bg-surface-muted transition-colors min-h-[48px]"
+            disabled={isSubmitting}
+            className="inline-flex items-center gap-2 rounded-lg border border-surface-border bg-white px-5 py-3 text-sm font-semibold text-navy-600 hover:bg-surface-muted transition-colors min-h-[48px] disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <ArrowLeft className="w-4 h-4" />
             {t('back')}
           </button>
           <button
+            type="button"
             onClick={next}
-            disabled={step === 'upload' && !prescriptionFile}
+            disabled={isSubmitting || (step === 'upload' && !prescriptionFile)}
             className={cn(
               'inline-flex items-center gap-2 rounded-lg px-6 py-3 text-sm font-bold transition-all min-h-[48px]',
-              step === 'upload' && !prescriptionFile
+              isSubmitting || (step === 'upload' && !prescriptionFile)
                 ? 'bg-surface-muted text-navy-300 cursor-not-allowed'
-                : 'bg-teal-500 text-white hover:bg-teal-600 shadow-sm',
+                : 'bg-teal-500 text-white hover:bg-teal-600 shadow-sm active:scale-95',
             )}
           >
-            {isLast ? t('submit') : t('continue')}
-            <ArrowRight className="w-4 h-4" />
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin text-teal-600" />
+                <span>{t('submitting')}</span>
+              </>
+            ) : (
+              <>
+                <span>{isLast ? t('submit') : t('continue')}</span>
+                <ArrowRight className="w-4 h-4" />
+              </>
+            )}
           </button>
         </div>
       </footer>
