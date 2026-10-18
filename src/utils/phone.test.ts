@@ -43,8 +43,38 @@ describe('Phone Number Validation & Utility Engine', () => {
       expect(formatPhoneNumber('9876543210', true)).toBe('+91 98765 43210');
     });
 
-    it('preserves non-10 digit input without mangling', () => {
+    it('formats a number with existing +91 prefix into 5+5 group', () => {
+      expect(formatPhoneNumber('+91 98765 43210')).toBe('98765 43210');
+      expect(formatPhoneNumber('+91 98765 43210', true)).toBe('+91 98765 43210');
+    });
+
+    it('formats a number with leading 0 trunk prefix into 5+5 group', () => {
+      expect(formatPhoneNumber('09876543210')).toBe('98765 43210');
+      expect(formatPhoneNumber('09876543210', true)).toBe('+91 98765 43210');
+    });
+
+    it('handles empty, null, undefined, or whitespace gracefully', () => {
+      expect(formatPhoneNumber('')).toBe('');
+      expect(formatPhoneNumber(null)).toBe('');
+      expect(formatPhoneNumber(undefined)).toBe('');
+      expect(formatPhoneNumber('   ')).toBe('');
+    });
+
+    it('preserves malformed and non-10 digit input without crashing or mangling', () => {
       expect(formatPhoneNumber('12345')).toBe('12345');
+      expect(formatPhoneNumber('invalid-text')).toBe('invalid-text');
+      expect(formatPhoneNumber('98765-ABCDE')).toBe('98765-ABCDE');
+    });
+
+    it('ensures stored raw values are preserved for tel: href usage while display is formatted', () => {
+      const storedPhone = '+91 98765 43210';
+      const formattedDisplay = formatPhoneNumber(storedPhone);
+      const telHref = `tel:${storedPhone}`;
+
+      expect(formattedDisplay).toBe('98765 43210');
+      expect(telHref).toBe('tel:+91 98765 43210');
+      // Stored phone remains unmodified
+      expect(storedPhone).toBe('+91 98765 43210');
     });
   });
 

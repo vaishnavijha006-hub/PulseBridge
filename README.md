@@ -1,9 +1,9 @@
 # PulseBridge AI — Clinical Intelligence & Care-Coordination Platform
 
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen?style=flat-square)](https://github.com/vaishnavijha006-hub/PulseBridge)
-[![Tests Passing](https://img.shields.io/badge/tests-188%20passed-success?style=flat-square)](https://github.com/vaishnavijha006-hub/PulseBridge)
+[![Tests Passing](https://img.shields.io/badge/tests-194%20passed-success?style=flat-square)](https://github.com/vaishnavijha006-hub/PulseBridge)
 [![TypeScript](https://img.shields.io/badge/typescript-strict%20%7C%200%20errors-blue?style=flat-square)](https://github.com/vaishnavijha006-hub/PulseBridge)
-[![Deployment](https://img.shields.io/badge/deployment-Vercel%20Live-black?style=flat-square&logo=vercel)](https://vercel.com/vaishnavijha006-3492s-projects/pulse-bridge)
+[![Deployment](https://img.shields.io/badge/deployment-Not%20yet%20verified-lightgrey?style=flat-square&logo=vercel)](https://vercel.com/vaishnavijha006-3492s-projects/pulse-bridge)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
 
 > **PulseBridge AI** is an enterprise-grade clinical intelligence and care-coordination platform designed to bridge communication gaps among doctors, patients, and family caregivers during post-consultation recovery. It transforms static prescription papers and laboratory pathology reports into active, closed-loop recovery workflows with bilingual voice guidance, smart triage prioritization, and patient-controlled family circles.
@@ -14,10 +14,10 @@
 
 | Environment | URL / Destination | Description |
 | :--- | :--- | :--- |
-| 🚀 **Live Production App (Vercel)** | [https://pulse-bridge-three.vercel.app](https://pulse-bridge-three.vercel.app) *(or your assigned Vercel domain)* | Live web deployment on Vercel Edge Network |
+| 🚀 **Production Deployment** | *Not yet verified* | Deployment domain pending verification on production host |
 | ⚡ **Vercel Project Dashboard** | [vercel.com/vaishnavijha006-3492s-projects/pulse-bridge](https://vercel.com/vaishnavijha006-3492s-projects/pulse-bridge) | Deployment management, logs & environment variables |
 | 💻 **GitHub Repository** | [github.com/vaishnavijha006-hub/PulseBridge](https://github.com/vaishnavijha006-hub/PulseBridge) | Complete source code, branch history & CI workflows |
-| 🛠️ **Local Development** | `http://localhost:5173` | Run `npm run dev` locally |
+| 🛠️ **Local Development** | `http://localhost:5173` *(Local development only)* | Run `npm run dev` locally |
 
 ---
 
@@ -180,9 +180,9 @@ All 6 primary feature branches are unified into `main` with zero merge conflicts
 ```bash
 npm test -- --run
 ```
-- **Test Files**: **13 passed (13 of 13 suites)**
-- **Total Tests**: **188 passed | 10 skipped | 0 failed (198 tests)**
-- **Execution Time**: ~13.32s
+- **Test Files**: **14 passed (14 of 14 suites)**
+- **Total Tests**: **194 passed | 10 skipped | 0 failed (204 tests)**
+- **Execution Time**: ~12.58s
 
 | Test Suite File | Tests Passed | Status | Coverage Scope |
 | :--- | :---: | :---: | :--- |
@@ -193,13 +193,14 @@ npm test -- --run
 | `src/pages/DoctorToPatientWorkflow.test.tsx` | **6** | ✅ Passed | End-to-end doctor review, care-plan update, patient sync |
 | `src/pages/AbhaIntegration.test.tsx` | **12** | ✅ Passed | ABHA format validation, unverified tagging, intake flow |
 | `src/pages/PhoneValidation.test.tsx` | **7** | ✅ Passed | Strict 10-digit phone intake validation, bilingual error states |
-| `src/utils/phone.test.ts` | **16** | ✅ Passed | Phone normalization (+91, trunk 0), 10-digit rule |
+| `src/utils/phone.test.ts` | **20** | ✅ Passed | Phone normalization (+91, trunk 0), formatting, 10-digit rule |
+| `src/utils/environmentIsolation.test.ts` | **2** | ✅ Passed | Hermetic demo environment test isolation |
 | `src/components/ClosedLoopCareView.test.tsx` | **5** | ✅ Passed | Closed-loop UI components, filter tabs, outcome modals |
 | `src/components/VoiceGuidanceControl.test.tsx` | **7** | ✅ Passed | Bilingual speech playback, accessibility attributes |
 | `src/pages/PatientContextContinuity.test.tsx` | **5** | ✅ Passed | Intake-to-dashboard identity continuity, demo fallback |
 | `src/pages/FamilyRecoveryCircle.test.tsx` | **12** | ✅ Passed | Family portal, timeline updates, notes, consent UI |
 | `src/pages/Dashboards.test.tsx` | **7** | ✅ Passed | Admin System Ops, Doctor Command Center, patient triage |
-| **Total** | **188 passed** | ✅ **All Pass** | *(10 database-level RLS skipped for live Supabase testing)* |
+| **Total** | **194 passed** | ✅ **All Pass** | *(10 database-level RLS skipped for live Supabase testing)* |
 
 ### TypeScript Strict Compilation
 ```bash
@@ -264,6 +265,16 @@ npm run build
 
 Copy `.env.example` to `.env` if connecting to live cloud services:
 
+```env
+# Supabase Project URL (e.g., https://your-project-id.supabase.co)
+VITE_SUPABASE_URL=
+
+# Supabase Anonymous / Publishable Key (safe for frontend distribution)
+VITE_SUPABASE_ANON_KEY=
+
+# Optional: ElevenLabs Voice API Key (for real-time speech generation)
+VITE_ELEVENLABS_API_KEY=
+```
 
 *Note: If environment variables are omitted, PulseBridge AI automatically operates in fully functional, interactive Demo Mode.*
 
