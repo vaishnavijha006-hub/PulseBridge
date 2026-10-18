@@ -38,6 +38,50 @@ PulseBridge creates a **closed-loop feedback circle**:
 
 ---
 
+## The Core Innovation Trinity
+
+PulseBridge is built upon three foundational clinical innovations that resolve the structural failures of modern outpatient recovery:
+
+```mermaid
+flowchart TD
+    subgraph Trinity["The PulseBridge Core Innovation Trinity"]
+        Pillar1["Pillar 1: National Health Identity (ABHA ID)<br/>14-Digit Format Normalization & EHR Linkage<br/>Honest Clinical Labeling without False Government Claims"]
+        Pillar2["Pillar 2: Proper Closed-Loop Care Feedback<br/>State Machine: open to in_progress to resolved / documented<br/>Mandatory Outcome Note & Doctor Lock Boundary"]
+        Pillar3["Pillar 3: Continuous CareGap Surveillance Engine<br/>Automated Detection of 5+ Recovery Gap Types<br/>One-Click Interventions & Radar Triage Escalation"]
+    end
+    Pillar1 --> Pillar2
+    Pillar2 --> Pillar3
+    Pillar3 --> Pillar2
+```
+
+### Pillar 1: Ayushman Bharat Health Account (ABHA ID) National Health Integration
+- **National Health ID Standard**: Standardizes and binds the patient's official 14-digit Ayushman Bharat Health Account number formatted as `XX-XXXX-XXXX-XXXX` ([src/utils/abha.ts](src/utils/abha.ts)).
+- **Patient Intake Onboarding**: Integrated directly into the patient intake wizard with live format validation, error correction, and helpful bilingual guidance in Hindi and English ([src/pages/PatientIntakeWizard.tsx](src/pages/PatientIntakeWizard.tsx)).
+- **EHR & Doctor Chart Visibility**: Prominently presented across doctor dashboards, clinical summary cards, and patient profiles alongside contact details and allergy warnings ([src/components/PatientStatusCard.tsx](src/components/PatientStatusCard.tsx) and [src/pages/DoctorDashboard.tsx](src/pages/DoctorDashboard.tsx)).
+- **Clinical Truthfulness & Integrity**: Because live ABDM Sandbox OTP integration requires institutional government credentials, PulseBridge transparently labels numbers as **"ABHA Unverified"** (`resolveAbhaVerificationStatus`), completely rejecting deceptive fake verification checkmarks common in demo applications.
+- **Automated Verification**: Backed by 12 end-to-end integration tests in [src/pages/AbhaIntegration.test.tsx](src/pages/AbhaIntegration.test.tsx).
+
+### Pillar 2: Proper Closed-Loop Care Feedback Loop
+- **Deterministic State Machine**: Every clinical intervention progresses strictly through `open` ➔ `in_progress` ➔ `resolved` or `documented` ([src/services/careActionService.ts](src/services/careActionService.ts)).
+- **Doctor Lock Boundary**: AI vision extractions produce only editable drafts. Medication schedules cannot activate on the patient's companion until a verified physician explicitly certifies dosages and allergy screens ([src/components/PrescriptionReview.tsx](src/components/PrescriptionReview.tsx)).
+- **Mandatory Outcome Accountability**: An open care action **cannot be closed or marked resolved** without submitting a structured, non-empty clinical outcome note (`outcomeNote`). Passive dismissal or ignored alerts are architecturally prohibited.
+- **Clinical Reopen Justification**: Any attempt to reopen a resolved care action requires explicit clinical justification (`reopenJustification`), preserving an immutable audit trail.
+- **Automated Verification**: Backed by 44 comprehensive unit and lifecycle tests in [src/services/careActionService.test.ts](src/services/careActionService.test.ts).
+
+### Pillar 3: Continuous CareGap Surveillance Engine
+- **Automated Clinical Gap Radar**: Continuously scans patient recovery streams in real time ([src/services/careGapRules.ts](src/services/careGapRules.ts)), instantly detecting 7 clinical gap types:
+  1. `missed_dose` / `repeated_missed_dose`: 2 or more missed doses within a 24–48 hour window.
+  2. `new_symptom`: Patient reports new or deteriorating physical symptoms during daily check-ins.
+  3. `missing_severity`: Symptoms submitted without a 1–10 clinical pain/severity scale.
+  4. `unanswered_followup`: Pending doctor inquiries left unanswered for >24 hours.
+  5. `overdue_update`: Inactive patients without a recovery check-in for >24 hours.
+  6. `allergy_conflict`: Active medications conflicting with patient-recorded drug allergies (including penicillin, sulfa, and NSAID classes).
+  7. `duplicate_medicine`: Duplicate active schedules detected for the same normalized medication.
+- **One-Click Closed-Loop Escalation**: Physicians convert any detected CareGap into a tracked closed-loop care action in a single click ([src/components/CareGapCard.tsx](src/components/CareGapCard.tsx) ➔ [src/components/ClosedLoopCareView.tsx](src/components/ClosedLoopCareView.tsx)).
+- **Live Clinical Triage Escalation**: Care gaps automatically feed into patient triage priority scoring, escalating urgent cases to the top of the physician's queue.
+
+---
+
 ## Unique Selling Propositions (USPs) & Core Innovations
 
 What sets PulseBridge distinctly apart from generic pill-reminder utilities and unvetted telehealth bots:
@@ -73,6 +117,74 @@ What sets PulseBridge distinctly apart from generic pill-reminder utilities and 
 | **Voice & Accessibility** | Text only | English only | 🗣️ **Bilingual Voice (ElevenLabs + WebSpeech)** |
 | **Offline Resilience** | Crashes without DB | Requires Live Server | ⚡ **Dual-Mode (Cloud + Local Demo Store)** |
 | **National Health ID (ABHA)** | None / Ignored | Faked verification checkmarks | ⚖️ **Format Checked + Honest Verification Status** |
+
+---
+
+## Medication Adherence Formulation & Clinical Triage Mathematics
+
+PulseBridge replaces subjective guesswork with transparent, deterministic mathematical models for patient adherence scoring and clinical queue triage.
+
+### 1. Daily Patient Adherence Formulation
+The patient's daily adherence percentage measures the exact fraction of scheduled doses taken within the current calendar day:
+
+$$
+\text{Daily Adherence (\%)} = \begin{cases} \operatorname{round}\left( \frac{\text{Doses Taken Today}}{\text{Total Scheduled Doses Today}} \times 100 \right) & \text{if } \text{Total Scheduled} > 0 \\ 100\% & \text{if } \text{Total Scheduled} = 0 \end{cases}
+$$
+
+- **Implementation**: [`PatientDashboard.tsx`](src/pages/PatientDashboard.tsx#L139-L141):
+  ```typescript
+  const adherence = totalCount > 0 ? Math.round((takenCount / totalCount) * 100) : 100;
+  ```
+- **Clinical Display**: Visualized as an interactive progress ring and headline recovery metric on the patient's daily companion screen.
+
+### 2. 7-Day Rolling Longitudinal Adherence
+For longitudinal physician review and trend monitoring, PulseBridge calculates the 7-day adherence rate across all active prescription schedules:
+
+$$
+\text{7-Day Longitudinal Adherence (\%)} = \begin{cases} \operatorname{round}\left( \frac{\sum_{i=1}^{N} \mathbb{I}(\text{status}_i = \text{"taken"})}{N} \times 100 \right) & \text{if } N > 0 \\ 100\% & \text{if } N = 0 \end{cases}
+$$
+
+where $N$ is the total count of active dose instances and $\mathbb{I}$ is the indicator function.
+- **Implementation**: [`dataService.ts`](src/services/dataService.ts#L483):
+  ```typescript
+  const adherence = schedules.length > 0 ? Math.round((taken / schedules.length) * 100) : 100;
+  ```
+
+### 3. Clinical Triage Score & Non-Adherence Penalties
+The Doctor Command Center orders patients using an objective, multi-factor triage priority score ($0 \le \text{Score} \le 100$):
+
+$$
+\text{Triage Score} = \min\left(100, \, \sum w_i \cdot x_i\right)
+$$
+
+#### Heuristic Scoring Weights (`DEFAULT_SCORING_WEIGHTS` in [`careGapRules.ts`](src/services/careGapRules.ts)):
+| Scoring Factor | Weight ($w_i$) | Clinical Trigger Condition |
+| :--- | :---: | :--- |
+| **New or Worsening Symptom** | **+40** | Patient reports new symptoms during daily check-in |
+| **Safety Flag / Allergy Conflict** | **+40** | Drug allergy conflict or duplicate medicine detected |
+| **Repeated Missed Doses** | **+30** | $\ge 2$ missed medication doses in 24–48h window |
+| **Overdue Care Task** | **+20** | Open closed-loop action passed due date |
+| **Missing Symptom Severity** | **+20** | Symptom reported without 1–10 pain/severity rating |
+| **Unanswered Follow-up** | **+15** | Doctor query pending without response for >24 hours |
+| **Unresolved Care Gap** | **+15** | Any open clinical CareGap requiring resolution |
+| **Overdue Health Update** | **+10** | No health check-in logged for >24 hours |
+
+#### The Repeated Missed Dose Impact:
+$$
+\text{If } \text{Missed Doses} \ge 2 \implies \text{Triage Penalty} = +30 \text{ points} \quad \text{and} \quad \text{Trigger } \mathtt{repeated\_missed\_dose}
+$$
+
+When a patient misses 2 or more doses:
+1. The scoring engine injects a **+30 point penalty**, immediately pushing the patient into elevated triage tiers (`MEDIUM` or `HIGH`).
+2. A high-severity `repeated_missed_dose` CareGap is generated with medication details and captured non-adherence reasons.
+3. The physician is alerted to review drug tolerance, side effects, or schedule conflicts before the patient drops off treatment.
+
+#### Deterministic Emergency Safety Override:
+$$
+\text{Emergency Red-Flag Symptoms (Chest pain, acute dyspnea, anaphylaxis, syncope)} \implies \text{Score} \equiv 100 \text{ (URGENT)}
+$$
+
+If any affirmative emergency symptom is detected, all mathematical scoring is bypassed: the patient is instantly locked to **100/100 URGENT** priority with an un-dismissible clinical emergency banner.
 
 ---
 
