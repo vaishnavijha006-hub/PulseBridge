@@ -38,6 +38,44 @@ PulseBridge creates a **closed-loop feedback circle**:
 
 ---
 
+## Unique Selling Propositions (USPs) & Core Innovations
+
+What sets PulseBridge distinctly apart from generic pill-reminder utilities and unvetted telehealth bots:
+
+1. 🔒 **The "Doctor Lock" Boundary (Zero Autonomous Hallucinations)**:
+- While AI vision extracts prescription parameters, it produces only an editable *draft*.
+- Medication schedules **cannot activate** on the patient's companion until a verified physician explicitly confirms dosages, screens drug allergies, and certifies the care plan.
+2. 🔄 **True Closed-Loop Care Accountability**:
+- Care interventions follow a deterministic state machine (`open` ➔ `in_progress` ➔ `resolved` / `documented`).
+- A clinical gap cannot be closed without entering a mandatory, structured clinical outcome note (`outcomeNote`), eliminating passive ignored notifications.
+3. 🛡️ **Patient-Controlled Cryptographic Family Privacy**:
+- Family members are invited via **one-way SHA-256 hashed cryptographic tokens** with 7-day expiration.
+- Patients control **7 independent category permission toggles** (e.g., share adherence progress, but hide pathology reports or disable direct phone calling).
+- Instant one-click fail-closed revocation immediately terminates access.
+4. 🚨 **Deterministic Emergency Safety Overrides**:
+- When patients report critical red-flag symptoms (e.g., chest heaviness, acute dyspnea) or severe drug-allergy interactions, the system bypasses all stochastic scoring and immediately locks priority to **100/100 URGENT** with an un-dismissible clinical banner.
+5. 🗣️ **Bilingual Accessibility with Resilient Dual-Engine Voice**:
+- High-clarity **ElevenLabs Multilingual v2** speech synthesis in both Hindi and English.
+- Seamless, zero-lag fallback to client-side **Web Speech API** ensures elderly or low-literacy patients never lose voice assistance during network drops.
+6. ⚡ **Dual-Mode Zero-Dependency Architecture**:
+- Operates in **Full Cloud Production Mode** (Supabase PostgreSQL with 9 RLS tables) or an **Interactive In-Memory Demo Store** (`localStorage` backup) with zero external setup required.
+7. ⚖️ **Clinical Truthfulness (ABHA Integrity)**:
+- Normalizes 14-digit Ayushman Bharat Health Account (ABHA) numbers (`XX-XXXX-XXXX-XXXX`), but explicitly labels them **"ABHA Unverified"** to maintain clinical transparency without faking live ABDM gateway verification.
+
+### Industry Comparison Matrix
+
+| Clinical & Architectural Capability | Generic Pill Reminders | Typical Telehealth Apps | **PulseBridge AI** |
+| :--- | :---: | :---: | :---: |
+| **Care Plan Activation** | Self-entered (unverified) | Direct AI output (risky) | 🔒 **Doctor Lock Mandatory** |
+| **Intervention Accountability** | Passive alerts only | Loose chat threads | 🔄 **Closed-Loop State Machine** |
+| **Family Data Sharing** | All-or-nothing access | Read-only static dashboard | 🛡️ **7-Category Granular Toggles** |
+| **Emergency Detection** | None | Generic Chatbot Advice | 🚨 **Instant 100/100 Override Banner** |
+| **Voice & Accessibility** | Text only | English only | 🗣️ **Bilingual Voice (ElevenLabs + WebSpeech)** |
+| **Offline Resilience** | Crashes without DB | Requires Live Server | ⚡ **Dual-Mode (Cloud + Local Demo Store)** |
+| **National Health ID (ABHA)** | None / Ignored | Faked verification checkmarks | ⚖️ **Format Checked + Honest Verification Status** |
+
+---
+
 ## System Architecture
 
 ```mermaid
@@ -221,15 +259,38 @@ npm run build
 
 ---
 
-## Tech Stack & Dependencies
+## Granular Tech Stack & Minute AI Model Architecture
 
-- **Frontend Framework**: React 18.3 with TypeScript (Vite 5 bundler)
-- **Styling & Tokens**: Tailwind CSS 3.4 with custom clinical navy/teal/cyan palette
-- **Icons**: Lucide React
-- **Voice Synthesis**: ElevenLabs Text-to-Speech API integration with localized phonetic support
-- **AI Processing**: Groq LLaMA 3.3 70B Versatile for safe clinical report summarization
-- **Database & Auth (Dual Mode)**: Supabase PostgreSQL Cloud with Row Level Security (RLS) & local reactive demo store
-- **Testing**: Vitest 2.1, React Testing Library, jsdom
+PulseBridge combines cutting-edge multimodal and foundational AI models with deterministic clinical heuristics, ensuring that probabilistic models never make autonomous clinical decisions without doctor verification.
+
+### 1. Minute AI Models & Subsystem Matrix
+
+| Subsystem | Primary Cloud Model | Model ID / Provider | Configuration & Temperature | Fallback Engine |
+| :--- | :--- | :--- | :--- | :--- |
+| **Prescription OCR & Vision** | Google Gemini Multimodal Vision | `gemini-flash-lite-latest` / `gemini-1.5-flash` | `temperature: 0.1`<br>Base64 image payload (max 10MB)<br>Structured JSON output schema | `prescriptionExtractor.ts`<br>Deterministic regex tokenizer (Latin/Hinglish frequencies, dosage patterns, 6-class drug-allergy matrix) |
+| **Diagnostic Report Summarization** | Groq LLaMA 3.3 70B Versatile / Gemini 1.5 Flash | `llama-3.3-70b-versatile`<br>`gemini-1.5-flash` | `temperature: 0.1`<br>`max_tokens: 800`<br>60 KB payload guard<br>`response_format: json_object` | `reportSummarizer.ts`<br>Rule-based interval comparator (`< X`, `> X`, `Min - Max` evaluation against reference ranges) |
+| **Bilingual Voice Guidance (TTS)** | ElevenLabs Multilingual v2 | `eleven_multilingual_v2` | - English: `EXAVITQu4vr4xnSDxMaL` (*Sarah*)<br>- Hindi: `JBFqnCBsd6RMkjVDRZzb` (*George*)<br>Max 600 chars, In-memory audio caching | `voiceGuidanceService.ts`<br>Client Web Speech API (`SpeechSynthesisUtterance`) with native `hi-IN` and `en-US`/`en-GB` voice resolution |
+| **Clinical Triage Radar** | Deterministic Mathematical Heuristic Engine | Core Algorithms in `careGapRules.ts` | 0–100 numerical score across 5 clinical dimensions + Emergency Safety Override (100 lock) | Runs 100% locally in browser and edge runtime |
+| **Care Coordination Tracker** | Deterministic State Machine Engine | Core Engine in `careActionService.ts` | States: `open` ➔ `in_progress` ➔ `resolved` / `documented`<br>Mandatory `outcomeNote` verification | Client & server state machine |
+| **Security & Cryptography** | Web Cryptography API | Native `crypto.subtle` | SHA-256 one-way hashing for family invite tokens; 7-bit fail-closed granular permission bitmask | Standard Web Crypto / deterministic fallback |
+| **Telephony & Identity** | ITU-T E.164 & NHA ABHA Engine | Core Regex in `src/utils/` | E.164 sanitization (strips `+91`/`0`, validates 10 digits); 14-digit ABHA pattern normalization (`XX-XXXX-XXXX-XXXX`) | Pure TypeScript regex sanitizers |
+
+### 2. Architectural Reality: Real vs Dual-Mode vs Mocked
+
+- **100% Real Production Code**:
+  - Entire React 18.3 frontend, state machines, and responsive dashboards.
+  - Mathematical Triage Radar scoring algorithm (0–100) and Emergency Override logic.
+  - Closed-Loop Action tracker with mandatory clinical outcome notes.
+  - SHA-256 cryptographic invite token generation and granular permission bitmasks.
+  - Strict 10-digit phone normalization and formatting.
+  - Bilingual translation dictionaries (English & Hindi).
+- **Dual-Mode (Real Cloud when Keys Configured, Intelligent Fallback Otherwise)**:
+  - **Database & Auth**: Connects to Supabase PostgreSQL (9 RLS tables) when `.env` is configured; automatically runs interactive in-memory Demo Store with `localStorage` persistence when keys are omitted.
+  - **AI Voice Guidance**: Proxies through ElevenLabs Multilingual v2 Edge Function; falls back to browser native Web Speech API seamlessly.
+  - **Prescription OCR**: Calls Gemini 1.5 Flash Vision when key is configured; uses client-side regex NLP parsing in demo mode.
+  - **Report Summarization**: Calls Groq LLaMA 3.3 70B or Gemini Flash; uses deterministic interval comparison in demo mode.
+- **Truthful Labeling (Not Faked)**:
+  - **ABHA Government Verification**: Format checking is real, but because the live government ABDM Sandbox OTP gateway is not configured, the interface explicitly labels records **"ABHA Unverified"** to maintain clinical honesty.
 
 ---
 
