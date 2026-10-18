@@ -20,12 +20,14 @@ import {
   Users,
   CreditCard,
   Phone,
+  Play,
 } from 'lucide-react';
 import { PulseBridgeLogo } from '@/components/PulseBridgeLogo';
 import { LanguageToggle } from '@/components/LanguageToggle';
 import { DemoBadge } from '@/components/DemoBanner';
 import { StatusBadge } from '@/components/StatusBadge';
 import { FamilyConsentManager } from '@/components/FamilyConsentManager';
+import { PatientWorkflowDemoModal } from '@/components/PatientWorkflowDemoModal';
 import { useLanguage } from '@/i18n/LanguageContext';
 import { cn } from '@/utils/cn';
 import { formatPhoneNumber } from '@/utils/phone';
@@ -95,6 +97,7 @@ export function PatientDashboard({
   const [confirmation, setConfirmation] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<PatientTab>('meds');
+  const [isWorkflowModalOpen, setIsWorkflowModalOpen] = useState(false);
 
   // Sync internal schedules with prop and apply 20-minute grace window overdue calculations
   useEffect(() => {
@@ -208,6 +211,16 @@ export function PatientDashboard({
                 </div>
               </div>
             )}
+
+            {/* Quick Patient Workflow Guide Button */}
+            <button
+              onClick={() => setIsWorkflowModalOpen(true)}
+              className="px-2.5 py-1 text-xs rounded-lg bg-teal-50 text-teal-700 hover:bg-teal-100 font-semibold border border-teal-200/80 transition-colors flex items-center gap-1.5 shadow-sm"
+              title={lang === 'hi' ? 'मरीज़ वर्कफ़्लो डेमो' : 'Workflow Demo'}
+            >
+              <Play className="w-3 h-3 text-teal-600 fill-teal-600" />
+              <span className="hidden sm:inline">{lang === 'hi' ? 'वर्कफ़्लो डेमो' : 'Workflow Demo'}</span>
+            </button>
 
             <LanguageToggle variant="light" />
           </div>
@@ -625,6 +638,14 @@ export function PatientDashboard({
           <FamilyConsentManager patientId={activePatient.id} />
         )}
       </main>
+
+      {/* Patient Workflow Demo Walkthrough Modal */}
+      <PatientWorkflowDemoModal
+        isOpen={isWorkflowModalOpen}
+        onClose={() => setIsWorkflowModalOpen(false)}
+        onExploreDemoPatient={() => setIsWorkflowModalOpen(false)}
+        onStartIntake={() => onNavigateRole?.('patient_intake')}
+      />
     </div>
   );
 }

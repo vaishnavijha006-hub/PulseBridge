@@ -19,12 +19,17 @@ import {
   Volume2,
   Menu,
   X,
+  Play,
+  Pill,
+  FileText,
+  Phone,
 } from 'lucide-react';
 import { PulseBridgeLogo } from '@/components/PulseBridgeLogo';
 import { RoleCard } from '@/components/RoleCard';
 import { CursorGlow } from '@/components/CursorGlow';
 import { DemoBanner } from '@/components/DemoBanner';
 import { LanguageToggle } from '@/components/LanguageToggle';
+import { PatientWorkflowDemoModal } from '@/components/PatientWorkflowDemoModal';
 import { useLanguage } from '@/i18n/LanguageContext';
 import { cn } from '@/utils/cn';
 
@@ -37,6 +42,7 @@ interface LandingPageProps {
 export function LandingPage({ onRoleSelect }: LandingPageProps) {
   const { t, lang } = useLanguage();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isWorkflowModalOpen, setIsWorkflowModalOpen] = useState(false);
 
   return (
     <div className="relative min-h-screen bg-[#080E1A] text-slate-100 overflow-x-hidden selection:bg-teal-500/30 selection:text-teal-200 font-sans">
@@ -60,6 +66,10 @@ export function LandingPage({ onRoleSelect }: LandingPageProps) {
 
             {/* Desktop Navigation Links */}
             <nav className="hidden lg:flex items-center gap-6 text-xs font-semibold text-slate-300">
+              <a href="#patient-workflow" className="hover:text-teal-300 transition-colors text-teal-300 font-bold flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-teal-400" />
+                <span>{t('nav_patient_workflow')}</span>
+              </a>
               <a href="#architecture" className="hover:text-teal-300 transition-colors">
                 {lang === 'hi' ? 'वास्तुकला' : 'Architecture'}
               </a>
@@ -137,6 +147,16 @@ export function LandingPage({ onRoleSelect }: LandingPageProps) {
             </div>
             <div className="grid grid-cols-2 gap-2 text-xs font-semibold">
               <button
+                onClick={() => { setMobileMenuOpen(false); setIsWorkflowModalOpen(true); }}
+                className="col-span-2 p-2.5 rounded-lg bg-teal-500/15 text-teal-300 border border-teal-500/40 text-left font-bold flex items-center justify-between"
+              >
+                <span className="flex items-center gap-1.5">
+                  <Play className="w-3.5 h-3.5 fill-teal-400" />
+                  <span>{t('landing_cta_workflow_demo')}</span>
+                </span>
+                <span className="text-[10px] bg-teal-400/20 px-1.5 py-0.5 rounded font-mono">6 Steps</span>
+              </button>
+              <button
                 onClick={() => { setMobileMenuOpen(false); onRoleSelect('patient_intake'); }}
                 className="p-2.5 rounded-lg bg-teal-500/20 text-teal-300 border border-teal-500/30 text-left font-bold"
               >
@@ -211,14 +231,27 @@ export function LandingPage({ onRoleSelect }: LandingPageProps) {
             </button>
           </div>
 
-          {/* Quick Demo Jump Link */}
-          <button
-            onClick={() => onRoleSelect('patient')}
-            className="text-xs text-slate-400 hover:text-teal-300 transition-colors inline-flex items-center gap-1 mt-1 underline underline-offset-4"
-          >
-            <span>{t('landing_cta_demo')}</span>
-            <ChevronRight className="w-3.5 h-3.5" />
-          </button>
+          {/* Quick Demo & Workflow Walkthrough Buttons */}
+          <div className="flex flex-col sm:flex-row items-center gap-3 mt-3">
+            <button
+              onClick={() => setIsWorkflowModalOpen(true)}
+              className="inline-flex items-center gap-2 rounded-xl bg-teal-500/15 border border-teal-500/40 hover:bg-teal-500/25 text-teal-300 hover:text-white px-4 py-2 text-xs sm:text-sm font-bold transition-all shadow-md shadow-teal-500/15 group"
+            >
+              <Play className="w-3.5 h-3.5 fill-teal-400 text-teal-400 group-hover:scale-110 transition-transform" />
+              <span>{t('landing_cta_workflow_demo')}</span>
+              <span className="text-[10px] bg-teal-400/20 text-teal-200 px-1.5 py-0.5 rounded font-mono">
+                {lang === 'hi' ? '6 चरण' : '6 Steps'}
+              </span>
+            </button>
+
+            <button
+              onClick={() => onRoleSelect('patient')}
+              className="text-xs text-slate-400 hover:text-teal-300 transition-colors inline-flex items-center gap-1 underline underline-offset-4"
+            >
+              <span>{t('landing_cta_demo')}</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
 
           {/* Verified Engineering Capabilities Strip */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 w-full mt-8 pt-8 border-t border-navy-700/60 text-left">
@@ -261,6 +294,209 @@ export function LandingPage({ onRoleSelect }: LandingPageProps) {
                 14-digit format validation & truthful unverified status
               </span>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 2.5. HOW PULSEBRIDGE WORKS FOR PATIENTS (INTERACTIVE WORKFLOW SHOWCASE) */}
+      <section id="patient-workflow" className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16 border-t border-navy-700/50">
+        <div className="flex flex-col items-center text-center gap-3 mb-12">
+          <div className="inline-flex items-center gap-2 rounded-full border border-teal-500/30 bg-teal-500/10 px-3.5 py-1 text-xs font-bold text-teal-300">
+            <Sparkles className="w-3.5 h-3.5 text-teal-400" />
+            <span>{lang === 'hi' ? 'मरीज़ वर्कफ़्लो एवं रिकवरी चक्र' : 'Patient Recovery Closed Loop'}</span>
+          </div>
+          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white tracking-tight">
+            {lang === 'hi'
+              ? 'मरीज़ के लिए PulseBridge कैसे काम करता है?'
+              : 'How PulseBridge Works for the Patient'}
+          </h2>
+          <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
+            {lang === 'hi'
+              ? 'अस्पताल से डिस्चार्ज होने से लेकर घर पर पूर्ण स्वस्थ होने तक का सरल, सुरक्षित और आवाज़-निर्देशित 6-चरणीय सफर।'
+              : 'From hospital discharge to safe home recovery: a gentle, voice-guided 6-step clinical journey.'}
+          </p>
+        </div>
+
+        {/* 6 Step Cards Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {/* Step 1: Intake & ABHA */}
+          <div className="rounded-2xl border border-navy-600 bg-navy-800/50 p-5 flex flex-col justify-between hover:border-teal-500/40 transition-all group">
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[11px] font-bold text-teal-300 bg-teal-500/15 border border-teal-500/30 px-2 py-0.5 rounded-full">
+                  {lang === 'hi' ? 'चरण 1' : 'Step 1'}
+                </span>
+                <Phone className="w-4 h-4 text-teal-400" />
+              </div>
+              <h3 className="text-base font-bold text-white group-hover:text-teal-300 transition-colors">
+                {lang === 'hi' ? 'आसान पंजीकरण व ABHA' : 'Smart Intake & ABHA'}
+              </h3>
+              <p className="text-xs text-slate-300 mt-2 leading-relaxed">
+                {lang === 'hi'
+                  ? 'मरीज़ 10-अंकीय फोन, ABHA आईडी दर्ज करते हैं और लक्षण बोलकर (Voice-to-Text) दर्ज कर सकते हैं।'
+                  : 'Patients enter basic details, 14-digit ABHA health number, and can speak symptoms in Hindi/English.'}
+              </p>
+            </div>
+            <div className="mt-4 pt-3 border-t border-navy-700/60 flex items-center justify-between text-[11px] text-teal-300">
+              <span>{lang === 'hi' ? 'आवाज़ से लक्षण दर्ज' : 'Voice-to-Text Input'}</span>
+              <span>✓ {lang === 'hi' ? 'सुलभ' : 'Zero Friction'}</span>
+            </div>
+          </div>
+
+          {/* Step 2: Prescription Scan */}
+          <div className="rounded-2xl border border-navy-600 bg-navy-800/50 p-5 flex flex-col justify-between hover:border-teal-500/40 transition-all group">
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[11px] font-bold text-teal-300 bg-teal-500/15 border border-teal-500/30 px-2 py-0.5 rounded-full">
+                  {lang === 'hi' ? 'चरण 2' : 'Step 2'}
+                </span>
+                <FileText className="w-4 h-4 text-teal-400" />
+              </div>
+              <h3 className="text-base font-bold text-white group-hover:text-teal-300 transition-colors">
+                {lang === 'hi' ? 'पर्ची स्कैन व AI ओसीआर' : 'Prescription OCR Scan'}
+              </h3>
+              <p className="text-xs text-slate-300 mt-2 leading-relaxed">
+                {lang === 'hi'
+                  ? 'पर्चे की फोटो खींचते ही PulseBridge AI दवाइयों के नाम, खुराक व समय स्वतः निकालकर ड्राफ्ट बनाता है।'
+                  : 'Snap a photo of the paper prescription; AI extracts medication names, dosage, and schedule drafts.'}
+              </p>
+            </div>
+            <div className="mt-4 pt-3 border-t border-navy-700/60 flex items-center justify-between text-[11px] text-teal-300">
+              <span>{lang === 'hi' ? 'हस्तलिखित पर्ची पहचान' : 'Handwritten OPD OCR'}</span>
+              <span>✓ 96% Match</span>
+            </div>
+          </div>
+
+          {/* Step 3: Doctor Verification */}
+          <div className="rounded-2xl border border-navy-600 bg-navy-800/50 p-5 flex flex-col justify-between hover:border-amber-500/40 transition-all group">
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[11px] font-bold text-amber-300 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded-full">
+                  {lang === 'hi' ? 'चरण 3 (सुरक्षा)' : 'Step 3 (Safety)'}
+                </span>
+                <Stethoscope className="w-4 h-4 text-amber-400" />
+              </div>
+              <h3 className="text-base font-bold text-white group-hover:text-amber-300 transition-colors">
+                {lang === 'hi' ? 'डॉक्टर क्लीनिकल पुष्टि' : 'Physician Verification'}
+              </h3>
+              <p className="text-xs text-slate-300 mt-2 leading-relaxed">
+                {lang === 'hi'
+                  ? 'सख्त क्लीनिकल सुरक्षा: AI की कोई भी दवा तब तक मरीज़ को नहीं दिखती जब तक डॉक्टर उसे कंफर्म न करें।'
+                  : 'Human-in-the-loop guarantee: Regimens remain locked until a verified physician signs off.'}
+              </p>
+            </div>
+            <div className="mt-4 pt-3 border-t border-navy-700/60 flex items-center justify-between text-[11px] text-amber-300">
+              <span>{lang === 'hi' ? '100% डॉक्टर सत्यापित' : 'Doctor Sign-Off'}</span>
+              <span>✓ Guardrail Active</span>
+            </div>
+          </div>
+
+          {/* Step 4: Voice-Guided Reminders */}
+          <div className="rounded-2xl border border-navy-600 bg-navy-800/50 p-5 flex flex-col justify-between hover:border-teal-500/40 transition-all group">
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[11px] font-bold text-teal-300 bg-teal-500/15 border border-teal-500/30 px-2 py-0.5 rounded-full">
+                  {lang === 'hi' ? 'चरण 4' : 'Step 4'}
+                </span>
+                <Pill className="w-4 h-4 text-teal-400" />
+              </div>
+              <h3 className="text-base font-bold text-white group-hover:text-teal-300 transition-colors">
+                {lang === 'hi' ? 'आवाज़ रिमाइंडर व दवा लेना' : 'Voice Alarms & Doses'}
+              </h3>
+              <p className="text-xs text-slate-300 mt-2 leading-relaxed">
+                {lang === 'hi'
+                  ? 'दवा के समय हिंदी/अंग्रेजी में बोलकर याद दिलाना। 1-टैप से "दवा ली", 10-मिनट स्नूज़ और 20-मिनट ग्रेस विंडो।'
+                  : 'Spoken Hindi/English reminders, single-tap adherence marking, 10-minute snooze, and 20-min grace window.'}
+              </p>
+            </div>
+            <div className="mt-4 pt-3 border-t border-navy-700/60 flex items-center justify-between text-[11px] text-teal-300">
+              <span>{lang === 'hi' ? 'स्पष्ट हिंदी ऑडियो' : 'Bilingual Voice'}</span>
+              <span>✓ 20-Min Grace</span>
+            </div>
+          </div>
+
+          {/* Step 5: Daily Check-In & Doctor Alert */}
+          <div className="rounded-2xl border border-navy-600 bg-navy-800/50 p-5 flex flex-col justify-between hover:border-teal-500/40 transition-all group">
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[11px] font-bold text-teal-300 bg-teal-500/15 border border-teal-500/30 px-2 py-0.5 rounded-full">
+                  {lang === 'hi' ? 'चरण 5' : 'Step 5'}
+                </span>
+                <HeartPulse className="w-4 h-4 text-teal-400" />
+              </div>
+              <h3 className="text-base font-bold text-white group-hover:text-teal-300 transition-colors">
+                {lang === 'hi' ? 'स्वास्थ्य जांच व डॉक्टर अलर्ट' : 'Check-In & CareGap Radar'}
+              </h3>
+              <p className="text-xs text-slate-300 mt-2 leading-relaxed">
+                {lang === 'hi'
+                  ? 'रोजाना सेहत बताएं (Good/OK/Bad)। सीने में दर्द जैसे लक्षण होने पर तुरंत डॉक्टर के पास 82/100 अलर्ट जाता है।'
+                  : 'Daily 3-face check-in. Any adverse symptom triggers immediate 82/100 priority triage in doctor radar.'}
+              </p>
+            </div>
+            <div className="mt-4 pt-3 border-t border-navy-700/60 flex items-center justify-between text-[11px] text-teal-300">
+              <span>{lang === 'hi' ? 'क्लोज़्ड-लूप सेफ्टी' : 'Closed-Loop Care'}</span>
+              <span>✓ Zero Drops</span>
+            </div>
+          </div>
+
+          {/* Step 6: Family Recovery Circle */}
+          <div className="rounded-2xl border border-navy-600 bg-navy-800/50 p-5 flex flex-col justify-between hover:border-teal-500/40 transition-all group">
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[11px] font-bold text-teal-300 bg-teal-500/15 border border-teal-500/30 px-2 py-0.5 rounded-full">
+                  {lang === 'hi' ? 'चरण 6' : 'Step 6'}
+                </span>
+                <Users className="w-4 h-4 text-teal-400" />
+              </div>
+              <h3 className="text-base font-bold text-white group-hover:text-teal-300 transition-colors">
+                {lang === 'hi' ? 'परिवार रिकवरी सर्कल' : 'Family Recovery Circle'}
+              </h3>
+              <p className="text-xs text-slate-300 mt-2 leading-relaxed">
+                {lang === 'hi'
+                  ? 'परिजनों को सुकून भरे अपडेट मिलते हैं (उदा. "2 दवाइयां ली गईं") बिना जटिल मेडिकल भाषा के। मरीज़ कभी भी प्राइवेसी रद्द कर सकता है।'
+                  : 'Family members get calming progress updates without jargon. Patient has 100% control to revoke access.'}
+              </p>
+            </div>
+            <div className="mt-4 pt-3 border-t border-navy-700/60 flex items-center justify-between text-[11px] text-teal-300">
+              <span>{lang === 'hi' ? 'परिवार को मानसिक शांति' : 'Peace of Mind'}</span>
+              <span>✓ Privacy Sovereign</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Interactive CTA Banner */}
+        <div className="mt-8 rounded-2xl bg-gradient-to-r from-teal-500/15 via-navy-800/90 to-navy-900 border border-teal-500/40 p-6 flex flex-col sm:flex-row items-center justify-between gap-5 shadow-xl">
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-teal-500/20 border border-teal-500/40 flex items-center justify-center text-teal-300 flex-shrink-0">
+              <Play className="w-5 h-5 fill-teal-400" />
+            </div>
+            <div>
+              <h3 className="text-base sm:text-lg font-bold text-white">
+                {lang === 'hi' ? 'लाइव इंटरेक्टिव वर्कफ़्लो डेमो चलाएं' : 'Experience the Full Interactive Patient Tour'}
+              </h3>
+              <p className="text-xs text-slate-300 mt-0.5">
+                {lang === 'hi'
+                  ? 'देखें कैसे आवाज़ में दवा रिमाइंडर बजते हैं, ओसीआर काम करता है, और डॉक्टर को अलर्ट जाता है।'
+                  : 'Test voice guidance audio, simulated prescription OCR, and closed-loop triage alerts.'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 flex-wrap">
+            <button
+              onClick={() => setIsWorkflowModalOpen(true)}
+              className="inline-flex items-center gap-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-navy-950 font-extrabold text-xs sm:text-sm px-5 py-2.5 shadow-lg shadow-teal-500/25 transition-all"
+            >
+              <Play className="w-4 h-4 fill-current" />
+              <span>{lang === 'hi' ? 'इंटरेक्टिव डेमो खोलें' : 'Launch Interactive Tour'}</span>
+            </button>
+            <button
+              onClick={() => onRoleSelect('patient')}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-teal-500/40 bg-navy-800 hover:bg-navy-700 text-teal-300 hover:text-white font-bold text-xs sm:text-sm px-4 py-2.5 transition-colors"
+            >
+              <span>{t('landing_cta_demo')}</span>
+              <ChevronRight className="w-4 h-4" />
+            </button>
           </div>
         </div>
       </section>
@@ -638,6 +874,14 @@ export function LandingPage({ onRoleSelect }: LandingPageProps) {
           </div>
         </div>
       </footer>
+
+      {/* Interactive Patient Workflow Demo Modal */}
+      <PatientWorkflowDemoModal
+        isOpen={isWorkflowModalOpen}
+        onClose={() => setIsWorkflowModalOpen(false)}
+        onExploreDemoPatient={() => onRoleSelect('patient')}
+        onStartIntake={() => onRoleSelect('patient_intake')}
+      />
     </div>
   );
 }

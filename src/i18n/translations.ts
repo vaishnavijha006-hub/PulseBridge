@@ -120,6 +120,8 @@ export type TranslationKey =
   | 'landing_hero_badge'
   | 'landing_cta_doctor'
   | 'landing_cta_demo'
+  | 'landing_cta_workflow_demo'
+  | 'nav_patient_workflow'
   | 'landing_preview_doctor_title'
   | 'landing_preview_patient_title'
   | 'landing_cap_title'
@@ -482,6 +484,14 @@ const dict: Dictionary = {
   landing_cta_demo: {
     en: 'Explore Demo Patient (Ravi Sharma)',
     hi: 'डेमो मरीज देखें (रवि शर्मा)'
+  },
+  landing_cta_workflow_demo: {
+    en: 'Patient Workflow Demo',
+    hi: 'मरीज़ वर्कफ़्लो डेमो देखें'
+  },
+  nav_patient_workflow: {
+    en: 'Patient Workflow',
+    hi: 'मरीज़ वर्कफ़्लो'
   },
   landing_preview_doctor_title: {
     en: 'Physician Clinical Command',
