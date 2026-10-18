@@ -523,7 +523,7 @@ const dict: Dictionary = {
   upload_select: { en: 'Select Photo', hi: 'फोटो चुनें' },
   upload_capture: { en: 'Take Photo', hi: 'फोटो लें' },
   upload_preview: { en: 'Selected photo preview', hi: 'चुनी गई फोटो प्रीव्यू' },
-  upload_retry_blur: { en: 'Photo saaf nahi aayi. Achhi roshni mein dobara lein.', hi: 'फोटो साफ़ नहीं आई। अच्छी रोशनी में दोबारा लें।' },
+  upload_retry_blur: { en: 'Photo was not clear. Please retake in good lighting.', hi: 'फोटो साफ़ नहीं आई। अच्छी रोशनी में दोबारा लें।' },
   upload_invalid_type: { en: 'Please select an image file (JPG, PNG).', hi: 'कृपया एक छवि फ़ाइल चुनें (JPG, PNG)।' },
   upload_too_large: { en: 'Photo size is too large. Please use a smaller image.', hi: 'फोटो का आकार बहुत बड़ा है। कृपया एक छोटी छवि का उपयोग करें।' },
   processing_title: { en: 'Processing Your Prescription', hi: 'आपकी पर्ची प्रोसेस हो रही है' },

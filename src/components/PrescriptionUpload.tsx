@@ -38,13 +38,17 @@ export function PrescriptionUpload({ onUpload, className }: PrescriptionUploadPr
     onUpload(file, url);
   };
 
-  const handleRetry = () => {
+  const handleRemove = () => {
     setPreview(null);
     setFileName(null);
-    setError(t('upload_retry_blur'));
+    setError(null);
     onUpload(null, null);
     if (fileRef.current) fileRef.current.value = '';
     if (cameraRef.current) cameraRef.current.value = '';
+  };
+
+  const handleRetry = () => {
+    handleRemove();
   };
 
   return (
@@ -90,9 +94,17 @@ export function PrescriptionUpload({ onUpload, className }: PrescriptionUploadPr
       ) : (
         <div className="rounded-2xl border border-surface-border bg-white p-4 flex flex-col gap-3">
           <div className="relative">
-            <img src={preview} alt={t('upload_preview')} className="w-full max-h-64 object-contain rounded-xl bg-surface-muted" />
+            <img
+              src={preview}
+              alt={t('upload_preview')}
+              className="w-full max-h-64 object-contain rounded-xl bg-surface-muted"
+              onError={() => {
+                setError(t('upload_retry_blur'));
+                handleRemove();
+              }}
+            />
             <button
-              onClick={handleRetry}
+              onClick={handleRemove}
               className="absolute top-2 right-2 flex w-8 h-8 items-center justify-center rounded-full bg-white/90 shadow-md hover:bg-white transition-colors"
               aria-label="Remove photo"
             >
@@ -115,9 +127,18 @@ export function PrescriptionUpload({ onUpload, className }: PrescriptionUploadPr
       )}
 
       {error && (
-        <div className="flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 px-4 py-3">
-          <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
-          <p className="text-sm text-amber-700">{error}</p>
+        <div className="flex items-start justify-between gap-2 rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 animate-fadeIn">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-amber-700">{error}</p>
+          </div>
+          <button
+            onClick={() => setError(null)}
+            className="text-amber-500 hover:text-amber-700 p-0.5 rounded transition-colors"
+            aria-label="Dismiss notice"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
     </div>
