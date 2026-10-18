@@ -1109,7 +1109,7 @@ const productionService: DataService = {
       .maybeSingle();
 
     if (consentError) {
-      console.error('Error reading caregiver consent:', consentError);
+      console.warn('[PulseBridge] Caregiver consent query notice:', consentError.message || consentError);
     }
 
     const isAuthorized = Boolean(consent?.authorized);
